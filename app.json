@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "ADHD Calendar",
+    "slug": "adhd-calendar",
+    "scheme": "adhdcalendar",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": ["expo-router", "expo-sqlite"],
+    "android": {
+      "package": "com.adhdcalendar.app"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "name": "adhd-calendar",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "start": "expo start",
+    "android": "expo start --android",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/taskRepository.test.ts",
+    "validate": "npm run format:check && npm run lint && npm run typecheck && npm run test"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.8",
+    "expo": "~57.0.10",
+    "expo-constants": "~57.0.9",
+    "expo-linking": "~57.0.5",
+    "expo-router": "~57.0.10",
+    "expo-sqlite": "~57.0.1",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/node": "~20.19.43",
+    "@types/react": "~19.2.2",
+    "@types/sql.js": "^1.4.9",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.1",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "prettier": "^3.9.6",
+    "sql.js": "^1.14.1",
+    "tsx": "^4.23.5",
+    "typescript": "~6.0.3"
+  }
+}
