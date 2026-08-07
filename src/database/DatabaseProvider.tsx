@@ -9,33 +9,41 @@ import {
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { createTaskRepository } from "./createTaskRepository";
+import { createRepositories } from "./createRepositories";
+import { CalendarEventRepository } from "./repositories/calendarEventRepository";
 import { TaskRepository } from "./repositories/taskRepository";
 
 type DatabaseState =
   | { status: "loading" }
-  | { status: "ready"; taskRepository: TaskRepository }
+  | {
+      status: "ready";
+      taskRepository: TaskRepository;
+      calendarEventRepository: CalendarEventRepository;
+    }
   | { status: "error"; message: string };
 
 const TaskRepositoryContext = createContext<TaskRepository | null>(null);
+const CalendarEventRepositoryContext = createContext<CalendarEventRepository | null>(
+  null
+);
 
 export function DatabaseProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<DatabaseState>({ status: "loading" });
 
   const openDatabase = useCallback(async () => {
-    return createTaskRepository();
+    return createRepositories();
   }, []);
 
   const retryDatabase = useCallback(async () => {
     setState({ status: "loading" });
 
     try {
-      setState({ status: "ready", taskRepository: await openDatabase() });
+      setState({ status: "ready", ...(await openDatabase()) });
     } catch (error) {
       console.error("Database initialization failed", error);
       setState({
         status: "error",
-        message: "Local task storage could not be opened. Please try again."
+        message: "Local calendar storage could not be opened. Please try again."
       });
     }
   }, [openDatabase]);
@@ -45,10 +53,10 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
 
     async function loadInitialDatabase() {
       try {
-        const taskRepository = await openDatabase();
+        const repositories = await openDatabase();
 
         if (isActive) {
-          setState({ status: "ready", taskRepository });
+          setState({ status: "ready", ...repositories });
         }
       } catch (error) {
         console.error("Database initialization failed", error);
@@ -56,7 +64,7 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
         if (isActive) {
           setState({
             status: "error",
-            message: "Local task storage could not be opened. Please try again."
+            message: "Local calendar storage could not be opened. Please try again."
           });
         }
       }
@@ -72,8 +80,8 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   if (state.status === "loading") {
     return (
       <SafeAreaView style={styles.centered}>
-        <ActivityIndicator accessibilityLabel="Opening local task storage" />
-        <Text style={styles.message}>Opening local task storage...</Text>
+        <ActivityIndicator accessibilityLabel="Opening local calendar storage" />
+        <Text style={styles.message}>Opening local calendar storage...</Text>
       </SafeAreaView>
     );
   }
@@ -86,7 +94,7 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
           <Text style={styles.message}>{state.message}</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Retry opening local task storage"
+            accessibilityLabel="Retry opening local calendar storage"
             onPress={retryDatabase}
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
           >
@@ -98,9 +106,11 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   }
 
   return (
-    <TaskRepositoryContext.Provider value={state.taskRepository}>
-      {children}
-    </TaskRepositoryContext.Provider>
+    <CalendarEventRepositoryContext.Provider value={state.calendarEventRepository}>
+      <TaskRepositoryContext.Provider value={state.taskRepository}>
+        {children}
+      </TaskRepositoryContext.Provider>
+    </CalendarEventRepositoryContext.Provider>
   );
 }
 
@@ -109,6 +119,16 @@ export function useTaskRepository(): TaskRepository {
 
   if (!repository) {
     throw new Error("TaskRepository is not available.");
+  }
+
+  return repository;
+}
+
+export function useCalendarEventRepository(): CalendarEventRepository {
+  const repository = useContext(CalendarEventRepositoryContext);
+
+  if (!repository) {
+    throw new Error("CalendarEventRepository is not available.");
   }
 
   return repository;

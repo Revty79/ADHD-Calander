@@ -1,3 +1,5 @@
+import { LocalDateString, LocalTimeString } from "./dateTime";
+
 export const implementedTaskStatuses = ["not_started", "completed"] as const;
 
 export const reservedTaskStatuses = [
@@ -16,16 +18,14 @@ export const taskStatuses = [
 
 export type ImplementedTaskStatus = (typeof implementedTaskStatuses)[number];
 export type TaskStatus = (typeof taskStatuses)[number];
-export type LocalDateString = `${number}-${number}-${number}`;
-export type LocalTimeString = `${number}:${number}`;
-
 export type Task = {
   id: string;
   title: string;
   description: string | null;
   status: TaskStatus;
-  scheduledDate: LocalDateString;
+  scheduledDate: LocalDateString | null;
   scheduledTime: LocalTimeString | null;
+  estimatedDurationMinutes: number | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -35,6 +35,9 @@ export type Task = {
 export type CreateTaskInput = {
   title: string;
   description?: string | null;
-  scheduledDate: string;
+  scheduledDate?: string | null;
   scheduledTime?: string | null;
+  estimatedDurationMinutes?: number | null;
 };
+
+export type { LocalDateString, LocalTimeString } from "./dateTime";

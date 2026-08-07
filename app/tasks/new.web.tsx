@@ -1,9 +1,9 @@
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { Href, Link, useLocalSearchParams, useRouter } from "expo-router";
 import { FormEvent, useMemo, useState } from "react";
 
 import { useTaskRepository } from "../../src/database/DatabaseProvider";
 import { TaskValidationError } from "../../src/database/repositories/errors";
-import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
+import { normalizeLocalDateInput } from "../../src/utils/dates";
 
 type NewTaskParams = {
   scheduledDate?: string;
@@ -17,15 +17,27 @@ export default function WebNewTaskScreen() {
   const params = useLocalSearchParams<NewTaskParams>();
   const taskRepository = useTaskRepository();
   const initialDate = useMemo(
-    () => normalizeLocalDateInput(params.scheduledDate ?? "") ?? getLocalDateString(),
+    () => normalizeLocalDateInput(params.scheduledDate ?? "") ?? "",
     [params.scheduledDate]
   );
-  const returnHref = params.returnTo === "tasks" ? "/tasks" : "/";
+  const returnHref: Href =
+    params.returnTo === "calendar"
+      ? { pathname: "/calendar", params: { date: initialDate } }
+      : params.returnTo === "tasks"
+        ? "/tasks"
+        : "/";
+  const returnLabel =
+    params.returnTo === "calendar"
+      ? "Calendar"
+      : params.returnTo === "tasks"
+        ? "Tasks"
+        : "Today";
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [scheduledDate, setScheduledDate] = useState<string>(initialDate);
   const [scheduledTime, setScheduledTime] = useState("");
+  const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -41,10 +53,20 @@ export default function WebNewTaskScreen() {
         title,
         description,
         scheduledDate,
-        scheduledTime
+        scheduledTime,
+        estimatedDurationMinutes: estimatedDurationMinutes.trim()
+          ? Number(estimatedDurationMinutes)
+          : null
       });
 
-      router.replace(params.returnTo === "tasks" ? "/(tabs)/tasks" : "/(tabs)");
+      if (params.returnTo === "calendar") {
+        router.replace({
+          pathname: "/(tabs)/calendar",
+          params: { date: scheduledDate }
+        });
+      } else {
+        router.replace(params.returnTo === "tasks" ? "/(tabs)/tasks" : "/(tabs)");
+      }
     } catch (error) {
       if (error instanceof TaskValidationError) {
         setFieldErrors({ [error.field]: error.message });
@@ -60,13 +82,13 @@ export default function WebNewTaskScreen() {
     <main className="web-form-shell">
       <div className="web-form-page">
         <Link className="web-back-link" href={returnHref}>
-          ← Back to {params.returnTo === "tasks" ? "Tasks" : "Today"}
+          Back to {returnLabel}
         </Link>
 
         <header className="web-form-header">
           <p className="web-eyebrow">Task details</p>
           <h1>New task</h1>
-          <p>Choose a date now. A time and description are optional.</p>
+          <p>Scheduling is optional. Add a date when it helps you plan.</p>
         </header>
 
         <form className="web-task-form" noValidate onSubmit={saveTask}>
@@ -105,7 +127,9 @@ export default function WebNewTaskScreen() {
 
           <div className="web-form-row">
             <div className="web-form-group">
-              <label htmlFor="task-date">Scheduled date</label>
+              <label htmlFor="task-date">
+                Scheduled date <span>Optional</span>
+              </label>
               <input
                 aria-describedby={
                   fieldErrors.scheduledDate ? "task-date-error" : undefined
@@ -113,7 +137,6 @@ export default function WebNewTaskScreen() {
                 aria-invalid={fieldErrors.scheduledDate ? true : undefined}
                 id="task-date"
                 onChange={(event) => setScheduledDate(event.currentTarget.value)}
-                required
                 type="date"
                 value={scheduledDate}
               />
@@ -144,6 +167,30 @@ export default function WebNewTaskScreen() {
                 </p>
               ) : null}
             </div>
+          </div>
+
+          <div className="web-form-group">
+            <label htmlFor="task-duration">
+              Estimated duration <span>Optional</span>
+            </label>
+            <input
+              aria-describedby={
+                fieldErrors.estimatedDurationMinutes ? "task-duration-error" : undefined
+              }
+              aria-invalid={fieldErrors.estimatedDurationMinutes ? true : undefined}
+              id="task-duration"
+              min="1"
+              onChange={(event) => setEstimatedDurationMinutes(event.currentTarget.value)}
+              placeholder="Minutes, for example 30"
+              step="1"
+              type="number"
+              value={estimatedDurationMinutes}
+            />
+            {fieldErrors.estimatedDurationMinutes ? (
+              <p className="web-validation-message" id="task-duration-error" role="alert">
+                {fieldErrors.estimatedDurationMinutes}
+              </p>
+            ) : null}
           </div>
 
           {errorMessage ? (

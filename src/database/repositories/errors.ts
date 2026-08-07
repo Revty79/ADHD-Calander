@@ -1,4 +1,5 @@
-export type TaskValidationField = "title" | "scheduledDate" | "scheduledTime";
+export type TaskValidationField =
+  "title" | "scheduledDate" | "scheduledTime" | "estimatedDurationMinutes";
 
 export class TaskValidationError extends Error {
   readonly field: TaskValidationField;

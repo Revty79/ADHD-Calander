@@ -12,6 +12,7 @@ import {
 import { TaskRepository } from "../src/database/repositories/taskRepository";
 import { SqlExecutor } from "../src/database/sql";
 import { SqlTaskStorage } from "../src/database/sqlTaskStorage";
+import { createTasksMigration } from "../src/database/migrations/001_create_tasks";
 import { getLocalDateString } from "../src/utils/dates";
 import { createSqlJsDatabase } from "./helpers/sqlJsDatabase";
 
@@ -29,7 +30,7 @@ async function createRepository() {
 }
 
 describe("task database", () => {
-  it("applies the initial migration", async () => {
+  it("applies the calendar foundation migrations", async () => {
     const database = await createSqlJsDatabase();
 
     await initializeDatabase(database);
@@ -37,12 +38,64 @@ describe("task database", () => {
     const taskTable = await database.getFirstAsync<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tasks';"
     );
+    const eventTable = await database.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'calendar_events';"
+    );
     const migrations = await database.getAllAsync<{ version: number; name: string }>(
       "SELECT version, name FROM schema_migrations ORDER BY version;"
     );
 
     assert.equal(taskTable?.name, "tasks");
-    assert.deepEqual(migrations, [{ version: 1, name: "create_tasks" }]);
+    assert.equal(eventTable?.name, "calendar_events");
+    assert.deepEqual(migrations, [
+      { version: 1, name: "create_tasks" },
+      { version: 2, name: "calendar_foundation" }
+    ]);
+  });
+
+  it("preserves existing tasks when upgrading to calendar storage", async () => {
+    const database = await createSqlJsDatabase();
+    await database.execAsync(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+    `);
+    await createTasksMigration.up(database);
+    await database.runAsync(
+      "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?);",
+      1,
+      "create_tasks",
+      "2026-08-04T14:30:00.000Z"
+    );
+    await database.runAsync(
+      `
+        INSERT INTO tasks (
+          id, title, description, status, scheduled_date, scheduled_time,
+          created_at, updated_at, completed_at, deleted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `,
+      "legacy-task",
+      "Existing task",
+      null,
+      "not_started",
+      "2026-08-06",
+      "09:00",
+      "2026-08-04T14:30:00.000Z",
+      "2026-08-04T14:30:00.000Z",
+      null,
+      null
+    );
+
+    await initializeDatabase(database);
+
+    const repository = new TaskRepository(new SqlTaskStorage(database));
+    const tasks = await repository.getAllTasks();
+
+    assert.equal(tasks[0]?.title, "Existing task");
+    assert.equal(tasks[0]?.scheduledDate, "2026-08-06");
+    assert.equal(tasks[0]?.estimatedDurationMinutes, null);
   });
 
   it("creates a task with normalized input", async () => {
@@ -52,7 +105,8 @@ describe("task database", () => {
       title: "  Pay electric bill  ",
       description: "  Use checking account  ",
       scheduledDate: "2026-08-04",
-      scheduledTime: "09:15"
+      scheduledTime: "09:15",
+      estimatedDurationMinutes: 25
     });
 
     assert.equal(task.id, "task-1");
@@ -61,8 +115,37 @@ describe("task database", () => {
     assert.equal(task.status, "not_started");
     assert.equal(task.scheduledDate, "2026-08-04");
     assert.equal(task.scheduledTime, "09:15");
+    assert.equal(task.estimatedDurationMinutes, 25);
     assert.equal(task.completedAt, null);
     assert.equal(task.deletedAt, null);
+  });
+
+  it("creates and persists an unscheduled task", async () => {
+    const { database, repository } = await createRepository();
+    const task = await repository.createTask({ title: "Sort paperwork" });
+
+    assert.equal(task.scheduledDate, null);
+    assert.equal(task.scheduledTime, null);
+
+    const restoredDatabase = await createSqlJsDatabase(database.exportData());
+    await initializeDatabase(restoredDatabase);
+    const restoredRepository = new TaskRepository(new SqlTaskStorage(restoredDatabase));
+
+    assert.equal((await restoredRepository.getAllTasks())[0]?.scheduledDate, null);
+  });
+
+  it("requires a date before a task time", async () => {
+    const { repository } = await createRepository();
+
+    await assert.rejects(
+      () => repository.createTask({ title: "Timed task", scheduledTime: "10:00" }),
+      (error) => {
+        assert.ok(error instanceof TaskValidationError);
+        assert.equal(error.field, "scheduledDate");
+
+        return true;
+      }
+    );
   });
 
   it("retrieves tasks for a date without returning other days", async () => {

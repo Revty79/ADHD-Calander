@@ -39,11 +39,18 @@ export function TaskList({
                 <View style={styles.metaRow}>
                   {showDate ? (
                     <Text style={styles.metaText}>
-                      {formatLocalDateForDisplay(task.scheduledDate)}
+                      {task.scheduledDate
+                        ? formatLocalDateForDisplay(task.scheduledDate)
+                        : "Unscheduled"}
                     </Text>
                   ) : null}
                   {task.scheduledTime ? (
                     <Text style={styles.metaText}>{task.scheduledTime}</Text>
+                  ) : null}
+                  {task.estimatedDurationMinutes ? (
+                    <Text style={styles.metaText}>
+                      {task.estimatedDurationMinutes} min estimate
+                    </Text>
                   ) : null}
                   <Text style={styles.metaText}>
                     {task.status === "completed" ? "Completed" : "Not started"}

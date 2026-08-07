@@ -3,10 +3,8 @@ import { useCallback } from "react";
 
 import { TaskList } from "../../src/features/tasks/components/TaskList";
 import { useAllTasks } from "../../src/features/tasks/hooks/useAllTasks";
-import { getLocalDateString } from "../../src/utils/dates";
 
 export default function WebTasksScreen() {
-  const today = getLocalDateString();
   const { tasks, isLoading, errorMessage, refresh, completeTask, undoCompletion } =
     useAllTasks();
 
@@ -26,14 +24,14 @@ export default function WebTasksScreen() {
           <p className="web-eyebrow">All tasks</p>
           <h1>Tasks</h1>
           <p className="web-page-intro">
-            Review every current task and its scheduled date.
+            Review scheduled and unscheduled work in one calm list.
           </p>
         </div>
         <Link
           className="web-primary-link"
           href={{
             pathname: "/tasks/new",
-            params: { scheduledDate: today, returnTo: "tasks" }
+            params: { returnTo: "tasks" }
           }}
         >
           Add task

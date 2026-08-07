@@ -23,6 +23,13 @@ export default function RootLayout() {
             presentation: "modal"
           }}
         />
+        <Stack.Screen
+          name="events/new"
+          options={{
+            title: "New event",
+            presentation: "modal"
+          }}
+        />
       </Stack>
     </DatabaseProvider>
   );

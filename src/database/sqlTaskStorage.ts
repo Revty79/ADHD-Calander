@@ -7,8 +7,9 @@ type TaskRow = {
   title: string;
   description: string | null;
   status: TaskStatus;
-  scheduledDate: LocalDateString;
+  scheduledDate: LocalDateString | null;
   scheduledTime: LocalTimeString | null;
+  estimatedDurationMinutes: number | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -23,6 +24,7 @@ const taskSelect = `
     status,
     scheduled_date AS scheduledDate,
     scheduled_time AS scheduledTime,
+    estimated_duration_minutes AS estimatedDurationMinutes,
     created_at AS createdAt,
     updated_at AS updatedAt,
     completed_at AS completedAt,
@@ -43,11 +45,12 @@ export class SqlTaskStorage implements TaskStorage {
           status,
           scheduled_date,
           scheduled_time,
+          estimated_duration_minutes,
           created_at,
           updated_at,
           completed_at,
           deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       task.id,
       task.title,
@@ -55,6 +58,7 @@ export class SqlTaskStorage implements TaskStorage {
       task.status,
       task.scheduledDate,
       task.scheduledTime,
+      task.estimatedDurationMinutes,
       task.createdAt,
       task.updatedAt,
       task.completedAt,
@@ -108,6 +112,7 @@ export class SqlTaskStorage implements TaskStorage {
           status = ?,
           scheduled_date = ?,
           scheduled_time = ?,
+          estimated_duration_minutes = ?,
           created_at = ?,
           updated_at = ?,
           completed_at = ?,
@@ -120,6 +125,7 @@ export class SqlTaskStorage implements TaskStorage {
       task.status,
       task.scheduledDate,
       task.scheduledTime,
+      task.estimatedDurationMinutes,
       task.createdAt,
       task.updatedAt,
       task.completedAt,
@@ -139,6 +145,7 @@ function mapTaskRow(row: TaskRow): Task {
     status: row.status,
     scheduledDate: row.scheduledDate,
     scheduledTime: row.scheduledTime,
+    estimatedDurationMinutes: row.estimatedDurationMinutes,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     completedAt: row.completedAt,

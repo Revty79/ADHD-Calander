@@ -163,6 +163,10 @@ textarea:focus-visible {
   max-width: 980px;
 }
 
+.web-calendar-page {
+  max-width: 1440px;
+}
+
 .web-page-header {
   display: flex;
   align-items: flex-start;
@@ -461,6 +465,22 @@ textarea:focus-visible {
   box-shadow: 0 0 0 1px #984a3f;
 }
 
+.web-form-group > div[aria-invalid="true"] input {
+  border-color: #984a3f;
+  box-shadow: 0 0 0 1px #984a3f;
+}
+
+.web-form-group > div > input,
+.web-form-group > div > textarea {
+  width: 100%;
+}
+
+.web-form-hint {
+  margin: -12px 0 0;
+  color: #706b64;
+  font-size: 0.84rem;
+}
+
 .web-form-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -517,7 +537,7 @@ textarea:focus-visible {
 
   .web-mobile-shell-header .web-navigation {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0;
     padding: 5px 8px 8px;
   }

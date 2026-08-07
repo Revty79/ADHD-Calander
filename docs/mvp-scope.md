@@ -24,18 +24,23 @@
 
 ## Current First-Build Scope
 
-- Expo Router navigation for Today, Tasks, Recovery, Recap, and Settings on
+- Expo Router navigation for Today, Calendar, Tasks, Recovery, Recap, and Settings on
   Android, future iOS builds, and responsive web browsers.
-- Functional Today and Tasks screens.
-- Basic local task creation with title, optional description, scheduled date,
-  and optional scheduled time.
-- SQLite-backed persistence through app restarts.
+- Functional Today, Calendar, and Tasks screens.
+- Month, Week, and Day calendar views with selectable dates and factual schedule
+  summaries.
+- Basic fixed-event creation with title, date, start time, optional end time or
+  duration, and optional notes.
+- Local task creation with optional description, scheduled date, scheduled
+  time, and duration estimate. Unscheduled tasks are valid.
+- SQLite-backed task and event persistence through app restarts.
 - Task completion and completion undo.
-- Versioned initial database migration.
-- Repository tests for migration, task creation, date retrieval, completion,
-  undo, persistence, validation, local dates, and database errors.
+- Versioned migrations that preserve existing task data.
+- Repository and aggregation tests for events, scheduled and unscheduled tasks,
+  chronological ordering, persistence, validation, and local dates.
 - Responsive web sidebar and compact-width navigation.
-- IndexedDB-backed browser persistence through refreshes and browser restarts.
+- IndexedDB-backed task and event persistence through refreshes and browser
+  restarts.
 - Browser task creation with semantic date and time inputs.
 - Shared repository behavior across SQLite and IndexedDB storage adapters.
 
@@ -48,7 +53,9 @@
 - Task editing
 - Soft deletion UI
 - Notifications
-- Calendar integration
+- Recurring calendar events
+- External calendar integration
+- Event and task editing or deletion
 - Cloud services
 - AI services
 - Payments

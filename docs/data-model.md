@@ -1,18 +1,31 @@
 # Data Model
 
-## Shared Task Model
+## Domain Boundaries
 
-All platforms use the `Task` type in `src/types/task.ts` and the same
-`TaskRepository` behavior. Task validation, creation, completion, completion
-undo, ordering, and non-deleted filtering are platform-neutral.
+Tasks and calendar events are separate domain entities. A calendar event is a
+fixed commitment and is never treated as movable work. A task remains a work
+item and may be unscheduled, associated with a date, or planned for a local
+start time. This separation is required for future scheduling and Recovery Mode
+logic.
 
-The repository depends on a `TaskStorage` contract. Native builds provide a SQL
-adapter and web builds provide an IndexedDB adapter.
+All platforms use the shared `TaskRepository` and `CalendarEventRepository`.
+Repositories own validation and ordering and depend on the platform-neutral
+`TaskStorage` and `CalendarEventStorage` contracts. Screens never issue SQL or
+IndexedDB requests directly.
+
+## Local Date And Time Strategy
+
+Date-only values use validated `YYYY-MM-DD` strings. Local wall-clock times use
+validated 24-hour `HH:MM` strings. They are not converted through UTC or stored
+as JavaScript timestamps, so an item entered for August 6 remains on August 6
+in the user's local calendar.
+
+Creation and update timestamps are ISO instants. They describe record history,
+not calendar placement.
 
 ## Native Persistence
 
 Android and future iOS builds use Expo SQLite with versioned SQL migrations.
-Native persistence behavior is unchanged by the web prototype.
 
 ### `schema_migrations`
 
@@ -24,107 +37,81 @@ Native persistence behavior is unchanged by the web prototype.
 
 ### `tasks`
 
-| Column           | Type | Notes                                                         |
-| ---------------- | ---- | ------------------------------------------------------------- |
-| `id`             | text | Unique task ID.                                               |
-| `title`          | text | Required trimmed title.                                       |
-| `description`    | text | Optional trimmed description.                                 |
-| `status`         | text | Current implemented values are `not_started` and `completed`. |
-| `scheduled_date` | text | Local date string in `YYYY-MM-DD` format.                     |
-| `scheduled_time` | text | Optional local time string in `HH:MM` format.                 |
-| `created_at`     | text | ISO timestamp.                                                |
-| `updated_at`     | text | ISO timestamp.                                                |
-| `completed_at`   | text | Optional ISO timestamp set on completion.                     |
-| `deleted_at`     | text | Optional ISO timestamp reserved for future soft deletion.     |
+| Column                       | Type    | Notes                                                         |
+| ---------------------------- | ------- | ------------------------------------------------------------- |
+| `id`                         | text    | Unique task ID.                                               |
+| `title`                      | text    | Required trimmed title.                                       |
+| `description`                | text    | Optional trimmed description.                                 |
+| `status`                     | text    | Current implemented values are `not_started` and `completed`. |
+| `scheduled_date`             | text    | Optional local `YYYY-MM-DD` date.                             |
+| `scheduled_time`             | text    | Optional local `HH:MM` time; requires a scheduled date.       |
+| `estimated_duration_minutes` | integer | Optional positive whole-number estimate.                      |
+| `created_at`                 | text    | ISO timestamp.                                                |
+| `updated_at`                 | text    | ISO timestamp.                                                |
+| `completed_at`               | text    | Optional ISO timestamp set on completion.                     |
+| `deleted_at`                 | text    | Optional ISO timestamp reserved for future soft deletion.     |
 
 The status constraint also reserves future values so later migrations do not
-need to rewrite existing rows only to recognize planned states:
+need to rewrite rows only to recognize planned states: `started`,
+`partially_completed`, `intentionally_skipped`, `rescheduled`,
+`recovery_queue`, and `no_longer_necessary`.
 
-- `started`
-- `partially_completed`
-- `intentionally_skipped`
-- `rescheduled`
-- `recovery_queue`
-- `no_longer_necessary`
+### `calendar_events`
 
-## Current Migration
+| Column             | Type    | Notes                                                  |
+| ------------------ | ------- | ------------------------------------------------------ |
+| `id`               | text    | Unique event ID.                                       |
+| `title`            | text    | Required trimmed title.                                |
+| `kind`             | text    | Currently constrained to `fixed`.                      |
+| `date`             | text    | Required local `YYYY-MM-DD` date.                      |
+| `start_time`       | text    | Required local `HH:MM` start.                          |
+| `end_time`         | text    | Optional local end time, not earlier than start.       |
+| `duration_minutes` | integer | Optional positive duration used instead of `end_time`. |
+| `notes`            | text    | Optional trimmed notes.                                |
+| `created_at`       | text    | ISO timestamp.                                         |
+| `updated_at`       | text    | ISO timestamp.                                         |
 
-`src/database/migrations/001_create_tasks.ts` creates the `tasks` table and
-indexes scheduled date and update timestamp access patterns.
+An event may have an end time or a duration, but not both. Both may be omitted
+when the duration is unknown. Calendar workload summaries count only known
+minutes and never infer availability or overload.
+
+## SQL Migrations
+
+### Version 1: `create_tasks`
+
+`src/database/migrations/001_create_tasks.ts` creates the initial required-date
+task table and indexes scheduled-date and update-timestamp access patterns.
+
+### Version 2: `calendar_foundation`
+
+`src/database/migrations/002_calendar_foundation.ts` rebuilds `tasks` with a
+nullable scheduled date, adds `estimated_duration_minutes`, copies every
+existing task unchanged, recreates task indexes, and creates the
+`calendar_events` table and its date/start-time and update-time indexes.
 
 ## Web Persistence
 
-The web build uses the browser's IndexedDB API. Database version 1 creates a
-`tasks` object store keyed by task ID and indexes `scheduledDate` and
-`updatedAt`. Records use the same fields and string/null representations as the
-shared `Task` type.
+The web build uses IndexedDB database version 2. It has:
 
-Stored records are validated when they are read. Invalid or unavailable browser
-storage is reported through the existing repository and provider error states;
-screens do not access IndexedDB directly.
+- `tasks`, keyed by task ID with `scheduledDate` and `updatedAt` indexes.
+- `calendarEvents`, keyed by event ID with `date` and `updatedAt` indexes.
+
+Version 2 preserves the existing version 1 task store and adds the event store.
+Older task records without `estimatedDurationMinutes` deserialize with a `null`
+estimate. Stored records are validated when read.
 
 Browser data is local to the browser profile and application origin. It remains
 after refreshes and ordinary browser restarts, but private browsing, storage
 pressure, policy restrictions, or clearing site data can remove it. Browser and
-native task data are intentionally separate in this phase.
+native data are intentionally separate.
 
-## Migration Limitations
+## Deferred Data Work
 
-SQL migrations apply only to native SQLite. IndexedDB has its own database
-version and upgrade callback, so any future task schema change must update and
-test both migration paths. There is no automatic migration between native and
-web storage and no import/export flow yet.
+Recurring events, event editing/deletion, task editing/deletion, time zones,
+all-day events, external calendar identifiers, notifications, day plans,
+Recovery Mode records, import/export, accounts, and cloud synchronization are
+not part of this foundation.
 
-## Future Cloud Sync Considerations
-
-Cloud synchronization is not approved or implemented. If it is considered in a
-future assignment, the shared task IDs and timestamps can support a sync
-protocol, but conflict resolution, deletion history, privacy, authentication,
-offline reconciliation, and migration from each local store require explicit
-product and technical decisions first.
-
-## Future Entities
-
-### User Preferences
-
-Local settings such as default day start, planning style, notification
-preferences, accessibility preferences, and recovery defaults.
-
-### Tasks
-
-Long-lived work items that may later support steps, estimates, priority, energy
-level, recurrence, and recovery behavior.
-
-### Task Steps
-
-Smaller units within a task. Steps should preserve partial progress and support
-completion history.
-
-### Fixed Calendar Events
-
-Appointments or commitments that must not be moved automatically.
-
-### Day Plans
-
-The planned set of tasks, priorities, fixed events, and flexible work for a
-specific local day.
-
-### Day States
-
-Daily context such as available energy, recovery mode status, and planning
-capacity.
-
-### Completion Events
-
-Append-only records of completed or partially completed work used for factual
-recaps.
-
-### Recovery Queue
-
-Flexible unfinished work moved into a reviewable queue when Recovery Mode is
-activated.
-
-### Notification Records
-
-Local records for reminders, pauses, and notification delivery state. Advanced
-notifications are deferred.
+Cloud synchronization remains unapproved. A future design must explicitly
+address privacy, authentication, conflict resolution, offline reconciliation,
+and migration from both local stores.

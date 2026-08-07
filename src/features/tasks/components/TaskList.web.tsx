@@ -38,12 +38,19 @@ export function TaskList({
                 {task.description ? <p>{task.description}</p> : null}
                 <div className="web-task-meta">
                   {showDate ? (
-                    <time dateTime={task.scheduledDate}>
-                      {formatLocalDateForDisplay(task.scheduledDate)}
-                    </time>
+                    task.scheduledDate ? (
+                      <time dateTime={task.scheduledDate}>
+                        {formatLocalDateForDisplay(task.scheduledDate)}
+                      </time>
+                    ) : (
+                      <span>Unscheduled</span>
+                    )
                   ) : null}
                   {task.scheduledTime ? (
                     <time dateTime={task.scheduledTime}>{task.scheduledTime}</time>
+                  ) : null}
+                  {task.estimatedDurationMinutes ? (
+                    <span>{task.estimatedDurationMinutes} min estimate</span>
                   ) : null}
                   <span>
                     Status: {task.status === "completed" ? "Completed" : "Not started"}

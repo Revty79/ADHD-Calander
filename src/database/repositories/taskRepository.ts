@@ -1,9 +1,5 @@
 import { CreateTaskInput, Task } from "../../types/task";
-import {
-  getLocalDateString,
-  normalizeLocalDateInput,
-  normalizeOptionalTime
-} from "../../utils/dates";
+import { normalizeLocalDateInput, normalizeOptionalTime } from "../../utils/dates";
 import { createTaskId } from "../../utils/ids";
 import { TaskStorage } from "../taskStorage";
 import { TaskNotFoundError, TaskPersistenceError, TaskValidationError } from "./errors";
@@ -28,6 +24,7 @@ export class TaskRepository {
       status: "not_started",
       scheduledDate: normalizedInput.scheduledDate,
       scheduledTime: normalizedInput.scheduledTime,
+      estimatedDurationMinutes: normalizedInput.estimatedDurationMinutes,
       createdAt: timestamp,
       updatedAt: timestamp,
       completedAt: null,
@@ -140,16 +137,22 @@ export class TaskRepository {
 
 function normalizeCreateTaskInput(
   input: CreateTaskInput
-): Pick<Task, "title" | "description" | "scheduledDate" | "scheduledTime"> {
+): Pick<
+  Task,
+  "title" | "description" | "scheduledDate" | "scheduledTime" | "estimatedDurationMinutes"
+> {
   const title = input.title.trim();
 
   if (!title) {
     throw new TaskValidationError("Enter a task title.", "title");
   }
 
-  const scheduledDate = normalizeLocalDateInput(input.scheduledDate);
+  const rawScheduledDate = input.scheduledDate?.trim() ?? "";
+  const scheduledDate = rawScheduledDate
+    ? normalizeLocalDateInput(rawScheduledDate)
+    : null;
 
-  if (!scheduledDate) {
+  if (rawScheduledDate && !scheduledDate) {
     throw new TaskValidationError(
       "Use a scheduled date in YYYY-MM-DD format.",
       "scheduledDate"
@@ -166,13 +169,33 @@ function normalizeCreateTaskInput(
     );
   }
 
+  if (scheduledTime && !scheduledDate) {
+    throw new TaskValidationError(
+      "Choose a scheduled date before adding a time.",
+      "scheduledDate"
+    );
+  }
+
+  const estimatedDurationMinutes = input.estimatedDurationMinutes ?? null;
+
+  if (
+    estimatedDurationMinutes !== null &&
+    (!Number.isInteger(estimatedDurationMinutes) || estimatedDurationMinutes <= 0)
+  ) {
+    throw new TaskValidationError(
+      "Estimate must be a whole number of minutes greater than zero.",
+      "estimatedDurationMinutes"
+    );
+  }
+
   const description = input.description?.trim() || null;
 
   return {
     title,
     description,
-    scheduledDate: scheduledDate ?? getLocalDateString(),
-    scheduledTime
+    scheduledDate,
+    scheduledTime,
+    estimatedDurationMinutes
   };
 }
 
@@ -181,7 +204,15 @@ function isVisibleTask(task: Task): boolean {
 }
 
 function compareTasks(first: Task, second: Task): number {
-  const dateOrder = first.scheduledDate.localeCompare(second.scheduledDate);
+  if (first.scheduledDate === null && second.scheduledDate !== null) {
+    return 1;
+  }
+
+  if (first.scheduledDate !== null && second.scheduledDate === null) {
+    return -1;
+  }
+
+  const dateOrder = (first.scheduledDate ?? "").localeCompare(second.scheduledDate ?? "");
 
   if (dateOrder !== 0) {
     return dateOrder;

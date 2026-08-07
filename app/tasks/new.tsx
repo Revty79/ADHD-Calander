@@ -15,7 +15,7 @@ import {
 import { ErrorNotice } from "../../src/components/ErrorNotice";
 import { useTaskRepository } from "../../src/database/DatabaseProvider";
 import { TaskValidationError } from "../../src/database/repositories/errors";
-import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
+import { normalizeLocalDateInput } from "../../src/utils/dates";
 
 type NewTaskParams = {
   scheduledDate?: string;
@@ -29,7 +29,7 @@ export default function NewTaskScreen() {
   const params = useLocalSearchParams<NewTaskParams>();
   const taskRepository = useTaskRepository();
   const initialDate = useMemo(
-    () => normalizeLocalDateInput(params.scheduledDate ?? "") ?? getLocalDateString(),
+    () => normalizeLocalDateInput(params.scheduledDate ?? "") ?? "",
     [params.scheduledDate]
   );
 
@@ -37,6 +37,7 @@ export default function NewTaskScreen() {
   const [description, setDescription] = useState("");
   const [scheduledDate, setScheduledDate] = useState<string>(initialDate);
   const [scheduledTime, setScheduledTime] = useState("");
+  const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -51,8 +52,19 @@ export default function NewTaskScreen() {
         title,
         description,
         scheduledDate,
-        scheduledTime
+        scheduledTime,
+        estimatedDurationMinutes: estimatedDurationMinutes.trim()
+          ? Number(estimatedDurationMinutes)
+          : null
       });
+
+      if (params.returnTo === "calendar") {
+        router.replace({
+          pathname: "/(tabs)/calendar",
+          params: { date: scheduledDate }
+        });
+        return;
+      }
 
       if (params.returnTo === "tasks") {
         router.replace("/(tabs)/tasks");
@@ -113,7 +125,7 @@ export default function NewTaskScreen() {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Scheduled date</Text>
+          <Text style={styles.label}>Scheduled date (optional)</Text>
           <TextInput
             accessibilityLabel="Scheduled date in year month day format"
             autoCapitalize="none"
@@ -126,6 +138,26 @@ export default function NewTaskScreen() {
           {fieldErrors.scheduledDate ? (
             <Text accessibilityRole="alert" style={styles.validationText}>
               {fieldErrors.scheduledDate}
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Estimated duration (optional)</Text>
+          <TextInput
+            accessibilityLabel="Optional estimated task duration in minutes"
+            keyboardType="number-pad"
+            onChangeText={setEstimatedDurationMinutes}
+            placeholder="Minutes, for example 30"
+            style={[
+              styles.input,
+              fieldErrors.estimatedDurationMinutes ? styles.inputError : null
+            ]}
+            value={estimatedDurationMinutes}
+          />
+          {fieldErrors.estimatedDurationMinutes ? (
+            <Text accessibilityRole="alert" style={styles.validationText}>
+              {fieldErrors.estimatedDurationMinutes}
             </Text>
           ) : null}
         </View>

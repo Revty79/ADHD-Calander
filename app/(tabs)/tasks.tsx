@@ -6,10 +6,8 @@ import { ErrorNotice } from "../../src/components/ErrorNotice";
 import { Screen } from "../../src/components/Screen";
 import { TaskList } from "../../src/features/tasks/components/TaskList";
 import { useAllTasks } from "../../src/features/tasks/hooks/useAllTasks";
-import { getLocalDateString } from "../../src/utils/dates";
 
 export default function TasksScreen() {
-  const today = getLocalDateString();
   const { tasks, isLoading, errorMessage, refresh, completeTask, undoCompletion } =
     useAllTasks();
 
@@ -29,7 +27,7 @@ export default function TasksScreen() {
         <Link
           href={{
             pathname: "/tasks/new",
-            params: { scheduledDate: today, returnTo: "tasks" }
+            params: { returnTo: "tasks" }
           }}
           asChild
         >

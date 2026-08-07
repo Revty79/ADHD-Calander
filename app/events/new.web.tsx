@@ -1,0 +1,209 @@
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { FormEvent, useMemo, useState } from "react";
+
+import { useCalendarEventRepository } from "../../src/database/DatabaseProvider";
+import { CalendarEventValidationError } from "../../src/database/repositories/calendarEventErrors";
+import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
+
+type FieldErrors = Partial<Record<CalendarEventValidationError["field"], string>>;
+
+export default function WebNewEventScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ date?: string }>();
+  const eventRepository = useCalendarEventRepository();
+  const initialDate = useMemo(
+    () => normalizeLocalDateInput(params.date ?? "") ?? getLocalDateString(),
+    [params.date]
+  );
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState<string>(initialDate);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("");
+  const [notes, setNotes] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function saveEvent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFieldErrors({});
+    setErrorMessage(null);
+    setIsSaving(true);
+
+    try {
+      await eventRepository.createEvent({
+        title,
+        date,
+        startTime,
+        endTime,
+        durationMinutes: durationMinutes.trim() ? Number(durationMinutes) : null,
+        notes
+      });
+
+      router.replace({ pathname: "/(tabs)/calendar", params: { date } });
+    } catch (error) {
+      if (error instanceof CalendarEventValidationError) {
+        setFieldErrors({ [error.field]: error.message });
+      } else {
+        setErrorMessage("The event could not be saved. Please try again.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <main className="web-form-shell">
+      <div className="web-form-page">
+        <Link
+          className="web-back-link"
+          href={{ pathname: "/calendar", params: { date: initialDate } }}
+        >
+          Back to Calendar
+        </Link>
+
+        <header className="web-form-header">
+          <p className="web-eyebrow">Fixed commitment</p>
+          <h1>New event</h1>
+          <p>Events stay fixed. Use a task for work that may remain flexible.</p>
+        </header>
+
+        <form className="web-task-form" noValidate onSubmit={saveEvent}>
+          <FormField error={fieldErrors.title} id="event-title" label="Title">
+            <input
+              autoFocus
+              id="event-title"
+              onChange={(event) => setTitle(event.currentTarget.value)}
+              placeholder="Event title"
+              required
+              type="text"
+              value={title}
+            />
+          </FormField>
+
+          <div className="web-form-row">
+            <FormField error={fieldErrors.date} id="event-date" label="Date">
+              <input
+                id="event-date"
+                onChange={(event) => setDate(event.currentTarget.value)}
+                required
+                type="date"
+                value={date}
+              />
+            </FormField>
+            <FormField
+              error={fieldErrors.startTime}
+              id="event-start-time"
+              label="Start time"
+            >
+              <input
+                id="event-start-time"
+                onChange={(event) => setStartTime(event.currentTarget.value)}
+                required
+                type="time"
+                value={startTime}
+              />
+            </FormField>
+          </div>
+
+          <div className="web-form-row">
+            <FormField
+              error={fieldErrors.endTime}
+              id="event-end-time"
+              label="End time"
+              optional
+            >
+              <input
+                id="event-end-time"
+                onChange={(event) => setEndTime(event.currentTarget.value)}
+                type="time"
+                value={endTime}
+              />
+            </FormField>
+            <FormField
+              error={fieldErrors.durationMinutes}
+              id="event-duration"
+              label="Duration in minutes"
+              optional
+            >
+              <input
+                id="event-duration"
+                min="1"
+                onChange={(event) => setDurationMinutes(event.currentTarget.value)}
+                placeholder="For example, 45"
+                step="1"
+                type="number"
+                value={durationMinutes}
+              />
+            </FormField>
+          </div>
+          <p className="web-form-hint">Use an end time or a duration, not both.</p>
+
+          <FormField id="event-notes" label="Notes" optional>
+            <textarea
+              id="event-notes"
+              onChange={(event) => setNotes(event.currentTarget.value)}
+              placeholder="Helpful details"
+              rows={4}
+              value={notes}
+            />
+          </FormField>
+
+          {errorMessage ? (
+            <div className="web-error-notice" role="alert">
+              <p>{errorMessage}</p>
+            </div>
+          ) : null}
+
+          <div className="web-form-actions">
+            <button className="web-primary-button" disabled={isSaving} type="submit">
+              {isSaving ? "Saving event..." : "Save event"}
+            </button>
+            <Link
+              className="web-cancel-link"
+              href={{ pathname: "/calendar", params: { date: initialDate } }}
+            >
+              Cancel
+            </Link>
+          </div>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+function FormField({
+  children,
+  error,
+  id,
+  label,
+  optional = false
+}: {
+  children: React.ReactNode;
+  error?: string | undefined;
+  id: string;
+  label: string;
+  optional?: boolean;
+}) {
+  const errorId = `${id}-error`;
+
+  return (
+    <div className="web-form-group">
+      <label htmlFor={id}>
+        {label} {optional ? <span>Optional</span> : null}
+      </label>
+      <div
+        aria-describedby={error ? errorId : undefined}
+        aria-invalid={error ? true : undefined}
+      >
+        {children}
+      </div>
+      {error ? (
+        <p className="web-validation-message" id={errorId} role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}

@@ -2,6 +2,49 @@
 
 ## 2026-08-06
 
+### Calendar As The Structural Center
+
+Decision: Add Calendar as a first-class destination with Month, Week, and Day
+views, rather than embedding a date grid inside Tasks.
+
+Reason: The product needs to explain what is fixed, planned, and flexible before
+future scheduling or recovery logic can be trustworthy.
+
+### Fixed Events Remain Separate From Tasks
+
+Decision: Model calendar commitments in `CalendarEvent` with `kind: fixed` and
+keep scheduling fields on `Task`.
+
+Reason: Future scheduling may move flexible tasks but must never automatically
+move fixed commitments. Converting either entity into the other would erase
+that safety boundary.
+
+### Local Calendar Values Stay As Strings
+
+Decision: Store event and task dates as `YYYY-MM-DD` and wall-clock times as
+`HH:MM`, without UTC conversion.
+
+Reason: Date-only values must not shift days because of timezone conversion.
+Timestamps remain ISO instants only for record history.
+
+### Factual Schedule Summaries
+
+Decision: Week and day summaries report stored counts and known minutes only.
+Event minutes come from an explicit duration or end time, and task minutes come
+from an estimate.
+
+Reason: The foundation has no approved capacity or overload rule. Empty time is
+not labeled as available capacity, and unknown durations are not guessed.
+
+### Shared Calendar UI With Responsive Reflow
+
+Decision: Use one React Native calendar screen for native and web, with a wide
+month grid plus day-detail panel on desktop and stacked week/day layouts at
+narrow widths. Keep platform-specific semantic forms for event and task entry.
+
+Reason: Calendar behavior should not drift across platforms, while browser forms
+benefit from native date/time controls and HTML keyboard semantics.
+
 ### One Shared Expo Codebase
 
 Decision: Keep Android, future iOS, and web in the existing Expo Router project.
@@ -20,8 +63,8 @@ without scattered runtime platform checks.
 
 ### IndexedDB For Web Persistence
 
-Decision: Store web tasks in a versioned IndexedDB object store behind the
-shared `TaskStorage` contract.
+Decision: Store web tasks and events in versioned IndexedDB object stores behind
+shared storage contracts.
 
 Reason: Expo SQLite web support in installed SDK 57 is documented as alpha and
 requires WebAssembly setup plus cross-origin-isolation headers. IndexedDB is a
@@ -83,7 +126,7 @@ of scope for the first build and require product-owner approval.
   implementation time.
 - Node.js should be upgraded to 20.19.4 or newer before Android runtime testing
   because React Native 0.86 declares that engine requirement.
-- Plain text date and time entry is acceptable for the first build; native date
+- Plain text date and time entry is acceptable for the current build; native date
   and time pickers can be added later.
 - Repository-level SQLite tests are sufficient for the first build because the
   most important risk is local persistence correctness.
@@ -98,5 +141,9 @@ of scope for the first build and require product-owner approval.
 - What accessibility settings should be configurable beyond system defaults?
 - Should a future local import/export feature bridge browser and mobile data
   before cloud synchronization is considered?
+- Should week view start on Sunday, Monday, or follow a configurable locale
+  preference? The foundation currently starts on Sunday.
+- When should event and task editing, deletion, and reversible undo flows be
+  introduced?
 - What retention or backup guidance should the web UI provide before the
   prototype is used for important long-term planning data?

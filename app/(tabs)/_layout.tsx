@@ -26,6 +26,7 @@ export default function TabLayout() {
   return (
     <Tabs screenOptions={tabScreenOptions}>
       <Tabs.Screen name="index" options={{ title: "Today" }} />
+      <Tabs.Screen name="calendar" options={{ title: "Calendar" }} />
       <Tabs.Screen name="tasks" options={{ title: "Tasks" }} />
       <Tabs.Screen name="recovery" options={{ title: "Recovery" }} />
       <Tabs.Screen name="recap" options={{ title: "Recap" }} />

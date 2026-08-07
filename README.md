@@ -9,17 +9,24 @@ not more judgmental, when a plan stops matching the day.
 The current prototype supports Android, responsive web browsers, and a shared
 code structure for future iOS work. It includes:
 
-- Navigation between Today, Tasks, Recovery, Recap, and Settings.
-- Creating a locally stored task with a title, optional description, date, and
-  optional time.
+- Navigation between Today, Calendar, Tasks, Recovery, Recap, and Settings.
+- Month, Week, and Day calendar views with selectable dates and factual schedule
+  summaries.
+- Creating fixed events with a local date, start time, optional end time or
+  duration, and optional notes.
+- Creating scheduled or unscheduled tasks with optional date, time, and duration
+  estimate.
+- Distinct calendar treatment for fixed commitments, planned tasks, and flexible
+  date-associated tasks.
 - Viewing today's tasks and all current non-deleted tasks.
 - Completing a task and undoing completion.
 - Native persistence in Expo SQLite.
 - Browser persistence in IndexedDB.
 - Desktop sidebar navigation and compact navigation at smaller browser widths.
 
-Recovery Mode, recap generation, scheduling automation, notifications, cloud
-sync, AI features, subscriptions, and calendar integrations remain deferred.
+Recovery Mode, recurring events, event editing, scheduling automation,
+notifications, cloud sync, AI features, subscriptions, and external calendar
+integrations remain deferred.
 
 ## Supported Platforms
 
@@ -67,9 +74,9 @@ npm run web
 ```
 
 Expo opens or prints the local browser URL. The web app uses a left sidebar at
-desktop widths, stacks the Today summary panel below 960 pixels, switches to a
-compact top navigation at 760 pixels, and stacks task cards and form fields at
-phone-sized widths.
+desktop widths, gives the calendar a wide month workspace and selected-day
+panel, reflows the week into a list on narrow screens, and switches to compact
+top navigation at 760 pixels.
 
 Create a production-style static web export in `dist/`:
 
@@ -81,9 +88,9 @@ Deployment is not configured in this prototype.
 
 ## Browser Persistence
 
-Web tasks are stored in the browser's IndexedDB database and are not sent to a
-server. Data survives normal page refreshes, browser restarts, and development
-server restarts for the same browser profile and origin.
+Web tasks and events are stored in the browser's IndexedDB database and are not
+sent to a server. Data survives normal page refreshes, browser restarts, and
+development server restarts for the same browser profile and origin.
 
 Browser and mobile data are currently separate. Clearing site data, using
 private browsing, browser storage pressure, or browser policy restrictions can
@@ -99,7 +106,7 @@ or cross-device transfer yet.
 4. Run `npm run android`.
 5. If Expo asks, choose the available Android target.
 
-Native task data continues to use Expo SQLite and versioned SQL migrations.
+Native task and calendar-event data use Expo SQLite and versioned SQL migrations.
 
 ## Development Commands
 
@@ -125,11 +132,14 @@ export on pull requests and pushes to `main`.
 ```text
 app/
   (tabs)/                    Shared and platform-specific route screens
+  events/new.tsx             Native event creation
+  events/new.web.tsx         Browser event creation
   tasks/new.tsx              Native task creation
   tasks/new.web.tsx          Browser task creation
 src/
   components/                Shared and web-specific UI primitives
   database/                  Storage contract, adapters, migrations, repository
+  features/calendar/         Local-date math, aggregation, and calendar hook
   features/tasks/            Shared hooks and platform task lists
   styles/web.css             Responsive web styles
   types/                     Shared TypeScript domain types
@@ -138,16 +148,17 @@ docs/                        Product and architecture documentation
 tests/                       SQLite repository and IndexedDB adapter tests
 ```
 
-See `docs/web-architecture.md` for the web navigation, persistence, responsive
-layout, and shared-code decisions.
+See `docs/calendar-architecture.md` and `docs/web-architecture.md` for calendar,
+persistence, responsive layout, and shared-code decisions.
 
 ## Known Limitations
 
 - Recovery, Recap, and Settings are placeholders.
 - Only `not_started` and `completed` task states are implemented in the UI.
 - Mobile date and time entry still use plain text fields.
+- Events can be created and viewed but not edited or deleted yet.
 - No task editing, deletion UI, filtering, sorting controls, drag-and-drop,
-  calendar view, recurring tasks, reminders, or notifications exist.
+  recurring items, reminders, or notifications exist.
 - Web and mobile stores do not sync and cannot import from one another.
 - Browser storage has no backup flow and may be cleared by the user or browser.
 - No component testing framework is configured; automated coverage focuses on

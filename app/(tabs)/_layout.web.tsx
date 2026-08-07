@@ -2,6 +2,7 @@ import { Href, Link, Slot, usePathname } from "expo-router";
 
 const navigationItems: { href: Href; label: string }[] = [
   { href: "/", label: "Today" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/tasks", label: "Tasks" },
   { href: "/recovery", label: "Recovery" },
   { href: "/recap", label: "Recap" },
@@ -19,7 +20,7 @@ export default function WebTabLayout() {
           <span className="web-brand-name">ADHD Calendar</span>
         </div>
         <Navigation pathname={pathname} />
-        <p className="web-sidebar-note">Your tasks stay on this browser.</p>
+        <p className="web-sidebar-note">Your calendar stays on this browser.</p>
       </aside>
 
       <div className="web-mobile-shell-header">
