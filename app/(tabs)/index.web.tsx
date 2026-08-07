@@ -2,13 +2,21 @@ import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useMemo } from "react";
 
 import { TaskList } from "../../src/features/tasks/components/TaskList";
-import { useTasksForDate } from "../../src/features/tasks/hooks/useTasksForDate";
+import { useTodayPlan } from "../../src/features/today/hooks/useTodayPlan";
+import { isTaskActive, isTaskCompleted } from "../../src/types/task";
 import { formatLocalDateForDisplay, getLocalDateString } from "../../src/utils/dates";
 
 export default function WebTodayScreen() {
   const today = useMemo(() => getLocalDateString(), []);
-  const { tasks, isLoading, errorMessage, refresh, completeTask, undoCompletion } =
-    useTasksForDate(today);
+  const {
+    tasks,
+    fixedEvents,
+    isLoading,
+    errorMessage,
+    refresh,
+    completeTask,
+    undoCompletion
+  } = useTodayPlan(today);
 
   useFocusEffect(
     useCallback(() => {
@@ -16,8 +24,10 @@ export default function WebTodayScreen() {
     }, [refresh])
   );
 
-  const openTasks = tasks.filter((task) => task.status !== "completed");
-  const completedTasks = tasks.filter((task) => task.status === "completed");
+  const activeTasks = tasks.filter(isTaskActive);
+  const plannedTasks = activeTasks.filter((task) => task.scheduledTime !== null);
+  const flexibleTasks = activeTasks.filter((task) => task.scheduledTime === null);
+  const completedTasks = tasks.filter(isTaskCompleted);
 
   return (
     <div className="web-page">
@@ -25,7 +35,9 @@ export default function WebTodayScreen() {
         <div>
           <p className="web-eyebrow">Today</p>
           <h1>{formatLocalDateForDisplay(today)}</h1>
-          <p className="web-page-intro">A calm view of what is scheduled for today.</p>
+          <p className="web-page-intro">
+            Fixed appointments, planned tasks, and flexible work in one calm view.
+          </p>
         </div>
         <Link
           className="web-primary-link"
@@ -38,9 +50,20 @@ export default function WebTodayScreen() {
         </Link>
       </header>
 
+      <Link
+        className="web-today-recovery-link"
+        href={{ pathname: "/recovery", params: { sourceDate: today } }}
+      >
+        <span>
+          <strong>Today got away from me</strong>
+          <small>Review unfinished tasks without moving fixed appointments.</small>
+        </span>
+        <b>Open Recovery Mode</b>
+      </Link>
+
       {isLoading ? (
         <p aria-live="polite" className="web-loading-state" role="status">
-          Loading today&apos;s tasks...
+          Loading today&apos;s plan...
         </p>
       ) : null}
 
@@ -56,12 +79,45 @@ export default function WebTodayScreen() {
       {!isLoading && !errorMessage ? (
         <div className="web-dashboard-grid">
           <div>
+            <section className="web-task-section">
+              <div className="web-section-heading">
+                <h2>Fixed appointments</h2>
+                <span className="web-count-badge">
+                  {fixedEvents.length} {fixedEvents.length === 1 ? "event" : "events"}
+                </span>
+              </div>
+              {fixedEvents.length === 0 ? (
+                <p className="web-empty-state">No fixed appointments today.</p>
+              ) : (
+                <ul className="web-fixed-event-list">
+                  {fixedEvents.map((event) => (
+                    <li key={event.id}>
+                      <time dateTime={event.startTime}>
+                        {event.startTime}
+                        {event.endTime ? `–${event.endTime}` : ""}
+                      </time>
+                      <div>
+                        <strong>{event.title}</strong>
+                        <span>Fixed</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
             <TaskList
               actionLabel="Complete"
-              emptyMessage="No tasks are scheduled for today."
+              emptyMessage="No tasks have a set time today."
               onAction={completeTask}
-              tasks={openTasks}
-              title="Open"
+              tasks={plannedTasks}
+              title="Planned tasks"
+            />
+            <TaskList
+              actionLabel="Complete"
+              emptyMessage="No flexible tasks are scheduled for today."
+              onAction={completeTask}
+              tasks={flexibleTasks}
+              title="Flexible tasks"
             />
             <TaskList
               actionLabel="Undo"
@@ -74,15 +130,19 @@ export default function WebTodayScreen() {
 
           <aside aria-labelledby="today-summary-title" className="web-summary-panel">
             <p className="web-eyebrow">At a glance</p>
-            <h2 id="today-summary-title">Today&apos;s tasks</h2>
+            <h2 id="today-summary-title">Today&apos;s plan</h2>
             <dl className="web-summary-list">
               <div>
-                <dt>Scheduled</dt>
-                <dd>{tasks.length}</dd>
+                <dt>Fixed appointments</dt>
+                <dd>{fixedEvents.length}</dd>
               </div>
               <div>
-                <dt>Open</dt>
-                <dd>{openTasks.length}</dd>
+                <dt>Planned tasks</dt>
+                <dd>{plannedTasks.length}</dd>
+              </div>
+              <div>
+                <dt>Flexible tasks</dt>
+                <dd>{flexibleTasks.length}</dd>
               </div>
               <div>
                 <dt>Completed</dt>
@@ -90,18 +150,8 @@ export default function WebTodayScreen() {
               </div>
             </dl>
             <p className="web-summary-note">
-              Recovery Mode is planned for a later build. It will help reduce future
-              workload without moving fixed commitments automatically.
+              These counts describe today without treating unfinished work as a failure.
             </p>
-            <Link
-              className="web-text-link"
-              href={{
-                pathname: "/tasks/new",
-                params: { scheduledDate: today, returnTo: "today" }
-              }}
-            >
-              Create a task for today
-            </Link>
           </aside>
         </div>
       ) : null}

@@ -38,9 +38,10 @@ offline and avoid unnecessary data collection.
 
 ## Current First-Build Scope
 
-The first build includes tab navigation, basic task creation, Today and Tasks
-views, local SQLite persistence, completion, completion undo, and placeholder
-Recovery and Recap screens.
+The first build includes tab navigation, task and fixed-event creation, Today,
+Calendar, Tasks, and Recovery views, local SQLite and IndexedDB persistence,
+completion, completion undo, and a placeholder Recap screen. Recovery supports
+explicit task-by-task decisions without automatic next-day scheduling.
 
 ## Explicit Non-MVP Features
 
@@ -50,11 +51,12 @@ Recovery and Recap screens.
 - Subscription or payment flows
 - Advanced notifications
 - Full scheduling engine
-- Final Recovery Mode workflow
+- Automated or AI-assisted Recovery Mode scheduling
 - Medical, diagnostic, or therapeutic advice
 
 ## Product Success Test
 
 A user can add a task, see it on the correct local day, mark it complete, undo
-that completion, close and reopen the app, and still see their data without any
+that completion, and deliberately process unfinished work in Recovery Mode.
+Closing and reopening the app preserves task and recovery progress without
 punitive language or alarming overdue treatment.

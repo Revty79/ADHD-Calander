@@ -1,6 +1,12 @@
 import { LocalDateString, LocalTimeString } from "./dateTime";
 
-export const implementedTaskStatuses = ["not_started", "completed"] as const;
+export const implementedTaskStatuses = [
+  "not_started",
+  "completed",
+  "delegated",
+  "removed",
+  "broken_down"
+] as const;
 
 export const reservedTaskStatuses = [
   "started",
@@ -39,5 +45,25 @@ export type CreateTaskInput = {
   scheduledTime?: string | null;
   estimatedDurationMinutes?: number | null;
 };
+
+export const resolvedTaskStatuses: readonly TaskStatus[] = [
+  "delegated",
+  "removed",
+  "broken_down",
+  "intentionally_skipped",
+  "no_longer_necessary"
+];
+
+export function isTaskCompleted(task: Task): boolean {
+  return task.status === "completed";
+}
+
+export function isTaskResolved(task: Task): boolean {
+  return resolvedTaskStatuses.includes(task.status);
+}
+
+export function isTaskActive(task: Task): boolean {
+  return !isTaskCompleted(task) && !isTaskResolved(task);
+}
 
 export type { LocalDateString, LocalTimeString } from "./dateTime";

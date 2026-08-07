@@ -1,5 +1,48 @@
 # Decision Log
 
+## 2026-08-07
+
+### One Active Recovery Session
+
+Decision: Persist one active Recovery Mode session at a time and resume it even
+if the user opens Recovery from another date.
+
+Reason: One unfinished review keeps state understandable and prevents duplicate
+decisions for the same work. A future flow can add an explicit abandon/archive
+action if product requirements call for it.
+
+### Decisions Mutate Tasks And Preserve Recovery History
+
+Decision: Keep and Reschedule update the original task; Break Down, Delegate,
+and Remove resolve the original with explicit statuses. Recovery items retain a
+snapshot and decision metadata.
+
+Reason: Rescheduling must preserve task identity, while delegated, removed, and
+broken-down work should leave active planning without erasing what happened.
+
+### Decide Later Remains Pending
+
+Decision: Store `skip` as a review marker but leave the item pending.
+
+Reason: The user can reduce immediate cognitive load without accidentally
+treating an undecided task as resolved.
+
+### No Automatic Tomorrow Placement
+
+Decision: Keep clears the schedule, breakdown children start unscheduled, and
+only explicit Reschedule sets a new date.
+
+Reason: Recovery must reduce future workload rather than transfer the entire
+unfinished list to tomorrow.
+
+### Recovery Storage Parity
+
+Decision: Add SQLite migration 3 and IndexedDB version 3 with matching recovery
+session/item concepts and atomic task-decision mutations.
+
+Reason: Recovery progress must survive app restarts and browser refreshes while
+the shared repository keeps behavior consistent across platforms.
+
 ## 2026-08-06
 
 ### Calendar As The Structural Center

@@ -3,6 +3,7 @@ import { useCallback } from "react";
 
 import { TaskList } from "../../src/features/tasks/components/TaskList";
 import { useAllTasks } from "../../src/features/tasks/hooks/useAllTasks";
+import { isTaskActive, isTaskCompleted, isTaskResolved } from "../../src/types/task";
 
 export default function WebTasksScreen() {
   const { tasks, isLoading, errorMessage, refresh, completeTask, undoCompletion } =
@@ -14,8 +15,9 @@ export default function WebTasksScreen() {
     }, [refresh])
   );
 
-  const openTasks = tasks.filter((task) => task.status !== "completed");
-  const completedTasks = tasks.filter((task) => task.status === "completed");
+  const openTasks = tasks.filter(isTaskActive);
+  const completedTasks = tasks.filter(isTaskCompleted);
+  const resolvedTasks = tasks.filter(isTaskResolved);
 
   return (
     <div className="web-page web-tasks-page">
@@ -70,6 +72,12 @@ export default function WebTasksScreen() {
             showDate
             tasks={completedTasks}
             title="Completed"
+          />
+          <TaskList
+            emptyMessage="Recovery decisions will appear here."
+            showDate
+            tasks={resolvedTasks}
+            title="Resolved in Recovery Mode"
           />
         </div>
       ) : null}

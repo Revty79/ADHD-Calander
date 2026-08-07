@@ -12,6 +12,7 @@ Shared code continues to own:
 
 - Task and fixed-event types.
 - Task and event input validation and normalization.
+- Recovery session rules and task mutations.
 - Local date and time handling.
 - Month/week/day date math and factual schedule aggregation.
 - Task creation, completion, and completion undo behavior.
@@ -25,6 +26,7 @@ Platform-specific files own:
 - `app/(tabs)/_layout.web.tsx`: responsive sidebar and compact navigation.
 - `app/(tabs)/index.web.tsx`: desktop-oriented Today layout and factual counts.
 - `app/(tabs)/tasks.web.tsx`: wider all-tasks layout.
+- `app/(tabs)/recovery.web.tsx`: one-task recovery review and semantic forms.
 - `app/tasks/new.web.tsx`: semantic browser form controls.
 - `app/events/new.web.tsx`: semantic browser event form controls.
 - `src/components/Screen.web.tsx`: web page sizing for shared placeholder pages.
@@ -50,11 +52,14 @@ return to Today, Tasks, or its selected Calendar date.
 
 Native builds continue to initialize Expo SQLite, apply versioned SQL
 migrations, and use SQL storage adapters. The web build opens IndexedDB database
-`adhd-calendar-web` at version 2 with `tasks` and `calendarEvents` stores.
+`adhd-calendar-web` at version 3 with `tasks`, `calendarEvents`,
+`recoverySessions`, and `recoveryItems` stores.
 
-`TaskRepository` and `CalendarEventRepository` depend on platform-neutral
-storage contracts. Both adapters return the same domain shapes, while
-validation and ordering remain in shared repositories.
+`TaskRepository`, `CalendarEventRepository`, and `RecoveryRepository` depend on
+platform-neutral storage contracts. Both platforms return the same domain
+shapes, while validation and recovery rules remain in shared repositories.
+IndexedDB recovery decisions update task records and recovery items in one
+transaction.
 
 IndexedDB was selected because Expo SQLite web support in the installed SDK 57
 is documented as alpha and requires WebAssembly configuration plus
@@ -74,6 +79,8 @@ sharing with native SQLite.
 - At 760 pixels and below: the sidebar becomes compact top navigation.
 - At 560 pixels and below: page headers, task cards, form fields, and actions
   stack vertically.
+- Recovery uses a prominent review card plus a sticky progress summary on wide
+  screens and a single stacked column on narrower screens.
 
 Content uses maximum widths, flexible grid columns, wrapping metadata, and
 breakable task text to avoid ordinary horizontal scrolling. Browser zoom and
@@ -85,14 +92,15 @@ larger text remain supported because sizing is primarily fluid and relative.
 - Private browsing, user-cleared site data, storage pressure, or browser policy
   can remove IndexedDB data.
 - Web and native tasks are separate and cannot currently be imported or synced.
-- Recovery, Recap, and Settings stay as calm placeholders.
+- Recap and Settings stay as calm placeholders.
+- Completed recovery sessions are retained but do not yet have a history browser.
 - Event/task editing, deletion, filtering, sorting controls, notifications, and
   recurring items are not implemented.
 
 ## Future Cross-Platform Work
 
-Future task behavior should be added to `TaskRepository` or another shared
-domain service first. Platform adapters should only translate that behavior to
-SQLite or IndexedDB. Any new stored field requires an explicit native SQL
-migration and a corresponding IndexedDB version upgrade, with both paths tested
-against the shared task contract.
+Future task behavior should be added to a shared repository or domain service
+first. Platform adapters should only translate that behavior to SQLite or
+IndexedDB. Any new stored field requires an explicit native SQL migration and a
+corresponding IndexedDB version upgrade, with both paths tested against the
+shared contract.

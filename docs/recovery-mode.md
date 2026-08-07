@@ -1,33 +1,33 @@
 # Recovery Mode
 
-Recovery Mode is a deferred feature. It should help the user recover from a day
-that no longer matches the plan without creating shame or overloading the next
-day.
+Recovery Mode is a functional first foundation for handling unfinished work
+without creating an alarming overdue pile. The detailed technical design is in
+`docs/recovery-architecture.md`.
 
-## Intended Behavior
+## Current Behavior
 
-Recovery Mode will eventually:
+- Start a recovery session manually for a local date from Today or Recovery.
+- Review unfinished active tasks one at a time.
+- Keep a task active but unscheduled.
+- Explicitly reschedule a task to a chosen date and optional time.
+- Break a task into two or more smaller unscheduled tasks.
+- Mark a task delegated with an optional local note.
+- Remove a task from active planning while retaining history.
+- Decide later without resolving or hiding the item.
+- Leave and resume an active session with saved progress.
+- Change a resolved decision while the session remains active.
+- Finish only after every item has a resolved decision.
 
-- Pause nonessential reminders.
-- Preserve fixed commitments.
-- Identify essential tasks.
-- Move flexible unfinished work into a recovery queue.
-- Preserve partial and completed progress.
-- Avoid overdue shame.
-- Help the user review tasks individually when returning.
-- Prevent the following day from becoming overloaded.
+Fixed appointments are never placed in a recovery session. Completed and
+already resolved tasks are excluded. No action automatically schedules work for
+tomorrow.
 
-## Product Rules
+## Deliberately Deferred
 
-- Fixed appointments must never be moved automatically.
-- Recovery should reduce future workload instead of simply moving everything to
-  tomorrow.
-- The user should approve important rescheduling choices.
-- Completed and partial progress should remain visible and factual.
-- Language should be calm, direct, and non-punitive.
-
-## First-Build Status
-
-The current app includes only a clearly labeled Recovery placeholder screen. No
-Recovery Mode scheduling, reminders, review queue, or automation is implemented
-yet.
+- Automatic task placement or workload optimization
+- Reminder pausing
+- Essential-task classification
+- Recurring work
+- Messaging or contact integration for delegation
+- Completed-session history browsing or analytics
+- AI assistance

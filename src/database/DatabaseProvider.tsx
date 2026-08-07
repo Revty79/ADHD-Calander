@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { createRepositories } from "./createRepositories";
 import { CalendarEventRepository } from "./repositories/calendarEventRepository";
+import { RecoveryRepository } from "./repositories/recoveryRepository";
 import { TaskRepository } from "./repositories/taskRepository";
 
 type DatabaseState =
@@ -19,6 +20,7 @@ type DatabaseState =
       status: "ready";
       taskRepository: TaskRepository;
       calendarEventRepository: CalendarEventRepository;
+      recoveryRepository: RecoveryRepository;
     }
   | { status: "error"; message: string };
 
@@ -26,6 +28,7 @@ const TaskRepositoryContext = createContext<TaskRepository | null>(null);
 const CalendarEventRepositoryContext = createContext<CalendarEventRepository | null>(
   null
 );
+const RecoveryRepositoryContext = createContext<RecoveryRepository | null>(null);
 
 export function DatabaseProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<DatabaseState>({ status: "loading" });
@@ -106,11 +109,13 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   }
 
   return (
-    <CalendarEventRepositoryContext.Provider value={state.calendarEventRepository}>
-      <TaskRepositoryContext.Provider value={state.taskRepository}>
-        {children}
-      </TaskRepositoryContext.Provider>
-    </CalendarEventRepositoryContext.Provider>
+    <RecoveryRepositoryContext.Provider value={state.recoveryRepository}>
+      <CalendarEventRepositoryContext.Provider value={state.calendarEventRepository}>
+        <TaskRepositoryContext.Provider value={state.taskRepository}>
+          {children}
+        </TaskRepositoryContext.Provider>
+      </CalendarEventRepositoryContext.Provider>
+    </RecoveryRepositoryContext.Provider>
   );
 }
 
@@ -129,6 +134,16 @@ export function useCalendarEventRepository(): CalendarEventRepository {
 
   if (!repository) {
     throw new Error("CalendarEventRepository is not available.");
+  }
+
+  return repository;
+}
+
+export function useRecoveryRepository(): RecoveryRepository {
+  const repository = useContext(RecoveryRepositoryContext);
+
+  if (!repository) {
+    throw new Error("RecoveryRepository is not available.");
   }
 
   return repository;

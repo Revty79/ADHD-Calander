@@ -1,6 +1,6 @@
 import { CalendarEvent } from "../../types/calendarEvent";
 import { LocalDateString, LocalTimeString } from "../../types/dateTime";
-import { Task } from "../../types/task";
+import { isTaskResolved, Task } from "../../types/task";
 
 export type CalendarDaySchedule = {
   date: LocalDateString;
@@ -27,6 +27,7 @@ export function buildCalendarSchedule(
 
   for (const task of tasks) {
     if (
+      isTaskResolved(task) ||
       task.scheduledDate === null ||
       task.scheduledDate < startDate ||
       task.scheduledDate > endDate

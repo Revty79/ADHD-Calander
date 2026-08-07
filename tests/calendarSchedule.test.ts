@@ -46,6 +46,21 @@ describe("calendar schedule", () => {
       35
     );
   });
+
+  it("keeps tasks resolved in Recovery Mode out of active calendar work", () => {
+    const delegatedTask = createTask({ id: "delegated", status: "delegated" });
+    const removedTask = createTask({ id: "removed", status: "removed" });
+    const brokenDownTask = createTask({ id: "broken", status: "broken_down" });
+
+    const day = buildCalendarSchedule(
+      "2026-08-06",
+      "2026-08-06",
+      [],
+      [delegatedTask, removedTask, brokenDownTask]
+    ).get("2026-08-06");
+
+    assert.equal(day, undefined);
+  });
 });
 
 function createEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {

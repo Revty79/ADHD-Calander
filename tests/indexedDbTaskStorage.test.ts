@@ -5,10 +5,15 @@ import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 
 import {
   deserializeCalendarEventFromWeb,
+  deserializeRecoveryItemFromWeb,
+  deserializeRecoverySessionFromWeb,
   deserializeTaskFromWeb,
   openIndexedDbCalendarEventStorage,
+  openIndexedDbStorages,
   openIndexedDbTaskStorage,
   serializeCalendarEventForWeb,
+  serializeRecoveryItemForWeb,
+  serializeRecoverySessionForWeb,
   serializeTaskForWeb,
   WebStorageDataError,
   WebStorageInitializationError
@@ -19,7 +24,9 @@ import {
 } from "../src/database/repositories/errors";
 import { TaskRepository } from "../src/database/repositories/taskRepository";
 import { CalendarEventRepository } from "../src/database/repositories/calendarEventRepository";
+import { RecoveryRepository } from "../src/database/repositories/recoveryRepository";
 import { CalendarEvent } from "../src/types/calendarEvent";
+import { RecoveryItem, RecoverySession } from "../src/types/recovery";
 import { Task } from "../src/types/task";
 
 function createRepository(databaseName: string, indexedDB = new IDBFactory()) {
@@ -278,6 +285,190 @@ describe("IndexedDB calendar event storage", () => {
     );
   });
 });
+
+describe("IndexedDB recovery storage", () => {
+  it("persists recovery progress and completion across reopened storage", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "recovery-persistence-test";
+    const first = await createRecoveryRepositories(databaseName, indexedDB);
+    const firstTask = await first.taskRepository.createTask({
+      title: "Move this task",
+      scheduledDate: "2026-08-06",
+      scheduledTime: "09:00"
+    });
+    const secondTask = await first.taskRepository.createTask({
+      title: "Review this later",
+      scheduledDate: "2026-08-06"
+    });
+    const session = await first.recoveryRepository.startSession("2026-08-06");
+    const firstItem = session.items.find((item) => item.taskId === firstTask.id)!;
+    const secondItem = session.items.find((item) => item.taskId === secondTask.id)!;
+
+    await first.recoveryRepository.rescheduleTask(firstItem.id, {
+      scheduledDate: "2026-08-09",
+      scheduledTime: "14:00"
+    });
+    await first.recoveryRepository.skipTask(secondItem.id);
+
+    const reopened = await createRecoveryRepositories(databaseName, indexedDB);
+    const restoredSession = await reopened.recoveryRepository.getActiveSession();
+
+    assert.equal(
+      restoredSession?.items.find((item) => item.id === firstItem.id)?.decision,
+      "reschedule"
+    );
+    assert.equal(
+      restoredSession?.items.find((item) => item.id === secondItem.id)?.decision,
+      "skip"
+    );
+    assert.equal(
+      (await reopened.taskRepository.getAllTasks()).find(
+        (task) => task.id === firstTask.id
+      )?.scheduledDate,
+      "2026-08-09"
+    );
+
+    await reopened.recoveryRepository.keepTask(secondItem.id);
+    const completed = await reopened.recoveryRepository.completeSession();
+    const completedRepository = await createRecoveryRepositories(databaseName, indexedDB);
+
+    assert.equal(completed.status, "completed");
+    assert.equal(await completedRepository.recoveryRepository.getActiveSession(), null);
+    assert.equal(
+      (await completedRepository.recoveryRepository.getLatestCompletedSession())?.id,
+      completed.id
+    );
+  });
+
+  it("applies breakdown, delegation, and removal mutations in browser storage", async () => {
+    const context = await createRecoveryRepositories(
+      "recovery-actions-test",
+      new IDBFactory()
+    );
+    const breakdownTask = await context.taskRepository.createTask({
+      title: "Large task",
+      scheduledDate: "2026-08-06"
+    });
+    const delegatedTask = await context.taskRepository.createTask({
+      title: "Shared task",
+      scheduledDate: "2026-08-06"
+    });
+    const removedTask = await context.taskRepository.createTask({
+      title: "Optional task",
+      scheduledDate: "2026-08-06"
+    });
+    const session = await context.recoveryRepository.startSession("2026-08-06");
+
+    await context.recoveryRepository.breakDownTask(
+      session.items.find((item) => item.taskId === breakdownTask.id)!.id,
+      { titles: ["First small task", "Second small task"] }
+    );
+    await context.recoveryRepository.delegateTask(
+      session.items.find((item) => item.taskId === delegatedTask.id)!.id,
+      { note: "Ask Lee" }
+    );
+    await context.recoveryRepository.removeTask(
+      session.items.find((item) => item.taskId === removedTask.id)!.id
+    );
+
+    const tasks = await context.taskRepository.getAllTasks();
+    assert.equal(
+      tasks.find((task) => task.id === breakdownTask.id)?.status,
+      "broken_down"
+    );
+    assert.equal(tasks.find((task) => task.id === delegatedTask.id)?.status, "delegated");
+    assert.equal(tasks.find((task) => task.id === removedTask.id)?.status, "removed");
+    assert.deepEqual(
+      tasks
+        .filter((task) => task.id.startsWith("web-smaller-task-"))
+        .map((task) => task.scheduledDate),
+      [null, null]
+    );
+  });
+
+  it("serializes recovery sessions and items and rejects malformed decisions", () => {
+    const item: RecoveryItem = {
+      id: "item-1",
+      sessionId: "session-1",
+      taskId: "task-1",
+      originalTitle: "Review notes",
+      originalStatus: "not_started",
+      originalScheduledDate: "2026-08-06",
+      originalScheduledTime: null,
+      originalEstimatedDurationMinutes: null,
+      status: "pending",
+      decision: "skip",
+      note: null,
+      rescheduledDate: null,
+      rescheduledTime: null,
+      createdTaskIds: [],
+      reviewedAt: "2026-08-07T15:00:00.000Z",
+      createdAt: "2026-08-07T15:00:00.000Z",
+      updatedAt: "2026-08-07T15:00:00.000Z"
+    };
+    const session: RecoverySession = {
+      id: "session-1",
+      sourceDate: "2026-08-06",
+      status: "active",
+      startedAt: "2026-08-07T15:00:00.000Z",
+      completedAt: null,
+      items: [item]
+    };
+
+    assert.deepEqual(
+      deserializeRecoveryItemFromWeb(serializeRecoveryItemForWeb(item)),
+      item
+    );
+    assert.deepEqual(
+      deserializeRecoverySessionFromWeb(serializeRecoverySessionForWeb(session)),
+      {
+        id: session.id,
+        sourceDate: session.sourceDate,
+        status: session.status,
+        startedAt: session.startedAt,
+        completedAt: session.completedAt
+      }
+    );
+    assert.throws(
+      () =>
+        deserializeRecoveryItemFromWeb({
+          ...item,
+          status: "resolved",
+          decision: "skip"
+        }),
+      WebStorageDataError
+    );
+  });
+});
+
+async function createRecoveryRepositories(databaseName: string, indexedDB: IDBFactory) {
+  const { taskStorage, recoveryStorage } = await openIndexedDbStorages({
+    databaseName,
+    indexedDB,
+    keyRange: IDBKeyRange
+  });
+  let taskId = 0;
+  let smallerTaskId = 0;
+  let itemId = 0;
+  let sessionId = 0;
+  const clock = () => new Date("2026-08-07T15:00:00.000Z");
+
+  return {
+    taskRepository: new TaskRepository(
+      taskStorage,
+      () => `web-recovery-task-${++taskId}`,
+      clock
+    ),
+    recoveryRepository: new RecoveryRepository(
+      recoveryStorage,
+      taskStorage,
+      () => `web-session-${++sessionId}`,
+      () => `web-item-${++itemId}`,
+      () => `web-smaller-task-${++smallerTaskId}`,
+      clock
+    )
+  };
+}
 
 function createVersionOneDatabase(
   indexedDB: IDBFactory,

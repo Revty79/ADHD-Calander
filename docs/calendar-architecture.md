@@ -16,8 +16,8 @@ what dated work remains flexible. It does not yet decide what should move.
 - Planned: a date with a start time.
 
 Calendar aggregation reads both repositories and keeps these categories
-separate. Future scheduling and Recovery Mode may propose changes to tasks, but
-must not automatically move fixed events.
+separate. Recovery Mode may update tasks only after an explicit decision, but
+never reads fixed events as movable recovery work.
 
 ## Views
 
@@ -27,6 +27,8 @@ must not automatically move fixed events.
   columns; narrow layouts use a vertical list.
 - Day groups items as Fixed, Planned, and Flexible and keeps completed tasks
   visible with a calm status label.
+- Tasks resolved as delegated, removed, or broken down remain in task history
+  but no longer appear as active calendar work.
 
 Current day and selected day each have non-color visual treatment. Event and
 task cards use both text labels and different borders, so their meaning does not
@@ -46,9 +48,9 @@ available, overloaded, or productive based on whitespace.
 ## Persistence
 
 Native repository composition uses one initialized Expo SQLite database with
-`SqlTaskStorage` and `SqlCalendarEventStorage`. Web composition opens one
-IndexedDB database and creates task and event adapters for their object stores.
-The provider exposes both repositories to hooks and forms.
+task, event, and recovery storage adapters. Web composition opens one IndexedDB
+database and creates equivalent adapters. Recovery task mutations and recovery
+decision writes share a storage transaction.
 
 The calendar hook loads events for the visible local-date range and filters
 scheduled tasks into that range. Unscheduled tasks remain available in Tasks
@@ -64,7 +66,7 @@ while record-history timestamps use ISO instants.
 ## Deliberately Deferred
 
 - Automatic scheduling and rescheduling
-- Full Recovery Mode
+- Automatic Recovery Mode scheduling
 - Capacity and overload rules
 - Recurring or all-day events
 - Event and task editing/deletion

@@ -5,8 +5,8 @@ type TaskListProps = {
   title: string;
   emptyMessage: string;
   tasks: Task[];
-  actionLabel: string;
-  onAction(id: string): void;
+  actionLabel?: string;
+  onAction?(id: string): void;
   showDate?: boolean;
 };
 
@@ -52,23 +52,38 @@ export function TaskList({
                   {task.estimatedDurationMinutes ? (
                     <span>{task.estimatedDurationMinutes} min estimate</span>
                   ) : null}
-                  <span>
-                    Status: {task.status === "completed" ? "Completed" : "Not started"}
-                  </span>
+                  <span>Status: {getTaskStatusLabel(task.status)}</span>
                 </div>
               </div>
-              <button
-                aria-label={`${actionLabel} ${task.title}`}
-                className="web-secondary-button"
-                onClick={() => onAction(task.id)}
-                type="button"
-              >
-                {actionLabel}
-              </button>
+              {actionLabel && onAction ? (
+                <button
+                  aria-label={`${actionLabel} ${task.title}`}
+                  className="web-secondary-button"
+                  onClick={() => onAction(task.id)}
+                  type="button"
+                >
+                  {actionLabel}
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
     </section>
   );
+}
+
+function getTaskStatusLabel(status: Task["status"]): string {
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "delegated":
+      return "Delegated";
+    case "removed":
+      return "Removed from active tasks";
+    case "broken_down":
+      return "Broken into smaller tasks";
+    default:
+      return "Not started";
+  }
 }

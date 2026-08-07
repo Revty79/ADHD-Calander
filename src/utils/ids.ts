@@ -6,7 +6,17 @@ export function createCalendarEventId(): string {
   return createLocalId("event");
 }
 
-function createLocalId(prefix: "task" | "event"): string {
+export function createRecoverySessionId(): string {
+  return createLocalId("recovery_session");
+}
+
+export function createRecoveryItemId(): string {
+  return createLocalId("recovery_item");
+}
+
+function createLocalId(
+  prefix: "task" | "event" | "recovery_session" | "recovery_item"
+): string {
   const randomUuid = globalThis.crypto?.randomUUID;
 
   if (randomUuid) {

@@ -26,7 +26,7 @@
 
 - Expo Router navigation for Today, Calendar, Tasks, Recovery, Recap, and Settings on
   Android, future iOS builds, and responsive web browsers.
-- Functional Today, Calendar, and Tasks screens.
+- Functional Today, Calendar, Tasks, and Recovery screens.
 - Month, Week, and Day calendar views with selectable dates and factual schedule
   summaries.
 - Basic fixed-event creation with title, date, start time, optional end time or
@@ -43,13 +43,17 @@
   restarts.
 - Browser task creation with semantic date and time inputs.
 - Shared repository behavior across SQLite and IndexedDB storage adapters.
+- One-task-at-a-time Recovery Mode sessions for unfinished dated tasks.
+- Explicit Keep, Reschedule, Break Down, Delegate, Remove, and Decide Later
+  recovery decisions.
+- Persisted recovery progress that resumes after leaving or restarting the app.
+- Reversible recovery decisions while a session remains active.
 
 ## Out Of Scope For First Build
 
-- Recovery Mode implementation
 - Recap implementation
 - Three-priority planning system
-- Task steps
+- General task-step/project hierarchy outside Recovery Mode breakdown
 - Task editing
 - Soft deletion UI
 - Notifications

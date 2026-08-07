@@ -3,15 +3,28 @@ import {
   CalendarEvent,
   CalendarEventKind
 } from "../types/calendarEvent";
+import {
+  recoveryDecisionTypes,
+  RecoveryDecisionType,
+  RecoveryItem,
+  recoveryItemStatuses,
+  RecoveryItemStatus,
+  RecoverySession,
+  recoverySessionStatuses,
+  RecoverySessionStatus
+} from "../types/recovery";
 import { taskStatuses, Task, TaskStatus } from "../types/task";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../utils/dates";
 import { CalendarEventStorage } from "./calendarEventStorage";
+import { RecoveryDecisionMutation, RecoveryStorage } from "./recoveryStorage";
 import { TaskStorage } from "./taskStorage";
 
 const WEB_DATABASE_NAME = "adhd-calendar-web";
-const WEB_DATABASE_VERSION = 2;
+const WEB_DATABASE_VERSION = 3;
 const TASK_STORE_NAME = "tasks";
 const EVENT_STORE_NAME = "calendarEvents";
+const RECOVERY_SESSION_STORE_NAME = "recoverySessions";
+const RECOVERY_ITEM_STORE_NAME = "recoveryItems";
 
 type IndexedDbFactory = Pick<IDBFactory, "open">;
 
@@ -48,6 +61,34 @@ type StoredCalendarEvent = {
   updatedAt: string;
 };
 
+type StoredRecoverySession = {
+  id: string;
+  sourceDate: string;
+  status: RecoverySessionStatus;
+  startedAt: string;
+  completedAt: string | null;
+};
+
+type StoredRecoveryItem = {
+  id: string;
+  sessionId: string;
+  taskId: string;
+  originalTitle: string;
+  originalStatus: TaskStatus;
+  originalScheduledDate: string;
+  originalScheduledTime: string | null;
+  originalEstimatedDurationMinutes: number | null;
+  status: RecoveryItemStatus;
+  decision: RecoveryDecisionType | null;
+  note: string | null;
+  rescheduledDate: string | null;
+  rescheduledTime: string | null;
+  createdTaskIds: string[];
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export class WebStorageInitializationError extends Error {
   readonly cause: unknown;
 
@@ -70,6 +111,7 @@ export async function openIndexedDbStorages(
 ): Promise<{
   taskStorage: TaskStorage;
   calendarEventStorage: CalendarEventStorage;
+  recoveryStorage: RecoveryStorage;
 }> {
   const indexedDbFactory = options.indexedDB ?? globalThis.indexedDB;
 
@@ -91,7 +133,8 @@ export async function openIndexedDbStorages(
       calendarEventStorage: new IndexedDbCalendarEventStorage(
         database,
         options.keyRange ?? globalThis.IDBKeyRange
-      )
+      ),
+      recoveryStorage: new IndexedDbRecoveryStorage(database)
     };
   } catch (error) {
     if (error instanceof WebStorageInitializationError) {
@@ -115,6 +158,12 @@ export async function openIndexedDbCalendarEventStorage(
   options: OpenIndexedDbStorageOptions = {}
 ): Promise<CalendarEventStorage> {
   return (await openIndexedDbStorages(options)).calendarEventStorage;
+}
+
+export async function openIndexedDbRecoveryStorage(
+  options: OpenIndexedDbStorageOptions = {}
+): Promise<RecoveryStorage> {
+  return (await openIndexedDbStorages(options)).recoveryStorage;
 }
 
 export function serializeTaskForWeb(task: Task): StoredTask {
@@ -215,6 +264,135 @@ export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
     endTime,
     durationMinutes,
     notes: value.notes,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt
+  };
+}
+
+export function serializeRecoverySessionForWeb(
+  session: RecoverySession
+): StoredRecoverySession {
+  return {
+    id: session.id,
+    sourceDate: session.sourceDate,
+    status: session.status,
+    startedAt: session.startedAt,
+    completedAt: session.completedAt
+  };
+}
+
+export function deserializeRecoverySessionFromWeb(
+  value: unknown
+): Omit<RecoverySession, "items"> {
+  if (!isRecord(value)) {
+    throw new WebStorageDataError("Stored recovery session data is not an object.");
+  }
+
+  const sourceDate = value.sourceDate;
+  const status = value.status;
+
+  if (
+    typeof value.id !== "string" ||
+    typeof sourceDate !== "string" ||
+    normalizeLocalDateInput(sourceDate) !== sourceDate ||
+    typeof status !== "string" ||
+    !isRecoverySessionStatus(status) ||
+    typeof value.startedAt !== "string" ||
+    !isNullableString(value.completedAt)
+  ) {
+    throw new WebStorageDataError("Stored recovery session data has an invalid shape.");
+  }
+
+  if (
+    (status === "active" && value.completedAt !== null) ||
+    (status === "completed" && value.completedAt === null)
+  ) {
+    throw new WebStorageDataError(
+      "Stored recovery session status does not match its completion time."
+    );
+  }
+
+  return {
+    id: value.id,
+    sourceDate,
+    status,
+    startedAt: value.startedAt,
+    completedAt: value.completedAt
+  };
+}
+
+export function serializeRecoveryItemForWeb(item: RecoveryItem): StoredRecoveryItem {
+  return { ...item, createdTaskIds: [...item.createdTaskIds] };
+}
+
+export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
+  if (!isRecord(value)) {
+    throw new WebStorageDataError("Stored recovery item data is not an object.");
+  }
+
+  const originalScheduledDate = value.originalScheduledDate;
+  const originalStatus = value.originalStatus;
+  const originalScheduledTime = value.originalScheduledTime;
+  const originalEstimatedDurationMinutes = value.originalEstimatedDurationMinutes;
+  const status = value.status;
+  const decision = value.decision;
+  const rescheduledDate = value.rescheduledDate;
+  const rescheduledTime = value.rescheduledTime;
+
+  if (
+    typeof value.id !== "string" ||
+    typeof value.sessionId !== "string" ||
+    typeof value.taskId !== "string" ||
+    typeof value.originalTitle !== "string" ||
+    typeof originalStatus !== "string" ||
+    !isTaskStatus(originalStatus) ||
+    typeof originalScheduledDate !== "string" ||
+    normalizeLocalDateInput(originalScheduledDate) !== originalScheduledDate ||
+    !isValidStoredTime(originalScheduledTime) ||
+    !isValidStoredDuration(originalEstimatedDurationMinutes) ||
+    typeof status !== "string" ||
+    !isRecoveryItemStatus(status) ||
+    !isRecoveryDecision(decision) ||
+    !isNullableString(value.note) ||
+    !isValidStoredDate(rescheduledDate) ||
+    !isValidStoredTime(rescheduledTime) ||
+    !isStringArray(value.createdTaskIds) ||
+    !isNullableString(value.reviewedAt) ||
+    typeof value.createdAt !== "string" ||
+    typeof value.updatedAt !== "string"
+  ) {
+    throw new WebStorageDataError("Stored recovery item data has an invalid shape.");
+  }
+
+  if (rescheduledTime !== null && rescheduledDate === null) {
+    throw new WebStorageDataError("Stored recovery time requires a recovery date.");
+  }
+
+  if (
+    (status === "pending" && decision !== null && decision !== "skip") ||
+    (status === "resolved" && (decision === null || decision === "skip"))
+  ) {
+    throw new WebStorageDataError(
+      "Stored recovery item status does not match its decision."
+    );
+  }
+
+  return {
+    id: value.id,
+    sessionId: value.sessionId,
+    taskId: value.taskId,
+    originalTitle: value.originalTitle,
+    originalStatus,
+    originalScheduledDate,
+    originalScheduledTime,
+    originalEstimatedDurationMinutes,
+    status,
+    decision,
+    note: value.note,
+    rescheduledDate,
+    rescheduledTime,
+    createdTaskIds: [...value.createdTaskIds],
+    reviewedAt: value.reviewedAt,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt
   };
@@ -345,6 +523,176 @@ class IndexedDbCalendarEventStorage implements CalendarEventStorage {
   }
 }
 
+class IndexedDbRecoveryStorage implements RecoveryStorage {
+  constructor(private readonly database: IDBDatabase) {}
+
+  async insertSession(session: RecoverySession): Promise<void> {
+    const transaction = this.database.transaction(
+      [RECOVERY_SESSION_STORE_NAME, RECOVERY_ITEM_STORE_NAME],
+      "readwrite"
+    );
+    const completion = transactionComplete(transaction);
+    const sessionStore = transaction.objectStore(RECOVERY_SESSION_STORE_NAME);
+    const itemStore = transaction.objectStore(RECOVERY_ITEM_STORE_NAME);
+
+    try {
+      const activeSession = await requestResult(
+        sessionStore.index("status").get("active")
+      );
+
+      if (activeSession !== undefined) {
+        throw new Error("An active recovery session already exists.");
+      }
+
+      await requestResult(sessionStore.add(serializeRecoverySessionForWeb(session)));
+
+      for (const item of session.items) {
+        await requestResult(itemStore.add(serializeRecoveryItemForWeb(item)));
+      }
+    } catch (error) {
+      abortTransaction(transaction);
+      await ignoreTransactionResult(completion);
+      throw error;
+    }
+
+    await completion;
+  }
+
+  async getActiveSession(): Promise<RecoverySession | null> {
+    const transaction = this.database.transaction(
+      RECOVERY_SESSION_STORE_NAME,
+      "readonly"
+    );
+    const completion = transactionComplete(transaction);
+    const record = await requestResult(
+      transaction.objectStore(RECOVERY_SESSION_STORE_NAME).index("status").get("active")
+    );
+
+    await completion;
+
+    if (record === undefined) {
+      return null;
+    }
+
+    return this.loadSession(deserializeRecoverySessionFromWeb(record));
+  }
+
+  async getLatestCompletedSession(): Promise<RecoverySession | null> {
+    const transaction = this.database.transaction(
+      RECOVERY_SESSION_STORE_NAME,
+      "readonly"
+    );
+    const completion = transactionComplete(transaction);
+    const records = await requestResult(
+      transaction
+        .objectStore(RECOVERY_SESSION_STORE_NAME)
+        .index("status")
+        .getAll("completed")
+    );
+
+    await completion;
+
+    const session = records
+      .map(deserializeRecoverySessionFromWeb)
+      .sort((left, right) =>
+        (right.completedAt ?? "").localeCompare(left.completedAt ?? "")
+      )[0];
+
+    return session ? this.loadSession(session) : null;
+  }
+
+  async saveDecision(mutation: RecoveryDecisionMutation): Promise<void> {
+    const transaction = this.database.transaction(
+      [TASK_STORE_NAME, RECOVERY_ITEM_STORE_NAME],
+      "readwrite"
+    );
+    const completion = transactionComplete(transaction);
+    const taskStore = transaction.objectStore(TASK_STORE_NAME);
+    const itemStore = transaction.objectStore(RECOVERY_ITEM_STORE_NAME);
+
+    try {
+      for (const task of mutation.updatedTasks) {
+        const existingTask = await requestResult(taskStore.get(task.id));
+
+        if (existingTask === undefined) {
+          throw new Error(`Task ${task.id} could not be updated.`);
+        }
+
+        await requestResult(taskStore.put(serializeTaskForWeb(task)));
+      }
+
+      for (const task of mutation.createdTasks) {
+        await requestResult(taskStore.add(serializeTaskForWeb(task)));
+      }
+
+      const existingItem = await requestResult(itemStore.get(mutation.item.id));
+
+      if (existingItem === undefined) {
+        throw new Error(`Recovery item ${mutation.item.id} could not be updated.`);
+      }
+
+      await requestResult(itemStore.put(serializeRecoveryItemForWeb(mutation.item)));
+    } catch (error) {
+      abortTransaction(transaction);
+      await ignoreTransactionResult(completion);
+      throw error;
+    }
+
+    await completion;
+  }
+
+  async updateSession(session: RecoverySession): Promise<void> {
+    const transaction = this.database.transaction(
+      RECOVERY_SESSION_STORE_NAME,
+      "readwrite"
+    );
+    const completion = transactionComplete(transaction);
+    const sessionStore = transaction.objectStore(RECOVERY_SESSION_STORE_NAME);
+
+    try {
+      const existingSession = await requestResult(sessionStore.get(session.id));
+
+      if (existingSession === undefined) {
+        throw new Error(`Recovery session ${session.id} could not be updated.`);
+      }
+
+      await requestResult(sessionStore.put(serializeRecoverySessionForWeb(session)));
+    } catch (error) {
+      abortTransaction(transaction);
+      await ignoreTransactionResult(completion);
+      throw error;
+    }
+
+    await completion;
+  }
+
+  private async loadSession(
+    session: Omit<RecoverySession, "items">
+  ): Promise<RecoverySession> {
+    const transaction = this.database.transaction(RECOVERY_ITEM_STORE_NAME, "readonly");
+    const completion = transactionComplete(transaction);
+    const records = await requestResult(
+      transaction
+        .objectStore(RECOVERY_ITEM_STORE_NAME)
+        .index("sessionId")
+        .getAll(session.id)
+    );
+
+    await completion;
+
+    return {
+      ...session,
+      items: records
+        .map(deserializeRecoveryItemFromWeb)
+        .sort(
+          (left, right) =>
+            left.createdAt.localeCompare(right.createdAt) ||
+            left.id.localeCompare(right.id)
+        )
+    };
+  }
+}
+
 function openDatabase(
   indexedDbFactory: IndexedDbFactory,
   databaseName: string
@@ -377,6 +725,22 @@ function openDatabase(
         eventStore.createIndex("date", "date", { unique: false });
         eventStore.createIndex("updatedAt", "updatedAt", { unique: false });
       }
+
+      if (!database.objectStoreNames.contains(RECOVERY_SESSION_STORE_NAME)) {
+        const sessionStore = database.createObjectStore(RECOVERY_SESSION_STORE_NAME, {
+          keyPath: "id"
+        });
+        sessionStore.createIndex("status", "status", { unique: false });
+        sessionStore.createIndex("completedAt", "completedAt", { unique: false });
+      }
+
+      if (!database.objectStoreNames.contains(RECOVERY_ITEM_STORE_NAME)) {
+        const itemStore = database.createObjectStore(RECOVERY_ITEM_STORE_NAME, {
+          keyPath: "id"
+        });
+        itemStore.createIndex("sessionId", "sessionId", { unique: false });
+        itemStore.createIndex("status", "status", { unique: false });
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed."));
@@ -402,6 +766,18 @@ function transactionComplete(transaction: IDBTransaction): Promise<void> {
   });
 }
 
+function abortTransaction(transaction: IDBTransaction): void {
+  try {
+    transaction.abort();
+  } catch {}
+}
+
+async function ignoreTransactionResult(completion: Promise<void>): Promise<void> {
+  try {
+    await completion;
+  } catch {}
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -416,6 +792,29 @@ function isTaskStatus(value: string): value is TaskStatus {
 
 function isCalendarEventKind(value: string): value is CalendarEventKind {
   return calendarEventKinds.some((kind) => kind === value);
+}
+
+function isRecoverySessionStatus(value: string): value is RecoverySessionStatus {
+  return recoverySessionStatuses.some((status) => status === value);
+}
+
+function isRecoveryItemStatus(value: string): value is RecoveryItemStatus {
+  return recoveryItemStatuses.some((status) => status === value);
+}
+
+function isRecoveryDecision(value: unknown): value is RecoveryDecisionType | null {
+  return (
+    value === null ||
+    (typeof value === "string" &&
+      recoveryDecisionTypes.some((decision) => decision === value))
+  );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((item): item is string => typeof item === "string")
+  );
 }
 
 function isValidStoredDate(value: unknown): value is Task["scheduledDate"] {

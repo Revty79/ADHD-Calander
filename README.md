@@ -20,13 +20,18 @@ code structure for future iOS work. It includes:
   date-associated tasks.
 - Viewing today's tasks and all current non-deleted tasks.
 - Completing a task and undoing completion.
+- Starting a one-task-at-a-time Recovery Mode review for any local date.
+- Keeping tasks unscheduled, explicitly rescheduling, breaking work into smaller
+  unscheduled tasks, delegating locally, removing from active planning, or deciding
+  later.
+- Persisting active Recovery Mode progress and its decision history locally.
 - Native persistence in Expo SQLite.
 - Browser persistence in IndexedDB.
 - Desktop sidebar navigation and compact navigation at smaller browser widths.
 
-Recovery Mode, recurring events, event editing, scheduling automation,
-notifications, cloud sync, AI features, subscriptions, and external calendar
-integrations remain deferred.
+Recurring events, event editing, scheduling automation, notifications, cloud
+sync, AI features, subscriptions, and external calendar integrations remain
+deferred.
 
 ## Supported Platforms
 
@@ -88,9 +93,10 @@ Deployment is not configured in this prototype.
 
 ## Browser Persistence
 
-Web tasks and events are stored in the browser's IndexedDB database and are not
-sent to a server. Data survives normal page refreshes, browser restarts, and
-development server restarts for the same browser profile and origin.
+Web tasks, events, and Recovery Mode sessions are stored in the browser's
+IndexedDB database and are not sent to a server. Data survives normal page
+refreshes, browser restarts, and development server restarts for the same browser
+profile and origin.
 
 Browser and mobile data are currently separate. Clearing site data, using
 private browsing, browser storage pressure, or browser policy restrictions can
@@ -106,7 +112,8 @@ or cross-device transfer yet.
 4. Run `npm run android`.
 5. If Expo asks, choose the available Android target.
 
-Native task and calendar-event data use Expo SQLite and versioned SQL migrations.
+Native task, calendar-event, and Recovery Mode data use Expo SQLite and versioned
+SQL migrations.
 
 ## Development Commands
 
@@ -140,7 +147,9 @@ src/
   components/                Shared and web-specific UI primitives
   database/                  Storage contract, adapters, migrations, repository
   features/calendar/         Local-date math, aggregation, and calendar hook
+  features/recovery/         Recovery session hook and presentation helpers
   features/tasks/            Shared hooks and platform task lists
+  features/today/            Today plan aggregation hook
   styles/web.css             Responsive web styles
   types/                     Shared TypeScript domain types
   utils/                     Shared date and ID helpers
@@ -148,13 +157,16 @@ docs/                        Product and architecture documentation
 tests/                       SQLite repository and IndexedDB adapter tests
 ```
 
-See `docs/calendar-architecture.md` and `docs/web-architecture.md` for calendar,
-persistence, responsive layout, and shared-code decisions.
+See `docs/calendar-architecture.md`, `docs/recovery-architecture.md`, and
+`docs/web-architecture.md` for calendar, recovery, persistence, responsive
+layout, and shared-code decisions.
 
 ## Known Limitations
 
-- Recovery, Recap, and Settings are placeholders.
-- Only `not_started` and `completed` task states are implemented in the UI.
+- Recap and Settings are placeholders.
+- Recovery decisions can be changed while a session is active, but completed
+  recovery sessions are currently read-only.
+- Delegation stores only a local note; it does not contact another person.
 - Mobile date and time entry still use plain text fields.
 - Events can be created and viewed but not edited or deleted yet.
 - No task editing, deletion UI, filtering, sorting controls, drag-and-drop,

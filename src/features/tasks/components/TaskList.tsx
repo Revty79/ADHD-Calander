@@ -7,8 +7,8 @@ type TaskListProps = {
   title: string;
   emptyMessage: string;
   tasks: Task[];
-  actionLabel: string;
-  onAction(id: string): void;
+  actionLabel?: string;
+  onAction?(id: string): void;
   showDate?: boolean;
 };
 
@@ -52,25 +52,43 @@ export function TaskList({
                       {task.estimatedDurationMinutes} min estimate
                     </Text>
                   ) : null}
-                  <Text style={styles.metaText}>
-                    {task.status === "completed" ? "Completed" : "Not started"}
-                  </Text>
+                  <Text style={styles.metaText}>{getTaskStatusLabel(task.status)}</Text>
                 </View>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${actionLabel} ${task.title}`}
-                onPress={() => onAction(task.id)}
-                style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.actionButtonText}>{actionLabel}</Text>
-              </Pressable>
+              {actionLabel && onAction ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${actionLabel} ${task.title}`}
+                  onPress={() => onAction(task.id)}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    pressed && styles.pressed
+                  ]}
+                >
+                  <Text style={styles.actionButtonText}>{actionLabel}</Text>
+                </Pressable>
+              ) : null}
             </View>
           ))}
         </View>
       )}
     </View>
   );
+}
+
+function getTaskStatusLabel(status: Task["status"]): string {
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "delegated":
+      return "Delegated";
+    case "removed":
+      return "Removed from active tasks";
+    case "broken_down":
+      return "Broken into smaller tasks";
+    default:
+      return "Not started";
+  }
 }
 
 const styles = StyleSheet.create({

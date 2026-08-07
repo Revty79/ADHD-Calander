@@ -6,6 +6,7 @@ import { ErrorNotice } from "../../src/components/ErrorNotice";
 import { Screen } from "../../src/components/Screen";
 import { TaskList } from "../../src/features/tasks/components/TaskList";
 import { useAllTasks } from "../../src/features/tasks/hooks/useAllTasks";
+import { isTaskActive, isTaskCompleted, isTaskResolved } from "../../src/types/task";
 
 export default function TasksScreen() {
   const { tasks, isLoading, errorMessage, refresh, completeTask, undoCompletion } =
@@ -17,8 +18,9 @@ export default function TasksScreen() {
     }, [refresh])
   );
 
-  const openTasks = tasks.filter((task) => task.status !== "completed");
-  const completedTasks = tasks.filter((task) => task.status === "completed");
+  const openTasks = tasks.filter(isTaskActive);
+  const completedTasks = tasks.filter(isTaskCompleted);
+  const resolvedTasks = tasks.filter(isTaskResolved);
 
   return (
     <Screen>
@@ -66,6 +68,12 @@ export default function TasksScreen() {
             tasks={completedTasks}
             actionLabel="Undo"
             onAction={undoCompletion}
+            showDate
+          />
+          <TaskList
+            title="Resolved in Recovery Mode"
+            emptyMessage="Recovery decisions will appear here."
+            tasks={resolvedTasks}
             showDate
           />
         </>

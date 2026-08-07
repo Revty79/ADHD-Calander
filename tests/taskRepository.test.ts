@@ -30,7 +30,7 @@ async function createRepository() {
 }
 
 describe("task database", () => {
-  it("applies the calendar foundation migrations", async () => {
+  it("applies the recovery foundation migrations", async () => {
     const database = await createSqlJsDatabase();
 
     await initializeDatabase(database);
@@ -41,15 +41,24 @@ describe("task database", () => {
     const eventTable = await database.getFirstAsync<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'calendar_events';"
     );
+    const recoverySessionTable = await database.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'recovery_sessions';"
+    );
+    const recoveryItemTable = await database.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'recovery_items';"
+    );
     const migrations = await database.getAllAsync<{ version: number; name: string }>(
       "SELECT version, name FROM schema_migrations ORDER BY version;"
     );
 
     assert.equal(taskTable?.name, "tasks");
     assert.equal(eventTable?.name, "calendar_events");
+    assert.equal(recoverySessionTable?.name, "recovery_sessions");
+    assert.equal(recoveryItemTable?.name, "recovery_items");
     assert.deepEqual(migrations, [
       { version: 1, name: "create_tasks" },
-      { version: 2, name: "calendar_foundation" }
+      { version: 2, name: "calendar_foundation" },
+      { version: 3, name: "recovery_foundation" }
     ]);
   });
 
