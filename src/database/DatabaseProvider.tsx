@@ -9,7 +9,7 @@ import {
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { initializeDatabase } from "./database";
+import { createTaskRepository } from "./createTaskRepository";
 import { TaskRepository } from "./repositories/taskRepository";
 
 type DatabaseState =
@@ -23,9 +23,7 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<DatabaseState>({ status: "loading" });
 
   const openDatabase = useCallback(async () => {
-    const database = await initializeDatabase();
-
-    return new TaskRepository(database);
+    return createTaskRepository();
   }, []);
 
   const retryDatabase = useCallback(async () => {

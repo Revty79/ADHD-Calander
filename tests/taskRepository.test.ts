@@ -11,6 +11,7 @@ import {
 } from "../src/database/repositories/errors";
 import { TaskRepository } from "../src/database/repositories/taskRepository";
 import { SqlExecutor } from "../src/database/sql";
+import { SqlTaskStorage } from "../src/database/sqlTaskStorage";
 import { getLocalDateString } from "../src/utils/dates";
 import { createSqlJsDatabase } from "./helpers/sqlJsDatabase";
 
@@ -19,7 +20,7 @@ async function createRepository() {
   await initializeDatabase(database);
   let id = 0;
   const repository = new TaskRepository(
-    database,
+    new SqlTaskStorage(database),
     () => `task-${++id}`,
     () => new Date("2026-08-04T14:30:00.000Z")
   );
@@ -120,7 +121,7 @@ describe("task database", () => {
     const exportedData = database.exportData();
     const restoredDatabase = await createSqlJsDatabase(exportedData);
     await initializeDatabase(restoredDatabase);
-    const restoredRepository = new TaskRepository(restoredDatabase);
+    const restoredRepository = new TaskRepository(new SqlTaskStorage(restoredDatabase));
 
     const tasks = await restoredRepository.getTasksForDate("2026-08-04");
 
@@ -163,7 +164,7 @@ describe("task database", () => {
       getAllAsync: async () => [],
       getFirstAsync: async () => null
     };
-    const repository = new TaskRepository(failingDatabase);
+    const repository = new TaskRepository(new SqlTaskStorage(failingDatabase));
 
     await assert.rejects(
       async () =>

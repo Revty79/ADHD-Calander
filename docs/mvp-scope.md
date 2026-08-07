@@ -24,7 +24,8 @@
 
 ## Current First-Build Scope
 
-- Expo Router tab navigation for Today, Tasks, Recovery, Recap, and Settings.
+- Expo Router navigation for Today, Tasks, Recovery, Recap, and Settings on
+  Android, future iOS builds, and responsive web browsers.
 - Functional Today and Tasks screens.
 - Basic local task creation with title, optional description, scheduled date,
   and optional scheduled time.
@@ -33,6 +34,10 @@
 - Versioned initial database migration.
 - Repository tests for migration, task creation, date retrieval, completion,
   undo, persistence, validation, local dates, and database errors.
+- Responsive web sidebar and compact-width navigation.
+- IndexedDB-backed browser persistence through refreshes and browser restarts.
+- Browser task creation with semantic date and time inputs.
+- Shared repository behavior across SQLite and IndexedDB storage adapters.
 
 ## Out Of Scope For First Build
 

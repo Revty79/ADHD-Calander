@@ -1,5 +1,44 @@
 # Decision Log
 
+## 2026-08-06
+
+### One Shared Expo Codebase
+
+Decision: Keep Android, future iOS, and web in the existing Expo Router project.
+
+Reason: Task behavior and product language should remain consistent, and a
+second application would create avoidable duplication and drift.
+
+### Platform-Specific Web Files
+
+Decision: Use Expo and Expo Router platform extensions for web navigation,
+screens, task lists, forms, repository composition, and page styling.
+
+Reason: Desktop navigation and browser form semantics differ from mobile while
+the domain behavior remains shared. Platform files localize those differences
+without scattered runtime platform checks.
+
+### IndexedDB For Web Persistence
+
+Decision: Store web tasks in a versioned IndexedDB object store behind the
+shared `TaskStorage` contract.
+
+Reason: Expo SQLite web support in installed SDK 57 is documented as alpha and
+requires WebAssembly setup plus cross-origin-isolation headers. IndexedDB is a
+built-in durable browser database, works offline, and requires no server or task
+data transmission.
+
+Tradeoffs: IndexedDB and native SQLite require separate migration paths.
+Browser storage can be cleared or evicted, and browser/native data do not share
+automatically.
+
+### Separate Web And Native Data
+
+Decision: Keep browser and mobile task data separate for the current prototype.
+
+Reason: Cross-device data requires cloud sync, account, privacy, security, and
+conflict-resolution decisions that are outside the approved scope.
+
 ## 2026-08-04
 
 ### Working Name: ADHD Calendar
@@ -57,3 +96,7 @@ of scope for the first build and require product-owner approval.
 - What should count as an essential task during Recovery Mode?
 - Should task editing be included before or after the first Recovery Mode slice?
 - What accessibility settings should be configurable beyond system defaults?
+- Should a future local import/export feature bridge browser and mobile data
+  before cloud synchronization is considered?
+- What retention or backup guidance should the web UI provide before the
+  prototype is used for important long-term planning data?

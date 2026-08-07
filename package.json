@@ -3,15 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
+  "engines": {
+    "node": ">=20.19.4",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "expo start",
     "start": "expo start",
     "android": "expo start --android",
+    "web": "expo start --web",
+    "web:export": "expo export --platform web",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/taskRepository.test.ts",
+    "test": "tsx --test tests/taskRepository.test.ts tests/indexedDbTaskStorage.test.ts",
     "validate": "npm run format:check && npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
@@ -33,9 +39,11 @@
     "@types/node": "~20.19.43",
     "@types/react": "~19.2.2",
     "@types/sql.js": "^1.4.9",
+    "babel-preset-expo": "~57.0.5",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.1",
     "eslint-import-resolver-typescript": "^4.4.5",
+    "fake-indexeddb": "^6.2.5",
     "prettier": "^3.9.6",
     "sql.js": "^1.14.1",
     "tsx": "^4.23.5",

@@ -1,53 +1,19 @@
-import {
-  CreateTaskInput,
-  LocalDateString,
-  LocalTimeString,
-  Task,
-  TaskStatus
-} from "../../types/task";
+import { CreateTaskInput, Task } from "../../types/task";
 import {
   getLocalDateString,
   normalizeLocalDateInput,
   normalizeOptionalTime
 } from "../../utils/dates";
 import { createTaskId } from "../../utils/ids";
-import { SqlExecutor } from "../sql";
+import { TaskStorage } from "../taskStorage";
 import { TaskNotFoundError, TaskPersistenceError, TaskValidationError } from "./errors";
-
-type TaskRow = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: TaskStatus;
-  scheduledDate: LocalDateString;
-  scheduledTime: LocalTimeString | null;
-  createdAt: string;
-  updatedAt: string;
-  completedAt: string | null;
-  deletedAt: string | null;
-};
 
 type Clock = () => Date;
 type IdGenerator = () => string;
 
-const taskSelect = `
-  SELECT
-    id,
-    title,
-    description,
-    status,
-    scheduled_date AS scheduledDate,
-    scheduled_time AS scheduledTime,
-    created_at AS createdAt,
-    updated_at AS updatedAt,
-    completed_at AS completedAt,
-    deleted_at AS deletedAt
-  FROM tasks
-`;
-
 export class TaskRepository {
   constructor(
-    private readonly database: SqlExecutor,
+    private readonly storage: TaskStorage,
     private readonly idGenerator: IdGenerator = createTaskId,
     private readonly clock: Clock = () => new Date()
   ) {}
@@ -69,32 +35,7 @@ export class TaskRepository {
     };
 
     try {
-      await this.database.runAsync(
-        `
-          INSERT INTO tasks (
-            id,
-            title,
-            description,
-            status,
-            scheduled_date,
-            scheduled_time,
-            created_at,
-            updated_at,
-            completed_at,
-            deleted_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        `,
-        task.id,
-        task.title,
-        task.description,
-        task.status,
-        task.scheduledDate,
-        task.scheduledTime,
-        task.createdAt,
-        task.updatedAt,
-        task.completedAt,
-        task.deletedAt
-      );
+      await this.storage.insertTask(task);
     } catch (error) {
       throw new TaskPersistenceError("Unable to save the task.", error);
     }
@@ -113,21 +54,9 @@ export class TaskRepository {
     }
 
     try {
-      const rows = await this.database.getAllAsync<TaskRow>(
-        `
-          ${taskSelect}
-          WHERE scheduled_date = ?
-            AND deleted_at IS NULL
-          ORDER BY
-            CASE status WHEN 'completed' THEN 1 ELSE 0 END,
-            scheduled_time IS NULL,
-            scheduled_time,
-            created_at;
-        `,
-        scheduledDate
-      );
+      const tasks = await this.storage.getTasksForDate(scheduledDate);
 
-      return rows.map(mapTaskRow);
+      return tasks.filter(isVisibleTask).sort(compareTasks);
     } catch (error) {
       throw new TaskPersistenceError(
         "Unable to load tasks for the selected date.",
@@ -138,18 +67,9 @@ export class TaskRepository {
 
   async getAllTasks(): Promise<Task[]> {
     try {
-      const rows = await this.database.getAllAsync<TaskRow>(`
-        ${taskSelect}
-        WHERE deleted_at IS NULL
-        ORDER BY
-          scheduled_date,
-          CASE status WHEN 'completed' THEN 1 ELSE 0 END,
-          scheduled_time IS NULL,
-          scheduled_time,
-          created_at;
-      `);
+      const tasks = await this.storage.getAllTasks();
 
-      return rows.map(mapTaskRow);
+      return tasks.filter(isVisibleTask).sort(compareTasks);
     } catch (error) {
       throw new TaskPersistenceError("Unable to load tasks.", error);
     }
@@ -159,26 +79,24 @@ export class TaskRepository {
     const timestamp = this.clock().toISOString();
 
     try {
-      const result = await this.database.runAsync(
-        `
-          UPDATE tasks
-          SET
-            status = 'completed',
-            completed_at = COALESCE(completed_at, ?),
-            updated_at = ?
-          WHERE id = ?
-            AND deleted_at IS NULL;
-        `,
-        timestamp,
-        timestamp,
-        id
-      );
+      const existingTask = await this.storage.getTaskById(id);
 
-      if (result.changes === 0) {
+      if (!existingTask) {
         throw new TaskNotFoundError();
       }
 
-      return await this.getTaskById(id);
+      const completedTask: Task = {
+        ...existingTask,
+        status: "completed",
+        completedAt: existingTask.completedAt ?? timestamp,
+        updatedAt: timestamp
+      };
+
+      if (!(await this.storage.updateTask(completedTask))) {
+        throw new TaskNotFoundError();
+      }
+
+      return completedTask;
     } catch (error) {
       if (error instanceof TaskNotFoundError) {
         throw error;
@@ -192,25 +110,24 @@ export class TaskRepository {
     const timestamp = this.clock().toISOString();
 
     try {
-      const result = await this.database.runAsync(
-        `
-          UPDATE tasks
-          SET
-            status = 'not_started',
-            completed_at = NULL,
-            updated_at = ?
-          WHERE id = ?
-            AND deleted_at IS NULL;
-        `,
-        timestamp,
-        id
-      );
+      const existingTask = await this.storage.getTaskById(id);
 
-      if (result.changes === 0) {
+      if (!existingTask) {
         throw new TaskNotFoundError();
       }
 
-      return await this.getTaskById(id);
+      const restoredTask: Task = {
+        ...existingTask,
+        status: "not_started",
+        completedAt: null,
+        updatedAt: timestamp
+      };
+
+      if (!(await this.storage.updateTask(restoredTask))) {
+        throw new TaskNotFoundError();
+      }
+
+      return restoredTask;
     } catch (error) {
       if (error instanceof TaskNotFoundError) {
         throw error;
@@ -218,24 +135,6 @@ export class TaskRepository {
 
       throw new TaskPersistenceError("Unable to undo task completion.", error);
     }
-  }
-
-  private async getTaskById(id: string): Promise<Task> {
-    const row = await this.database.getFirstAsync<TaskRow>(
-      `
-        ${taskSelect}
-        WHERE id = ?
-          AND deleted_at IS NULL
-        LIMIT 1;
-      `,
-      id
-    );
-
-    if (!row) {
-      throw new TaskNotFoundError();
-    }
-
-    return mapTaskRow(row);
   }
 }
 
@@ -277,17 +176,37 @@ function normalizeCreateTaskInput(
   };
 }
 
-function mapTaskRow(row: TaskRow): Task {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    status: row.status,
-    scheduledDate: row.scheduledDate,
-    scheduledTime: row.scheduledTime,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    completedAt: row.completedAt,
-    deletedAt: row.deletedAt
-  };
+function isVisibleTask(task: Task): boolean {
+  return task.deletedAt === null;
+}
+
+function compareTasks(first: Task, second: Task): number {
+  const dateOrder = first.scheduledDate.localeCompare(second.scheduledDate);
+
+  if (dateOrder !== 0) {
+    return dateOrder;
+  }
+
+  const firstCompleted = first.status === "completed" ? 1 : 0;
+  const secondCompleted = second.status === "completed" ? 1 : 0;
+
+  if (firstCompleted !== secondCompleted) {
+    return firstCompleted - secondCompleted;
+  }
+
+  if (first.scheduledTime === null && second.scheduledTime !== null) {
+    return 1;
+  }
+
+  if (first.scheduledTime !== null && second.scheduledTime === null) {
+    return -1;
+  }
+
+  const timeOrder = (first.scheduledTime ?? "").localeCompare(second.scheduledTime ?? "");
+
+  if (timeOrder !== 0) {
+    return timeOrder;
+  }
+
+  return first.createdAt.localeCompare(second.createdAt);
 }
