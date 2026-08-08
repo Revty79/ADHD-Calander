@@ -13,18 +13,21 @@ import {
   recoverySessionStatuses,
   RecoverySessionStatus
 } from "../types/recovery";
+import { isReminderOffsetMinutes } from "../notifications/reminderRules";
 import { taskStatuses, Task, TaskStatus } from "../types/task";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../utils/dates";
 import { CalendarEventStorage } from "./calendarEventStorage";
 import { RecoveryDecisionMutation, RecoveryStorage } from "./recoveryStorage";
+import { SettingsStorage, StoredSetting } from "./settingsStorage";
 import { TaskStorage } from "./taskStorage";
 
 const WEB_DATABASE_NAME = "adhd-calendar-web";
-const WEB_DATABASE_VERSION = 3;
+const WEB_DATABASE_VERSION = 5;
 const TASK_STORE_NAME = "tasks";
 const EVENT_STORE_NAME = "calendarEvents";
 const RECOVERY_SESSION_STORE_NAME = "recoverySessions";
 const RECOVERY_ITEM_STORE_NAME = "recoveryItems";
+const SETTINGS_STORE_NAME = "appSettings";
 
 type IndexedDbFactory = Pick<IDBFactory, "open">;
 
@@ -42,9 +45,11 @@ type StoredTask = {
   scheduledDate: string | null;
   scheduledTime: string | null;
   estimatedDurationMinutes?: number | null;
+  deadlineDate?: Task["deadlineDate"];
   createdAt: string;
   updatedAt: string;
   completedAt?: string | null;
+  reminderOffsetMinutes?: Task["reminderOffsetMinutes"];
   deletedAt: string | null;
 };
 
@@ -57,6 +62,7 @@ type StoredCalendarEvent = {
   endTime: string | null;
   durationMinutes: number | null;
   notes: string | null;
+  reminderOffsetMinutes?: CalendarEvent["reminderOffsetMinutes"];
   createdAt: string;
   updatedAt: string;
 };
@@ -78,6 +84,7 @@ type StoredRecoveryItem = {
   originalScheduledDate: string;
   originalScheduledTime: string | null;
   originalEstimatedDurationMinutes: number | null;
+  originalReminderOffsetMinutes?: RecoveryItem["originalReminderOffsetMinutes"];
   status: RecoveryItemStatus;
   decision: RecoveryDecisionType | null;
   note: string | null;
@@ -112,6 +119,7 @@ export async function openIndexedDbStorages(
   taskStorage: TaskStorage;
   calendarEventStorage: CalendarEventStorage;
   recoveryStorage: RecoveryStorage;
+  settingsStorage: SettingsStorage;
 }> {
   const indexedDbFactory = options.indexedDB ?? globalThis.indexedDB;
 
@@ -134,7 +142,8 @@ export async function openIndexedDbStorages(
         database,
         options.keyRange ?? globalThis.IDBKeyRange
       ),
-      recoveryStorage: new IndexedDbRecoveryStorage(database)
+      recoveryStorage: new IndexedDbRecoveryStorage(database),
+      settingsStorage: new IndexedDbSettingsStorage(database)
     };
   } catch (error) {
     if (error instanceof WebStorageInitializationError) {
@@ -166,6 +175,12 @@ export async function openIndexedDbRecoveryStorage(
   return (await openIndexedDbStorages(options)).recoveryStorage;
 }
 
+export async function openIndexedDbSettingsStorage(
+  options: OpenIndexedDbStorageOptions = {}
+): Promise<SettingsStorage> {
+  return (await openIndexedDbStorages(options)).settingsStorage;
+}
+
 export function serializeTaskForWeb(task: Task): StoredTask {
   return { ...task };
 }
@@ -179,7 +194,9 @@ export function deserializeTaskFromWeb(value: unknown): Task {
   const scheduledDate = value.scheduledDate;
   const scheduledTime = value.scheduledTime;
   const estimatedDurationMinutes = value.estimatedDurationMinutes ?? null;
+  const deadlineDate = value.deadlineDate ?? null;
   const completedAt = value.completedAt ?? null;
+  const reminderOffsetMinutes = value.reminderOffsetMinutes ?? null;
 
   if (
     typeof value.id !== "string" ||
@@ -190,6 +207,8 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     !isValidStoredDate(scheduledDate) ||
     !isValidStoredTime(scheduledTime) ||
     !isValidStoredDuration(estimatedDurationMinutes) ||
+    !isValidStoredDate(deadlineDate) ||
+    !isValidStoredReminderOffset(reminderOffsetMinutes) ||
     typeof value.createdAt !== "string" ||
     typeof value.updatedAt !== "string" ||
     !isNullableString(completedAt) ||
@@ -210,9 +229,11 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     scheduledDate,
     scheduledTime,
     estimatedDurationMinutes,
+    deadlineDate,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     completedAt,
+    reminderOffsetMinutes,
     deletedAt: value.deletedAt
   };
 }
@@ -231,6 +252,7 @@ export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
   const startTime = value.startTime;
   const endTime = value.endTime;
   const durationMinutes = value.durationMinutes;
+  const reminderOffsetMinutes = value.reminderOffsetMinutes ?? null;
 
   if (
     typeof value.id !== "string" ||
@@ -243,6 +265,7 @@ export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
     normalizeOptionalTime(startTime) !== startTime ||
     !isValidStoredTime(endTime) ||
     !isValidStoredDuration(durationMinutes) ||
+    !isValidStoredReminderOffset(reminderOffsetMinutes) ||
     !isNullableString(value.notes) ||
     typeof value.createdAt !== "string" ||
     typeof value.updatedAt !== "string"
@@ -265,6 +288,7 @@ export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
     endTime,
     durationMinutes,
     notes: value.notes,
+    reminderOffsetMinutes,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt
   };
@@ -335,6 +359,7 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
   const originalStatus = value.originalStatus;
   const originalScheduledTime = value.originalScheduledTime;
   const originalEstimatedDurationMinutes = value.originalEstimatedDurationMinutes;
+  const originalReminderOffsetMinutes = value.originalReminderOffsetMinutes ?? null;
   const status = value.status;
   const decision = value.decision;
   const rescheduledDate = value.rescheduledDate;
@@ -351,6 +376,7 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
     normalizeLocalDateInput(originalScheduledDate) !== originalScheduledDate ||
     !isValidStoredTime(originalScheduledTime) ||
     !isValidStoredDuration(originalEstimatedDurationMinutes) ||
+    !isValidStoredReminderOffset(originalReminderOffsetMinutes) ||
     typeof status !== "string" ||
     !isRecoveryItemStatus(status) ||
     !isRecoveryDecision(decision) ||
@@ -387,6 +413,7 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
     originalScheduledDate,
     originalScheduledTime,
     originalEstimatedDurationMinutes,
+    originalReminderOffsetMinutes,
     status,
     decision,
     note: value.note,
@@ -521,6 +548,46 @@ class IndexedDbCalendarEventStorage implements CalendarEventStorage {
     await completion;
 
     return records.map(deserializeCalendarEventFromWeb);
+  }
+
+  async getAllEvents(): Promise<CalendarEvent[]> {
+    const transaction = this.database.transaction(EVENT_STORE_NAME, "readonly");
+    const completion = transactionComplete(transaction);
+    const records = await requestResult(
+      transaction.objectStore(EVENT_STORE_NAME).getAll()
+    );
+
+    await completion;
+
+    return records.map(deserializeCalendarEventFromWeb);
+  }
+}
+
+class IndexedDbSettingsStorage implements SettingsStorage {
+  constructor(private readonly database: IDBDatabase) {}
+
+  async getSetting(key: string): Promise<StoredSetting | null> {
+    const transaction = this.database.transaction(SETTINGS_STORE_NAME, "readonly");
+    const completion = transactionComplete(transaction);
+    const record = await requestResult(
+      transaction.objectStore(SETTINGS_STORE_NAME).get(key)
+    );
+
+    await completion;
+
+    if (record === undefined || !isStoredSetting(record)) {
+      return null;
+    }
+
+    return record;
+  }
+
+  async setSetting(setting: StoredSetting): Promise<void> {
+    const transaction = this.database.transaction(SETTINGS_STORE_NAME, "readwrite");
+    const completion = transactionComplete(transaction);
+
+    await requestResult(transaction.objectStore(SETTINGS_STORE_NAME).put(setting));
+    await completion;
   }
 }
 
@@ -765,6 +832,10 @@ function openDatabase(
         itemStore.createIndex("sessionId", "sessionId", { unique: false });
         itemStore.createIndex("status", "status", { unique: false });
       }
+
+      if (!database.objectStoreNames.contains(SETTINGS_STORE_NAME)) {
+        database.createObjectStore(SETTINGS_STORE_NAME, { keyPath: "key" });
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed."));
@@ -858,5 +929,20 @@ function isValidStoredTime(value: unknown): value is Task["scheduledTime"] {
 function isValidStoredDuration(value: unknown): value is number | null {
   return (
     value === null || (typeof value === "number" && Number.isInteger(value) && value > 0)
+  );
+}
+
+function isValidStoredReminderOffset(
+  value: unknown
+): value is Task["reminderOffsetMinutes"] {
+  return value === null || isReminderOffsetMinutes(value);
+}
+
+function isStoredSetting(value: unknown): value is StoredSetting {
+  return (
+    isRecord(value) &&
+    typeof value.key === "string" &&
+    typeof value.value === "string" &&
+    typeof value.updatedAt === "string"
   );
 }

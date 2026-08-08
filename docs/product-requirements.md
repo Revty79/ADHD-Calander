@@ -43,7 +43,13 @@ Calendar, Tasks, Recovery, and Daily Recap views, local SQLite and IndexedDB
 persistence, completion, and completion undo. Recap uses actual local
 completion dates, keeps fixed commitments factual, and summarizes explicit
 Recovery decisions without scoring the day. Recovery supports explicit
-task-by-task decisions without automatic next-day scheduling.
+task-by-task decisions without automatic next-day scheduling. Settings provides
+a local reminder master control, accessibility and privacy guidance, and app
+information. Native scheduled tasks and fixed events may each have one optional
+local reminder; web reports that notification scheduling is unavailable there.
+Flexible tasks can request deterministic scheduling suggestions inside local
+planning boundaries. The user reviews no more than three factual options and
+must choose and confirm one before the existing task schedule changes.
 
 ## Explicit Non-MVP Features
 
@@ -51,8 +57,8 @@ task-by-task decisions without automatic next-day scheduling.
 - AI task assistance
 - External calendar integrations
 - Subscription or payment flows
-- Advanced notifications
-- Full scheduling engine
+- Advanced notifications, quiet hours, and cloud push
+- Automatic schedule optimization or unconfirmed rescheduling
 - Automated or AI-assisted Recovery Mode scheduling
 - Medical, diagnostic, or therapeutic advice
 
@@ -63,3 +69,12 @@ that completion, deliberately process unfinished work in Recovery Mode, and
 review recorded accomplishments for the date they were actually completed.
 Closing and reopening the app preserves task, recovery, and derived recap
 accuracy without punitive language or alarming overdue treatment.
+
+Optional reminders pass the same success test when enabled: they follow the
+item's explicit local schedule, stop after completion or a resolving Recovery
+decision, and never prevent planning when permission is unavailable.
+
+Scheduling assistance passes when a flexible task with a duration can receive
+bounded, non-overlapping local-time suggestions around fixed events and timed
+tasks; accepting one preserves task identity and persistence, while declining
+leaves the task unchanged.

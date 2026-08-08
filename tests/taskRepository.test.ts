@@ -30,7 +30,7 @@ async function createRepository() {
 }
 
 describe("task database", () => {
-  it("applies the recovery foundation migrations", async () => {
+  it("applies the scheduling assistance foundation migrations", async () => {
     const database = await createSqlJsDatabase();
 
     await initializeDatabase(database);
@@ -47,6 +47,9 @@ describe("task database", () => {
     const recoveryItemTable = await database.getFirstAsync<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'recovery_items';"
     );
+    const settingsTable = await database.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'app_settings';"
+    );
     const migrations = await database.getAllAsync<{ version: number; name: string }>(
       "SELECT version, name FROM schema_migrations ORDER BY version;"
     );
@@ -55,10 +58,13 @@ describe("task database", () => {
     assert.equal(eventTable?.name, "calendar_events");
     assert.equal(recoverySessionTable?.name, "recovery_sessions");
     assert.equal(recoveryItemTable?.name, "recovery_items");
+    assert.equal(settingsTable?.name, "app_settings");
     assert.deepEqual(migrations, [
       { version: 1, name: "create_tasks" },
       { version: 2, name: "calendar_foundation" },
-      { version: 3, name: "recovery_foundation" }
+      { version: 3, name: "recovery_foundation" },
+      { version: 4, name: "settings_reminders_foundation" },
+      { version: 5, name: "scheduling_assistance_foundation" }
     ]);
   });
 
@@ -105,6 +111,8 @@ describe("task database", () => {
     assert.equal(tasks[0]?.title, "Existing task");
     assert.equal(tasks[0]?.scheduledDate, "2026-08-06");
     assert.equal(tasks[0]?.estimatedDurationMinutes, null);
+    assert.equal(tasks[0]?.deadlineDate, null);
+    assert.equal(tasks[0]?.reminderOffsetMinutes, null);
   });
 
   it("creates a task with normalized input", async () => {
@@ -115,7 +123,8 @@ describe("task database", () => {
       description: "  Use checking account  ",
       scheduledDate: "2026-08-04",
       scheduledTime: "09:15",
-      estimatedDurationMinutes: 25
+      estimatedDurationMinutes: 25,
+      deadlineDate: "2026-08-08"
     });
 
     assert.equal(task.id, "task-1");
@@ -125,6 +134,7 @@ describe("task database", () => {
     assert.equal(task.scheduledDate, "2026-08-04");
     assert.equal(task.scheduledTime, "09:15");
     assert.equal(task.estimatedDurationMinutes, 25);
+    assert.equal(task.deadlineDate, "2026-08-08");
     assert.equal(task.completedAt, null);
     assert.equal(task.deletedAt, null);
   });
@@ -155,6 +165,29 @@ describe("task database", () => {
         return true;
       }
     );
+  });
+
+  it("keeps a deadline distinct and not earlier than a planned date", async () => {
+    const { repository } = await createRepository();
+
+    await assert.rejects(
+      () =>
+        repository.createTask({
+          title: "Impossible plan",
+          scheduledDate: "2026-08-08",
+          deadlineDate: "2026-08-07"
+        }),
+      (error) => error instanceof TaskValidationError && error.field === "deadlineDate"
+    );
+
+    const task = await repository.createTask({
+      title: "Possible plan",
+      scheduledDate: "2026-08-08",
+      deadlineDate: "2026-08-08"
+    });
+
+    assert.equal(task.scheduledDate, "2026-08-08");
+    assert.equal(task.deadlineDate, "2026-08-08");
   });
 
   it("retrieves tasks for a date without returning other days", async () => {

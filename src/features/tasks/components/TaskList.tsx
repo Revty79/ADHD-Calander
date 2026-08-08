@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { Task } from "../../../types/task";
+import { formatReminderOffset } from "../../../notifications/reminderRules";
+import { isTaskActive, Task } from "../../../types/task";
 import { formatLocalDateForDisplay } from "../../../utils/dates";
 
 type TaskListProps = {
@@ -9,6 +10,7 @@ type TaskListProps = {
   tasks: Task[];
   actionLabel?: string;
   onAction?(id: string): void;
+  onSchedule?(id: string): void;
   showDate?: boolean;
 };
 
@@ -18,6 +20,7 @@ export function TaskList({
   tasks,
   actionLabel,
   onAction,
+  onSchedule,
   showDate = false
 }: TaskListProps) {
   return (
@@ -52,21 +55,46 @@ export function TaskList({
                       {task.estimatedDurationMinutes} min estimate
                     </Text>
                   ) : null}
+                  {task.deadlineDate ? (
+                    <Text style={styles.metaText}>
+                      Deadline {formatLocalDateForDisplay(task.deadlineDate)}
+                    </Text>
+                  ) : null}
+                  {task.reminderOffsetMinutes !== null ? (
+                    <Text style={styles.metaText}>
+                      Reminder: {formatReminderOffset(task.reminderOffsetMinutes)}
+                    </Text>
+                  ) : null}
                   <Text style={styles.metaText}>{getTaskStatusLabel(task.status)}</Text>
                 </View>
               </View>
               {actionLabel && onAction ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${actionLabel} ${task.title}`}
-                  onPress={() => onAction(task.id)}
-                  style={({ pressed }) => [
-                    styles.actionButton,
-                    pressed && styles.pressed
-                  ]}
-                >
-                  <Text style={styles.actionButtonText}>{actionLabel}</Text>
-                </Pressable>
+                <View style={styles.actions}>
+                  {onSchedule && isTaskActive(task) && task.scheduledTime === null ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Help me schedule ${task.title}`}
+                      onPress={() => onSchedule(task.id)}
+                      style={({ pressed }) => [
+                        styles.scheduleButton,
+                        pressed && styles.pressed
+                      ]}
+                    >
+                      <Text style={styles.scheduleButtonText}>Help me schedule</Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${actionLabel} ${task.title}`}
+                    onPress={() => onAction(task.id)}
+                    style={({ pressed }) => [
+                      styles.actionButton,
+                      pressed && styles.pressed
+                    ]}
+                  >
+                    <Text style={styles.actionButtonText}>{actionLabel}</Text>
+                  </Pressable>
+                </View>
               ) : null}
             </View>
           ))}
@@ -159,8 +187,25 @@ const styles = StyleSheet.create({
     minWidth: 84,
     paddingHorizontal: 12
   },
+  actions: {
+    alignItems: "stretch",
+    gap: 8
+  },
   actionButtonText: {
     color: "#2f5d62",
+    fontSize: 14,
+    fontWeight: "700"
+  },
+  scheduleButton: {
+    alignItems: "center",
+    backgroundColor: "#2f5d62",
+    borderRadius: 8,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 12
+  },
+  scheduleButtonText: {
+    color: "#ffffff",
     fontSize: 14,
     fontWeight: "700"
   },

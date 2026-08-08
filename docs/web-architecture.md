@@ -29,7 +29,11 @@ Platform-specific files own:
 - `app/(tabs)/recovery.web.tsx`: one-task recovery review and semantic forms.
 - `app/(tabs)/recap.web.tsx`: semantic date controls and a responsive derived
   daily recap.
+- `app/(tabs)/settings.web.tsx`: semantic accessibility, privacy, app-info, and
+  accurate notification-support sections.
 - `app/tasks/new.web.tsx`: semantic browser form controls.
+- `app/tasks/[id]/schedule.web.tsx`: semantic suggestion selection and explicit
+  scheduling confirmation.
 - `app/events/new.web.tsx`: semantic browser event form controls.
 - `src/components/Screen.web.tsx`: web page sizing for shared placeholder pages.
 - `src/features/tasks/components/TaskList.web.tsx`: semantic web task lists.
@@ -54,8 +58,8 @@ return to Today, Tasks, or its selected Calendar date.
 
 Native builds continue to initialize Expo SQLite, apply versioned SQL
 migrations, and use SQL storage adapters. The web build opens IndexedDB database
-`adhd-calendar-web` at version 3 with `tasks`, `calendarEvents`,
-`recoverySessions`, and `recoveryItems` stores.
+`adhd-calendar-web` at version 5 with `tasks`, `calendarEvents`,
+`recoverySessions`, `recoveryItems`, and `appSettings` stores.
 
 `TaskRepository`, `CalendarEventRepository`, and `RecoveryRepository` depend on
 platform-neutral storage contracts. Both platforms return the same domain
@@ -63,10 +67,17 @@ shapes, while validation and recovery rules remain in shared repositories.
 IndexedDB recovery decisions update task records and recovery items in one
 transaction.
 
+`SettingsRepository` uses the `appSettings` store through a shared storage
+contract. `ReminderService` is also composed on web, but receives
+`UnsupportedNotificationAdapter`: it schedules nothing and reports
+`unsupported`. The Settings screen explains that reminders are available in the
+Android app and never asks for browser notification permission.
+
 `DailyRecapRepository` composes those shared repositories and persists nothing.
 IndexedDB recovery sessions are filtered by source date in the adapter without
 an object-store version change. Legacy task records that omit `completedAt` are
-read as having an unknown completion time.
+read as having an unknown completion time, and records that omit `deadlineDate`
+are read with no deadline.
 
 IndexedDB was selected because Expo SQLite web support in the installed SDK 57
 is documented as alpha and requires WebAssembly configuration plus
@@ -90,10 +101,16 @@ sharing with native SQLite.
   screens and a single stacked column on narrower screens.
 - Recap uses a wide accomplishment area with smaller factual calendar and
   Recovery context panels, then stacks into one column below 960 pixels.
+- Scheduling assistance uses up to three side-by-side suggestion cards on wide
+  screens and one vertical column below 960 pixels. Every option is a semantic
+  button with visible focus, pressed state, and descriptive accessible text.
 
 Content uses maximum widths, flexible grid columns, wrapping metadata, and
 breakable task text to avoid ordinary horizontal scrolling. Browser zoom and
 larger text remain supported because sizing is primarily fluid and relative.
+Visible focus outlines remain enabled, and a reduced-motion media query removes
+nonessential animation and transition duration when the operating system asks
+for reduced motion.
 
 ## Known Limitations
 
@@ -101,12 +118,13 @@ larger text remain supported because sizing is primarily fluid and relative.
 - Private browsing, user-cleared site data, storage pressure, or browser policy
   can remove IndexedDB data.
 - Web and native tasks are separate and cannot currently be imported or synced.
-- Settings stays as a calm placeholder.
+- Web notification scheduling is deliberately unsupported; Settings reports the
+  Android-app-only availability accurately.
 - Completed legacy tasks without a known completion timestamp cannot appear on
   a historical Recap date.
 - Completed recovery sessions are retained but do not yet have a history browser.
-- Event/task editing, deletion, filtering, sorting controls, notifications, and
-  recurring items are not implemented.
+- Event/task editing, deletion, filtering, sorting controls, advanced
+  notifications, and recurring items are not implemented.
 
 ## Future Cross-Platform Work
 

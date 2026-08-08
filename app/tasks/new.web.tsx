@@ -38,6 +38,7 @@ export default function WebNewTaskScreen() {
   const [scheduledDate, setScheduledDate] = useState<string>(initialDate);
   const [scheduledTime, setScheduledTime] = useState("");
   const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState("");
+  const [deadlineDate, setDeadlineDate] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,7 +57,8 @@ export default function WebNewTaskScreen() {
         scheduledTime,
         estimatedDurationMinutes: estimatedDurationMinutes.trim()
           ? Number(estimatedDurationMinutes)
-          : null
+          : null,
+        deadlineDate
       });
 
       if (params.returnTo === "calendar") {
@@ -189,6 +191,32 @@ export default function WebNewTaskScreen() {
             {fieldErrors.estimatedDurationMinutes ? (
               <p className="web-validation-message" id="task-duration-error" role="alert">
                 {fieldErrors.estimatedDurationMinutes}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="web-form-group">
+            <label htmlFor="task-deadline">
+              Deadline <span>Optional</span>
+            </label>
+            <input
+              aria-describedby={
+                fieldErrors.deadlineDate
+                  ? "task-deadline-error task-deadline-help"
+                  : "task-deadline-help"
+              }
+              aria-invalid={fieldErrors.deadlineDate ? true : undefined}
+              id="task-deadline"
+              onChange={(event) => setDeadlineDate(event.currentTarget.value)}
+              type="date"
+              value={deadlineDate}
+            />
+            <small id="task-deadline-help">
+              A deadline is the last day to finish, not the time you plan to work.
+            </small>
+            {fieldErrors.deadlineDate ? (
+              <p className="web-validation-message" id="task-deadline-error" role="alert">
+                {fieldErrors.deadlineDate}
               </p>
             ) : null}
           </div>

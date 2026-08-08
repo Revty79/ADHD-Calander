@@ -28,6 +28,7 @@ type RecoveryItemRow = {
   originalScheduledDate: LocalDateString;
   originalScheduledTime: LocalTimeString | null;
   originalEstimatedDurationMinutes: number | null;
+  originalReminderOffsetMinutes: RecoveryItem["originalReminderOffsetMinutes"];
   status: RecoveryItemStatus;
   decision: RecoveryDecisionType | null;
   note: string | null;
@@ -59,6 +60,7 @@ const itemSelect = `
     original_scheduled_date AS originalScheduledDate,
     original_scheduled_time AS originalScheduledTime,
     original_estimated_duration_minutes AS originalEstimatedDurationMinutes,
+    original_reminder_offset_minutes AS originalReminderOffsetMinutes,
     status,
     decision,
     note,
@@ -205,6 +207,7 @@ export class SqlRecoveryStorage implements RecoveryStorage {
           original_scheduled_date,
           original_scheduled_time,
           original_estimated_duration_minutes,
+          original_reminder_offset_minutes,
           status,
           decision,
           note,
@@ -214,7 +217,7 @@ export class SqlRecoveryStorage implements RecoveryStorage {
           reviewed_at,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       item.id,
       item.sessionId,
@@ -224,6 +227,7 @@ export class SqlRecoveryStorage implements RecoveryStorage {
       item.originalScheduledDate,
       item.originalScheduledTime,
       item.originalEstimatedDurationMinutes,
+      item.originalReminderOffsetMinutes,
       item.status,
       item.decision,
       item.note,
@@ -282,6 +286,7 @@ function mapRecoveryItemRow(row: RecoveryItemRow): RecoveryItem {
     originalScheduledDate: row.originalScheduledDate,
     originalScheduledTime: row.originalScheduledTime,
     originalEstimatedDurationMinutes: row.originalEstimatedDurationMinutes,
+    originalReminderOffsetMinutes: row.originalReminderOffsetMinutes,
     status: row.status,
     decision: row.decision,
     note: row.note,

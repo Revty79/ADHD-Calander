@@ -1007,7 +1007,309 @@ textarea:focus-visible {
   padding-top: 4px;
 }
 
+.web-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.web-settings-panel {
+  align-self: start;
+  padding: 22px;
+}
+
+.web-settings-panel h2 {
+  margin: 0;
+  color: #2f2d2a;
+  font-size: 1.35rem;
+}
+
+.web-settings-description,
+.web-settings-about {
+  margin: 8px 0 0;
+  color: #5e5a54;
+  line-height: 1.55;
+}
+
+.web-settings-content {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.web-settings-controls {
+  display: grid;
+  gap: 16px;
+}
+
+.web-settings-control {
+  display: grid;
+  gap: 7px;
+}
+
+.web-settings-control label {
+  color: #2f2d2a;
+  font-weight: 700;
+}
+
+.web-settings-control select {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  color: #2f2d2a;
+  background: #ffffff;
+  border: 1px solid #aaa39a;
+  border-radius: 8px;
+}
+
+.web-settings-status {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  color: #3f554e;
+  background: #f1f4ef;
+  border-radius: 8px;
+  line-height: 1.45;
+}
+
+.web-settings-row {
+  display: grid;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid #ebe7df;
+}
+
+.web-settings-row dt {
+  color: #2f2d2a;
+  font-weight: 700;
+}
+
+.web-settings-row dd {
+  margin: 0;
+  color: #5e5a54;
+  line-height: 1.45;
+}
+
+.web-task-actions {
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.web-task-schedule-button {
+  white-space: nowrap;
+}
+
+.web-scheduling-page {
+  width: min(100%, 1040px);
+  display: grid;
+  gap: 22px;
+}
+
+.web-scheduling-task {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.7fr);
+  gap: 24px;
+  padding: 22px;
+  border: 1px solid #9fb6ad;
+  border-radius: 12px;
+  background: #eef2ed;
+}
+
+.web-scheduling-task h2,
+.web-scheduling-task p,
+.web-scheduling-task dl,
+.web-scheduling-task dd {
+  margin: 0;
+}
+
+.web-scheduling-task h2 {
+  margin: 5px 0 8px;
+  color: #263f38;
+  font-size: 1.45rem;
+}
+
+.web-scheduling-task p:not(.web-eyebrow) {
+  color: #40544c;
+  line-height: 1.5;
+}
+
+.web-scheduling-task dl {
+  display: grid;
+  gap: 10px;
+}
+
+.web-scheduling-task dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.web-scheduling-task dt {
+  color: #526159;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.web-scheduling-task dd {
+  color: #263f38;
+  font-weight: 700;
+}
+
+.web-scheduling-section {
+  display: grid;
+  gap: 10px;
+}
+
+.web-scheduling-section > h2,
+.web-scheduling-section > p,
+.web-scheduling-message h2,
+.web-scheduling-message p,
+.web-scheduling-confirm h2,
+.web-scheduling-confirm p {
+  margin: 0;
+}
+
+.web-scheduling-section > h2,
+.web-scheduling-message h2,
+.web-scheduling-confirm h2 {
+  color: #2f2d2a;
+  font-size: 1.25rem;
+}
+
+.web-scheduling-section > p,
+.web-scheduling-message p,
+.web-scheduling-confirm p {
+  color: #57534d;
+  line-height: 1.55;
+}
+
+.web-duration-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.web-duration-button {
+  min-width: 72px;
+  min-height: 44px;
+  padding: 9px 15px;
+  border: 1px solid #9b948a;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #4a4742;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+}
+
+.web-duration-button.is-selected {
+  border-color: #2f5d62;
+  background: #2f5d62;
+  color: #ffffff;
+}
+
+.web-suggestion-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.web-suggestion-card {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-height: 230px;
+  padding: 18px;
+  border: 1px solid #cfc8bd;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #4a4742;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.web-suggestion-card.is-selected {
+  border-color: #2f5d62;
+  background: #eef2ed;
+  box-shadow: 0 0 0 2px rgb(47 93 98 / 16%);
+}
+
+.web-suggestion-card strong {
+  color: #24565c;
+  font-size: 1.35rem;
+}
+
+.web-suggestion-card b {
+  align-self: end;
+  color: #24565c;
+}
+
+.web-suggestion-date {
+  color: #2f2d2a;
+  font-weight: 800;
+}
+
+.web-scheduling-message,
+.web-scheduling-confirm {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid #ded9cf;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.web-scheduling-confirm {
+  border-color: #d5bd72;
+  background: #fff7dc;
+}
+
+.web-scheduling-message-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.web-scheduling-leave {
+  justify-self: start;
+}
+
+.web-duration-button:focus-visible,
+.web-suggestion-card:focus-visible {
+  outline: 3px solid #efb84f;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 @media (max-width: 960px) {
+  .web-suggestion-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .web-suggestion-card {
+    min-height: auto;
+  }
+
+  .web-settings-grid {
+    grid-template-columns: 1fr;
+  }
   .web-dashboard-grid {
     grid-template-columns: 1fr;
   }
@@ -1090,6 +1392,21 @@ textarea:focus-visible {
 }
 
 @media (max-width: 560px) {
+  .web-scheduling-task {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .web-scheduling-message-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .web-task-actions,
+  .web-task-actions button {
+    width: 100%;
+  }
+
   .web-page-header {
     align-items: stretch;
     flex-direction: column;

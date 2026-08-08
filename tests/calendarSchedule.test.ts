@@ -73,6 +73,7 @@ function createEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     endTime: null,
     durationMinutes: null,
     notes: null,
+    reminderOffsetMinutes: null,
     createdAt: timestamp,
     updatedAt: timestamp,
     ...overrides
@@ -88,6 +89,8 @@ function createTask(overrides: Partial<Task> = {}): Task {
     scheduledDate: "2026-08-06",
     scheduledTime: null,
     estimatedDurationMinutes: null,
+    deadlineDate: null,
+    reminderOffsetMinutes: null,
     createdAt: timestamp,
     updatedAt: timestamp,
     completedAt: null,

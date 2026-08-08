@@ -70,6 +70,14 @@ and item session ID are indexed. Browser writes update tasks and recovery items
 in one transaction, and session creation checks for an existing active session.
 Stored values are validated when read.
 
+SQLite migration 4 and IndexedDB version 4 add the original reminder offset to
+the Recovery item snapshot. Keep, Break Down, Delegate, and Remove clear the
+original task reminder. Reschedule retains it only when the user gives the task
+a new time, so the trigger is rebuilt from the new local schedule. Child tasks
+start without reminders. Reopening restores the original reminder snapshot
+along with the task schedule. Each persisted mutation is then synchronized
+through `ReminderService`; fixed events remain outside Recovery.
+
 Daily Recap reads every active or completed Recovery session whose `sourceDate`
 matches the selected recap date. Final decisions are summarized as plan
 adjustments, while pending and Decide Later items remain waiting for a decision.
@@ -78,11 +86,14 @@ is derived, reopening an active decision immediately changes the next summary.
 
 ## Deliberately Deferred
 
-- Automatic scheduling, “best time” placement, or tomorrow rollover
+- A direct optional "Help me find a time" action inside an active Recovery
+  reschedule decision. The shared scheduling service can support it later, but
+  the current supported entry point is Tasks.
+- Automatic scheduling, best-time placement, or tomorrow rollover
 - Capacity scoring and essential-task selection
 - Full task hierarchy or project management
 - Sharing, contacts, or delegate messaging
-- Notifications and reminder pausing
+- Quiet hours, reminder pausing, and advanced notification actions
 - Recurring work and external calendars
 - Recovery analytics, streaks, and performance scoring
 - Accounts, cloud sync, and AI

@@ -9,6 +9,7 @@ export default function WebRootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="tasks/new" />
+        <Stack.Screen name="tasks/[id]/schedule" />
         <Stack.Screen name="events/new" />
       </Stack>
     </DatabaseProvider>

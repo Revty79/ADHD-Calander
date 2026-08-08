@@ -10,6 +10,8 @@ type TaskRow = {
   scheduledDate: LocalDateString | null;
   scheduledTime: LocalTimeString | null;
   estimatedDurationMinutes: number | null;
+  deadlineDate: LocalDateString | null;
+  reminderOffsetMinutes: Task["reminderOffsetMinutes"];
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -25,6 +27,8 @@ const taskSelect = `
     scheduled_date AS scheduledDate,
     scheduled_time AS scheduledTime,
     estimated_duration_minutes AS estimatedDurationMinutes,
+    deadline_date AS deadlineDate,
+    reminder_offset_minutes AS reminderOffsetMinutes,
     created_at AS createdAt,
     updated_at AS updatedAt,
     completed_at AS completedAt,
@@ -46,11 +50,13 @@ export class SqlTaskStorage implements TaskStorage {
           scheduled_date,
           scheduled_time,
           estimated_duration_minutes,
+          deadline_date,
+          reminder_offset_minutes,
           created_at,
           updated_at,
           completed_at,
           deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       task.id,
       task.title,
@@ -59,6 +65,8 @@ export class SqlTaskStorage implements TaskStorage {
       task.scheduledDate,
       task.scheduledTime,
       task.estimatedDurationMinutes,
+      task.deadlineDate,
+      task.reminderOffsetMinutes,
       task.createdAt,
       task.updatedAt,
       task.completedAt,
@@ -113,6 +121,8 @@ export class SqlTaskStorage implements TaskStorage {
           scheduled_date = ?,
           scheduled_time = ?,
           estimated_duration_minutes = ?,
+          deadline_date = ?,
+          reminder_offset_minutes = ?,
           created_at = ?,
           updated_at = ?,
           completed_at = ?,
@@ -126,6 +136,8 @@ export class SqlTaskStorage implements TaskStorage {
       task.scheduledDate,
       task.scheduledTime,
       task.estimatedDurationMinutes,
+      task.deadlineDate,
+      task.reminderOffsetMinutes,
       task.createdAt,
       task.updatedAt,
       task.completedAt,
@@ -146,6 +158,8 @@ function mapTaskRow(row: TaskRow): Task {
     scheduledDate: row.scheduledDate,
     scheduledTime: row.scheduledTime,
     estimatedDurationMinutes: row.estimatedDurationMinutes,
+    deadlineDate: row.deadlineDate,
+    reminderOffsetMinutes: row.reminderOffsetMinutes,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     completedAt: row.completedAt,

@@ -13,7 +13,10 @@ import { createRepositories } from "./createRepositories";
 import { CalendarEventRepository } from "./repositories/calendarEventRepository";
 import { DailyRecapRepository } from "./repositories/dailyRecapRepository";
 import { RecoveryRepository } from "./repositories/recoveryRepository";
+import { SettingsRepository } from "./repositories/settingsRepository";
 import { TaskRepository } from "./repositories/taskRepository";
+import { ReminderService } from "../notifications/reminderService";
+import { SchedulingService } from "../features/scheduling/schedulingService";
 
 type DatabaseState =
   | { status: "loading" }
@@ -23,6 +26,9 @@ type DatabaseState =
       calendarEventRepository: CalendarEventRepository;
       recoveryRepository: RecoveryRepository;
       dailyRecapRepository: DailyRecapRepository;
+      settingsRepository: SettingsRepository;
+      reminderService: ReminderService;
+      schedulingService: SchedulingService;
     }
   | { status: "error"; message: string };
 
@@ -32,6 +38,9 @@ const CalendarEventRepositoryContext = createContext<CalendarEventRepository | n
 );
 const RecoveryRepositoryContext = createContext<RecoveryRepository | null>(null);
 const DailyRecapRepositoryContext = createContext<DailyRecapRepository | null>(null);
+const SettingsRepositoryContext = createContext<SettingsRepository | null>(null);
+const ReminderServiceContext = createContext<ReminderService | null>(null);
+const SchedulingServiceContext = createContext<SchedulingService | null>(null);
 
 export function DatabaseProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<DatabaseState>({ status: "loading" });
@@ -44,7 +53,9 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
     setState({ status: "loading" });
 
     try {
-      setState({ status: "ready", ...(await openDatabase()) });
+      const repositories = await openDatabase();
+      await repositories.reminderService.reconcileAll();
+      setState({ status: "ready", ...repositories });
     } catch (error) {
       console.error("Database initialization failed", error);
       setState({
@@ -60,6 +71,7 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
     async function loadInitialDatabase() {
       try {
         const repositories = await openDatabase();
+        await repositories.reminderService.reconcileAll();
 
         if (isActive) {
           setState({ status: "ready", ...repositories });
@@ -112,15 +124,23 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   }
 
   return (
-    <DailyRecapRepositoryContext.Provider value={state.dailyRecapRepository}>
-      <RecoveryRepositoryContext.Provider value={state.recoveryRepository}>
-        <CalendarEventRepositoryContext.Provider value={state.calendarEventRepository}>
-          <TaskRepositoryContext.Provider value={state.taskRepository}>
-            {children}
-          </TaskRepositoryContext.Provider>
-        </CalendarEventRepositoryContext.Provider>
-      </RecoveryRepositoryContext.Provider>
-    </DailyRecapRepositoryContext.Provider>
+    <SchedulingServiceContext.Provider value={state.schedulingService}>
+      <ReminderServiceContext.Provider value={state.reminderService}>
+        <SettingsRepositoryContext.Provider value={state.settingsRepository}>
+          <DailyRecapRepositoryContext.Provider value={state.dailyRecapRepository}>
+            <RecoveryRepositoryContext.Provider value={state.recoveryRepository}>
+              <CalendarEventRepositoryContext.Provider
+                value={state.calendarEventRepository}
+              >
+                <TaskRepositoryContext.Provider value={state.taskRepository}>
+                  {children}
+                </TaskRepositoryContext.Provider>
+              </CalendarEventRepositoryContext.Provider>
+            </RecoveryRepositoryContext.Provider>
+          </DailyRecapRepositoryContext.Provider>
+        </SettingsRepositoryContext.Provider>
+      </ReminderServiceContext.Provider>
+    </SchedulingServiceContext.Provider>
   );
 }
 
@@ -162,6 +182,36 @@ export function useDailyRecapRepository(): DailyRecapRepository {
   }
 
   return repository;
+}
+
+export function useSettingsRepository(): SettingsRepository {
+  const repository = useContext(SettingsRepositoryContext);
+
+  if (!repository) {
+    throw new Error("SettingsRepository is not available.");
+  }
+
+  return repository;
+}
+
+export function useReminderService(): ReminderService {
+  const service = useContext(ReminderServiceContext);
+
+  if (!service) {
+    throw new Error("ReminderService is not available.");
+  }
+
+  return service;
+}
+
+export function useSchedulingService(): SchedulingService {
+  const service = useContext(SchedulingServiceContext);
+
+  if (!service) {
+    throw new Error("SchedulingService is not available.");
+  }
+
+  return service;
 }
 
 const styles = StyleSheet.create({

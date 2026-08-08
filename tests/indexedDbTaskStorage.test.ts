@@ -26,6 +26,7 @@ import { TaskRepository } from "../src/database/repositories/taskRepository";
 import { CalendarEventRepository } from "../src/database/repositories/calendarEventRepository";
 import { DailyRecapRepository } from "../src/database/repositories/dailyRecapRepository";
 import { RecoveryRepository } from "../src/database/repositories/recoveryRepository";
+import { SettingsRepository } from "../src/database/repositories/settingsRepository";
 import { CalendarEvent } from "../src/types/calendarEvent";
 import { RecoveryItem, RecoverySession } from "../src/types/recovery";
 import { Task } from "../src/types/task";
@@ -48,6 +49,25 @@ function createRepository(databaseName: string, indexedDB = new IDBFactory()) {
 }
 
 describe("IndexedDB task storage", () => {
+  it("persists settings after browser storage reinitialization", async () => {
+    const indexedDB = new IDBFactory();
+    const options = {
+      databaseName: "settings-persistence-test",
+      indexedDB,
+      keyRange: IDBKeyRange
+    };
+    const firstStorages = await openIndexedDbStorages(options);
+    const firstRepository = new SettingsRepository(firstStorages.settingsStorage);
+
+    assert.equal((await firstRepository.getSettings()).remindersEnabled, false);
+    await firstRepository.setRemindersEnabled(true);
+
+    const reopenedStorages = await openIndexedDbStorages(options);
+    const reopenedRepository = new SettingsRepository(reopenedStorages.settingsStorage);
+
+    assert.equal((await reopenedRepository.getSettings()).remindersEnabled, true);
+  });
+
   it("initializes an empty web task store", async () => {
     const repository = await createRepository("initialization-test");
 
@@ -170,6 +190,8 @@ describe("IndexedDB task storage", () => {
       scheduledDate: "2026-08-06",
       scheduledTime: null,
       estimatedDurationMinutes: null,
+      deadlineDate: null,
+      reminderOffsetMinutes: null,
       createdAt: "2026-08-06T15:00:00.000Z",
       updatedAt: "2026-08-06T15:00:00.000Z",
       completedAt: null,
@@ -177,6 +199,13 @@ describe("IndexedDB task storage", () => {
     };
 
     assert.deepEqual(deserializeTaskFromWeb(serializeTaskForWeb(task)), task);
+    assert.equal(
+      deserializeTaskFromWeb({
+        ...task,
+        reminderOffsetMinutes: undefined
+      }).reminderOffsetMinutes,
+      null
+    );
     assert.throws(
       () => deserializeTaskFromWeb({ ...task, scheduledDate: "August 6" }),
       WebStorageDataError
@@ -198,6 +227,7 @@ describe("IndexedDB task storage", () => {
     };
 
     assert.equal(deserializeTaskFromWeb(legacyTask).estimatedDurationMinutes, null);
+    assert.equal(deserializeTaskFromWeb(legacyTask).deadlineDate, null);
   });
 
   it("reads legacy task records without completion timestamp data", () => {
@@ -292,6 +322,7 @@ describe("IndexedDB calendar event storage", () => {
       endTime: null,
       durationMinutes: 30,
       notes: null,
+      reminderOffsetMinutes: null,
       createdAt: "2026-08-06T15:00:00.000Z",
       updatedAt: "2026-08-06T15:00:00.000Z"
     };
@@ -447,6 +478,7 @@ describe("IndexedDB recovery storage", () => {
       originalScheduledDate: "2026-08-06",
       originalScheduledTime: null,
       originalEstimatedDurationMinutes: null,
+      originalReminderOffsetMinutes: null,
       status: "pending",
       decision: "skip",
       note: null,

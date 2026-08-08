@@ -28,6 +28,30 @@ plan into a larger next-day burden.
 - Do not communicate task state only through color.
 - Add screen-reader labels to controls.
 - Avoid unnecessary animation.
+- Respect system reduced-motion preferences and keep state understandable
+  without motion.
+- Keep keyboard focus visible and use semantic headings and form errors on web.
+
+## Conservative Scheduling Assistance
+
+- Treat calendar whitespace as unknown capacity, not automatically productive
+  time.
+- Offer a small number of deterministic, explainable suggestions rather than
+  filling a day.
+- Respect local planning hours, fixed commitments, timed tasks, transition
+  buffers, deadlines, and a daily suggested-task limit.
+- Revalidate a selected opening and require explicit confirmation before
+  changing the task.
+- Scheduling assistance may update a flexible task but must never move a fixed
+  event or automatically reschedule unfinished work.
+
+## Reminders Without Pressure
+
+- Reminders are optional and require an explicit scheduled date and time.
+- Ask for notification permission only after the user chooses to enable reminders.
+- Keep task and calendar features fully usable after permission denial.
+- Use factual timing copy without blame, fake urgency, repeated nagging, or
+  productivity judgment.
 
 ## Privacy And Scope
 

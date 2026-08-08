@@ -8,6 +8,10 @@ import {
 } from "../../types/recovery";
 import { LocalDateString } from "../../types/dateTime";
 import { isTaskActive, isTaskCompleted, Task } from "../../types/task";
+import {
+  noOpReminderSynchronizer,
+  ReminderSynchronizer
+} from "../../notifications/reminderSynchronizer";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../../utils/dates";
 import {
   createRecoveryItemId,
@@ -32,7 +36,8 @@ export class RecoveryRepository {
     private readonly sessionIdGenerator: IdGenerator = createRecoverySessionId,
     private readonly itemIdGenerator: IdGenerator = createRecoveryItemId,
     private readonly taskIdGenerator: IdGenerator = createTaskId,
-    private readonly clock: Clock = () => new Date()
+    private readonly clock: Clock = () => new Date(),
+    private readonly reminderSynchronizer: ReminderSynchronizer = noOpReminderSynchronizer
   ) {}
 
   async startSession(sourceDateInput: string): Promise<RecoverySession> {
@@ -110,6 +115,7 @@ export class RecoveryRepository {
           ...task,
           scheduledDate: null,
           scheduledTime: null,
+          reminderOffsetMinutes: null,
           updatedAt: timestamp
         }
       ],
@@ -142,6 +148,7 @@ export class RecoveryRepository {
           ...task,
           scheduledDate,
           scheduledTime,
+          reminderOffsetMinutes: scheduledTime ? task.reminderOffsetMinutes : null,
           updatedAt: timestamp
         }
       ],
@@ -168,6 +175,7 @@ export class RecoveryRepository {
           {
             ...task,
             status: "broken_down",
+            reminderOffsetMinutes: null,
             updatedAt: timestamp
           }
         ],
@@ -188,6 +196,7 @@ export class RecoveryRepository {
         {
           ...task,
           status: "delegated",
+          reminderOffsetMinutes: null,
           updatedAt: timestamp
         }
       ],
@@ -202,6 +211,7 @@ export class RecoveryRepository {
         {
           ...task,
           status: "removed",
+          reminderOffsetMinutes: null,
           updatedAt: timestamp
         }
       ],
@@ -267,12 +277,14 @@ export class RecoveryRepository {
         status: item.originalStatus,
         scheduledDate: item.originalScheduledDate,
         scheduledTime: item.originalScheduledTime,
+        reminderOffsetMinutes: item.originalReminderOffsetMinutes,
         completedAt: null,
         updatedAt: timestamp
       };
       const retiredCreatedTasks = createdTasks.map<Task>((task) => ({
         ...task,
         status: "removed",
+        reminderOffsetMinutes: null,
         updatedAt: timestamp
       }));
 
@@ -291,6 +303,7 @@ export class RecoveryRepository {
         updatedTasks: [restoredOriginalTask, ...retiredCreatedTasks],
         createdTasks: []
       });
+      await this.syncTaskReminders([restoredOriginalTask, ...retiredCreatedTasks]);
 
       return await this.requireActiveSession();
     } catch (error) {
@@ -346,6 +359,7 @@ export class RecoveryRepository {
       }
 
       await this.recoveryStorage.saveDecision(mutation);
+      await this.syncTaskReminders([...mutation.updatedTasks, ...mutation.createdTasks]);
 
       return await this.requireActiveSession();
     } catch (error) {
@@ -400,6 +414,12 @@ export class RecoveryRepository {
 
     return task;
   }
+
+  private async syncTaskReminders(tasks: Task[]): Promise<void> {
+    await Promise.all(
+      tasks.map((task) => this.reminderSynchronizer.syncTaskReminder(task))
+    );
+  }
 }
 
 function createRecoveryItem(
@@ -418,6 +438,7 @@ function createRecoveryItem(
     originalScheduledDate: sourceDate,
     originalScheduledTime: task.scheduledTime,
     originalEstimatedDurationMinutes: task.estimatedDurationMinutes,
+    originalReminderOffsetMinutes: task.reminderOffsetMinutes,
     status: "pending",
     decision: null,
     note: null,
@@ -439,6 +460,8 @@ function createUnscheduledTask(id: string, title: string, timestamp: string): Ta
     scheduledDate: null,
     scheduledTime: null,
     estimatedDurationMinutes: null,
+    deadlineDate: null,
+    reminderOffsetMinutes: null,
     createdAt: timestamp,
     updatedAt: timestamp,
     completedAt: null,

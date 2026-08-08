@@ -4,7 +4,8 @@
 
 Calendar is the structural center for the Plan -> Do -> Recover direction. This
 foundation answers what is fixed, what work has been deliberately planned, and
-what dated work remains flexible. It does not yet decide what should move.
+what dated work remains flexible. Scheduling assistance may now suggest a place
+for one flexible task, but never decides or moves work on its own.
 
 ## Domain Separation
 
@@ -71,15 +72,41 @@ Recap intentionally maps one record-history instant to a local date:
 which completion actually occurred. It never substitutes the task's scheduled
 date.
 
+## Reminder Integration
+
+A task or fixed event may store one optional reminder offset. Reminder intent
+does not change the Calendar grouping: fixed events remain fixed, timed tasks
+remain planned, and untimed tasks remain flexible. Native item cards show the
+stored reminder as text, so its state is not communicated by color.
+
+`ReminderService` builds a local trigger from the item's validated local date
+and time. A master setting controls OS scheduling without erasing item intent.
+Web keeps the same domain shape but does not schedule browser notifications.
+General event/task editing remains deferred; future edits must cancel the old
+identifier before scheduling against a changed date or time.
+
+## Scheduling Assistance Integration
+
+Fixed events and active timed tasks are read as blockers by the pure scheduling
+engine. Fixed events receive the configured transition buffer; timed tasks use
+their exact known estimate and no extra fixed-event buffer. Untimed dated tasks
+remain visible as flexible work but do not claim an exact interval. An accepted
+suggestion updates the task's local date and time, so Calendar and Today read the
+new placement through their existing repositories without a duplicate event.
+
+Unknown timed durations are conservative blockers through the end of the
+planning day. Calendar workload facts still count only known minutes; blocking
+behavior does not invent duration or label a day overloaded.
+
 ## Deliberately Deferred
 
-- Automatic scheduling and rescheduling
+- Automatic scheduling, optimization, and rescheduling
 - Automatic Recovery Mode scheduling
-- Capacity and overload rules
+- Weekly availability and inferred capacity or overload labels
 - Recurring or all-day events
 - Event and task editing/deletion
 - Drag-and-drop
-- Notifications
+- Advanced notifications, quiet hours, and reminder editing
 - Time-zone-aware travel behavior
 - External calendar sync
 - Accounts, cloud sync, analytics, and AI

@@ -1,5 +1,127 @@
 # Decision Log
 
+## 2026-08-08
+
+### Scheduling Suggestions Never Mutate Automatically
+
+Decision: Keep candidate generation pure, show at most three options, and
+require a separate choose-and-confirm step. Acceptance re-runs the search and
+updates the existing task only if the exact opening is still available.
+
+Reason: Calendar whitespace is not proof of usable capacity. Explicit
+confirmation and stale-slot revalidation preserve user control and prevent
+overlaps caused by changed local data.
+
+### Conservative Planning Defaults
+
+Decision: Search seven days by default between 08:00 and 20:00, protect 15
+minutes around fixed events, cap suggested task time at 180 minutes per day,
+and expose only small preset alternatives in Settings. A user may extend one
+search to 14 days.
+
+Reason: These are transparent planning defaults, not medical claims. A bounded
+search and task-time cap avoid treating every open minute as productive time.
+
+### Unknown Timed Durations Block The Remaining Day
+
+Decision: A fixed event or timed task without an end or estimate blocks from its
+start through the planning-day end. Untimed dated tasks do not block exact time.
+
+Reason: Guessing an end can create an overlap. The conservative result may omit
+usable time, but it does not invent availability.
+
+### Deadline Is Separate From Schedule
+
+Decision: Add only nullable `Task.deadlineDate` in this phase. Treat it as the
+latest eligible local date, never as an automatic placement.
+
+Reason: A deadline is required for useful bounded suggestions, while earliest
+start, preferred time, and energy fields would expand the creation form and
+ranking rules without current evidence.
+
+### Recovery Scheduling Link Deferred
+
+Decision: Keep Recovery's explicit reschedule form unchanged and provide the
+scheduling entry point from Tasks.
+
+Reason: Recovery integration is optional for this phase. Adding a partial path
+inside an active decision flow risks confusing reversible Recovery state; the
+shared service is ready for a later deliberate integration.
+
+### Small Key-Value Settings Store
+
+Decision: Persist app preferences through `SettingsRepository` using a native
+SQLite `app_settings` table and a web IndexedDB `appSettings` store.
+
+Reason: Preferences are local app state, not task or event properties. A shared
+repository keeps defaults and validation out of UI components while preserving
+the established platform-storage boundary.
+
+### One Optional Reminder Per Scheduled Item
+
+Decision: Store one nullable offset of 0, 10, 30, or 60 minutes on a task or
+fixed event. Do not add a default offset or multiple reminders.
+
+Reason: A small choice set supports useful reminders without turning creation or
+Settings into a high-load control panel. Requiring a date, time, and future
+trigger prevents ambiguous reminder intent.
+
+### Disabling Reminders Cancels Scheduled Notifications
+
+Decision: Keep item-level reminder intent in local storage but cancel all OS
+notifications when the master setting is turned off. Reconcile future eligible
+items when it is turned back on.
+
+Reason: The switch has an immediate, testable consequence while preserving the
+user's explicit item choices for later. Reconciliation prevents stale or
+duplicate scheduled notifications.
+
+### Domain Intent Is Separate From Expo Notifications
+
+Decision: Put reminder rules in repositories and `ReminderService`, and isolate
+Expo APIs behind `NotificationAdapter`. Use deterministic IDs derived from item
+type and ID.
+
+Reason: Persistence and Recovery behavior can be tested without receiving a real
+OS notification. Cancel-before-schedule behavior prevents duplicates without a
+second identifier table.
+
+### Permission Is Requested Only On Explicit Enable
+
+Decision: Do not request notification permission at startup. If permission is
+denied, leave reminders off, keep the planning app usable, and offer a route to
+device settings without prompting again.
+
+Reason: Notifications are optional and must never block core offline planning or
+become a repeated source of pressure.
+
+### Web Notifications Are Unsupported In This Phase
+
+Decision: Persist settings with the established web architecture but use an
+unsupported notification adapter and show an accurate Android-app-only state.
+
+Reason: Fake or unreliable browser notification behavior would violate user
+trust. Accessibility, privacy, and app information remain available on web.
+
+### System Accessibility Preferences First
+
+Decision: Preserve native font scaling, browser zoom, focus-visible behavior,
+and system reduced-motion support instead of adding duplicate app-specific text,
+contrast, or motion controls.
+
+Reason: Those system capabilities provide real value now. A custom theme or
+dynamic-type system would add broad complexity without evidence that it is the
+highest-value accessibility fix.
+
+### Quiet Hours And Exact Alarms Deferred
+
+Decision: Do not half-implement quiet hours and do not add Android exact-alarm
+permission in this phase.
+
+Reason: Quiet hours require clear rules for fixed events and day boundaries.
+Exact-alarm access is policy-sensitive and belongs in release-build and Google
+Play review rather than being added silently.
+
 ## 2026-08-07
 
 ### Daily Recap Is Derived
@@ -228,3 +350,9 @@ of scope for the first build and require product-owner approval.
   prototype is used for important long-term planning data?
 - What user action and data shape should represent partial progress without
   requiring percentage-based project tracking?
+- Should the Android release request exact-alarm access, accept inexact delivery,
+  or use a different scheduling strategy after release-build measurement?
+- What finalized privacy-policy destination should About link to during Google
+  Play preparation?
+- Which existing screens need layout changes after hands-on testing with the
+  largest Android font and display-size settings?

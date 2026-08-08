@@ -1,4 +1,12 @@
 import { CalendarEvent, CreateCalendarEventInput } from "../../types/calendarEvent";
+import {
+  getReminderTriggerDate,
+  isReminderOffsetMinutes
+} from "../../notifications/reminderRules";
+import {
+  noOpReminderSynchronizer,
+  ReminderSynchronizer
+} from "../../notifications/reminderSynchronizer";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../../utils/dates";
 import { createCalendarEventId } from "../../utils/ids";
 import { CalendarEventStorage } from "../calendarEventStorage";
@@ -14,12 +22,30 @@ export class CalendarEventRepository {
   constructor(
     private readonly storage: CalendarEventStorage,
     private readonly idGenerator: IdGenerator = createCalendarEventId,
-    private readonly clock: Clock = () => new Date()
+    private readonly clock: Clock = () => new Date(),
+    private readonly reminderSynchronizer: ReminderSynchronizer = noOpReminderSynchronizer
   ) {}
 
   async createEvent(input: CreateCalendarEventInput): Promise<CalendarEvent> {
     const normalizedInput = normalizeCreateEventInput(input);
-    const timestamp = this.clock().toISOString();
+    const now = this.clock();
+    const timestamp = now.toISOString();
+
+    if (normalizedInput.reminderOffsetMinutes !== null) {
+      const reminderDate = getReminderTriggerDate(
+        normalizedInput.date,
+        normalizedInput.startTime,
+        normalizedInput.reminderOffsetMinutes
+      );
+
+      if (!reminderDate || reminderDate.getTime() <= now.getTime()) {
+        throw new CalendarEventValidationError(
+          "Choose a future event time for this reminder.",
+          "reminderOffsetMinutes"
+        );
+      }
+    }
+
     const event: CalendarEvent = {
       id: this.idGenerator(),
       title: normalizedInput.title,
@@ -29,6 +55,7 @@ export class CalendarEventRepository {
       endTime: normalizedInput.endTime,
       durationMinutes: normalizedInput.durationMinutes,
       notes: normalizedInput.notes,
+      reminderOffsetMinutes: normalizedInput.reminderOffsetMinutes,
       createdAt: timestamp,
       updatedAt: timestamp
     };
@@ -38,6 +65,8 @@ export class CalendarEventRepository {
     } catch (error) {
       throw new CalendarEventPersistenceError("Unable to save the event.", error);
     }
+
+    await this.reminderSynchronizer.syncEventReminder(event);
 
     return event;
   }
@@ -85,7 +114,13 @@ function normalizeCreateEventInput(
   input: CreateCalendarEventInput
 ): Pick<
   CalendarEvent,
-  "title" | "date" | "startTime" | "endTime" | "durationMinutes" | "notes"
+  | "title"
+  | "date"
+  | "startTime"
+  | "endTime"
+  | "durationMinutes"
+  | "notes"
+  | "reminderOffsetMinutes"
 > {
   const title = input.title.trim();
 
@@ -144,13 +179,23 @@ function normalizeCreateEventInput(
     );
   }
 
+  const reminderOffsetMinutes = input.reminderOffsetMinutes ?? null;
+
+  if (reminderOffsetMinutes !== null && !isReminderOffsetMinutes(reminderOffsetMinutes)) {
+    throw new CalendarEventValidationError(
+      "Choose an available reminder time.",
+      "reminderOffsetMinutes"
+    );
+  }
+
   return {
     title,
     date,
     startTime,
     endTime,
     durationMinutes,
-    notes: input.notes?.trim() || null
+    notes: input.notes?.trim() || null,
+    reminderOffsetMinutes
   };
 }
 

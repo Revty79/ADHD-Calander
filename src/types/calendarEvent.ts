@@ -1,4 +1,5 @@
 import { LocalDateString, LocalTimeString } from "./dateTime";
+import { ReminderOffsetMinutes } from "./reminder";
 
 export const calendarEventKinds = ["fixed"] as const;
 
@@ -13,6 +14,7 @@ export type CalendarEvent = {
   endTime: LocalTimeString | null;
   durationMinutes: number | null;
   notes: string | null;
+  reminderOffsetMinutes: ReminderOffsetMinutes | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -24,4 +26,5 @@ export type CreateCalendarEventInput = {
   endTime?: string | null;
   durationMinutes?: number | null;
   notes?: string | null;
+  reminderOffsetMinutes?: number | null;
 };

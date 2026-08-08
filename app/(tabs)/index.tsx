@@ -6,6 +6,7 @@ import { ErrorNotice } from "../../src/components/ErrorNotice";
 import { Screen } from "../../src/components/Screen";
 import { TaskList } from "../../src/features/tasks/components/TaskList";
 import { useTodayPlan } from "../../src/features/today/hooks/useTodayPlan";
+import { formatReminderOffset } from "../../src/notifications/reminderRules";
 import { CalendarEvent } from "../../src/types/calendarEvent";
 import { isTaskActive, isTaskCompleted } from "../../src/types/task";
 import { formatLocalDateForDisplay, getLocalDateString } from "../../src/utils/dates";
@@ -141,6 +142,11 @@ function FixedEventList({ events }: { events: CalendarEvent[] }) {
               <View style={styles.eventCopy}>
                 <Text style={styles.eventTitle}>{event.title}</Text>
                 <Text style={styles.fixedLabel}>Fixed</Text>
+                {event.reminderOffsetMinutes !== null ? (
+                  <Text style={styles.fixedLabel}>
+                    Reminder: {formatReminderOffset(event.reminderOffsetMinutes)}
+                  </Text>
+                ) : null}
               </View>
             </View>
           ))}

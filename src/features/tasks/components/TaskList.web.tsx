@@ -1,4 +1,5 @@
-import { Task } from "../../../types/task";
+import { formatReminderOffset } from "../../../notifications/reminderRules";
+import { isTaskActive, Task } from "../../../types/task";
 import { formatLocalDateForDisplay } from "../../../utils/dates";
 
 type TaskListProps = {
@@ -7,6 +8,7 @@ type TaskListProps = {
   tasks: Task[];
   actionLabel?: string;
   onAction?(id: string): void;
+  onSchedule?(id: string): void;
   showDate?: boolean;
 };
 
@@ -16,6 +18,7 @@ export function TaskList({
   tasks,
   actionLabel,
   onAction,
+  onSchedule,
   showDate = false
 }: TaskListProps) {
   return (
@@ -52,18 +55,38 @@ export function TaskList({
                   {task.estimatedDurationMinutes ? (
                     <span>{task.estimatedDurationMinutes} min estimate</span>
                   ) : null}
+                  {task.deadlineDate ? (
+                    <span>Deadline {formatLocalDateForDisplay(task.deadlineDate)}</span>
+                  ) : null}
+                  {task.reminderOffsetMinutes !== null ? (
+                    <span>
+                      Reminder: {formatReminderOffset(task.reminderOffsetMinutes)}
+                    </span>
+                  ) : null}
                   <span>Status: {getTaskStatusLabel(task.status)}</span>
                 </div>
               </div>
               {actionLabel && onAction ? (
-                <button
-                  aria-label={`${actionLabel} ${task.title}`}
-                  className="web-secondary-button"
-                  onClick={() => onAction(task.id)}
-                  type="button"
-                >
-                  {actionLabel}
-                </button>
+                <div className="web-task-actions">
+                  {onSchedule && isTaskActive(task) && task.scheduledTime === null ? (
+                    <button
+                      aria-label={`Help me schedule ${task.title}`}
+                      className="web-primary-button web-task-schedule-button"
+                      onClick={() => onSchedule(task.id)}
+                      type="button"
+                    >
+                      Help me schedule
+                    </button>
+                  ) : null}
+                  <button
+                    aria-label={`${actionLabel} ${task.title}`}
+                    className="web-secondary-button"
+                    onClick={() => onAction(task.id)}
+                    type="button"
+                  >
+                    {actionLabel}
+                  </button>
+                </div>
               ) : null}
             </li>
           ))}

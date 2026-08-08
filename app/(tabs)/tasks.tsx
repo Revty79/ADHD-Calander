@@ -1,4 +1,4 @@
-import { Link, useFocusEffect } from "expo-router";
+import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useCallback } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -9,6 +9,7 @@ import { useAllTasks } from "../../src/features/tasks/hooks/useAllTasks";
 import { isTaskActive, isTaskCompleted, isTaskResolved } from "../../src/types/task";
 
 export default function TasksScreen() {
+  const router = useRouter();
   const { tasks, isLoading, errorMessage, refresh, completeTask, undoCompletion } =
     useAllTasks();
 
@@ -60,6 +61,9 @@ export default function TasksScreen() {
             tasks={openTasks}
             actionLabel="Complete"
             onAction={completeTask}
+            onSchedule={(id) =>
+              router.push({ pathname: "/tasks/[id]/schedule", params: { id } })
+            }
             showDate
           />
           <TaskList

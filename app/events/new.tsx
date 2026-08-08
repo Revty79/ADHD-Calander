@@ -15,6 +15,9 @@ import {
 import { ErrorNotice } from "../../src/components/ErrorNotice";
 import { useCalendarEventRepository } from "../../src/database/DatabaseProvider";
 import { CalendarEventValidationError } from "../../src/database/repositories/calendarEventErrors";
+import { ReminderOffsetSelector } from "../../src/features/reminders/components/ReminderOffsetSelector";
+import { useReminderSettings } from "../../src/features/settings/hooks/useReminderSettings";
+import { ReminderOffsetMinutes } from "../../src/types/reminder";
 import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
 
 type FieldErrors = Partial<Record<CalendarEventValidationError["field"], string>>;
@@ -23,6 +26,7 @@ export default function NewEventScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ date?: string }>();
   const eventRepository = useCalendarEventRepository();
+  const reminderSettings = useReminderSettings();
   const initialDate = useMemo(
     () => normalizeLocalDateInput(params.date ?? "") ?? getLocalDateString(),
     [params.date]
@@ -33,6 +37,8 @@ export default function NewEventScreen() {
   const [endTime, setEndTime] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [notes, setNotes] = useState("");
+  const [reminderOffsetMinutes, setReminderOffsetMinutes] =
+    useState<ReminderOffsetMinutes | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,7 +55,8 @@ export default function NewEventScreen() {
         startTime,
         endTime,
         durationMinutes: durationMinutes.trim() ? Number(durationMinutes) : null,
-        notes
+        notes,
+        reminderOffsetMinutes
       });
 
       router.replace({ pathname: "/(tabs)/calendar", params: { date } });
@@ -152,6 +159,16 @@ export default function NewEventScreen() {
             value={notes}
           />
         </FormField>
+
+        <ReminderOffsetSelector
+          disabled={
+            reminderSettings.isLoading ||
+            reminderSettings.status?.settings.remindersEnabled !== true
+          }
+          error={fieldErrors.reminderOffsetMinutes}
+          onChange={setReminderOffsetMinutes}
+          value={reminderOffsetMinutes}
+        />
 
         {errorMessage ? (
           <ErrorNotice message={errorMessage} onRetry={() => setErrorMessage(null)} />

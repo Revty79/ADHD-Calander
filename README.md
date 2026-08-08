@@ -14,8 +14,8 @@ code structure for future iOS work. It includes:
   summaries.
 - Creating fixed events with a local date, start time, optional end time or
   duration, and optional notes.
-- Creating scheduled or unscheduled tasks with optional date, time, and duration
-  estimate.
+- Creating scheduled or unscheduled tasks with optional date, time, duration
+  estimate, and a deadline that remains separate from the planned date.
 - Distinct calendar treatment for fixed commitments, planned tasks, and flexible
   date-associated tasks.
 - Viewing today's tasks and all current non-deleted tasks.
@@ -32,10 +32,22 @@ code structure for future iOS work. It includes:
 - Native persistence in Expo SQLite.
 - Browser persistence in IndexedDB.
 - Desktop sidebar navigation and compact navigation at smaller browser widths.
+- Functional Settings sections for reminders, accessibility, local data, and
+  app information.
+- One optional local reminder for a native scheduled task or fixed event, with
+  cancellation on completion and synchronization through Recovery decisions.
+- Safe notification permission handling that leaves all planning features usable
+  when reminders are off or permission is denied.
+- Deterministic scheduling assistance for flexible tasks, with up to three
+  explainable options inside local planning hours.
+- Explicit two-step scheduling confirmation that preserves the task record,
+  revalidates the opening, and keeps reminder intent synchronized.
+- Local planning preferences for day start/end, fixed-event transition buffer,
+  and maximum suggested task time per day.
 
-Recurring events, event editing, scheduling automation, notifications, cloud
-sync, AI features, subscriptions, and external calendar integrations remain
-deferred.
+Recurring events, event editing, automatic schedule optimization or
+rescheduling, advanced notification policy, quiet hours, cloud sync, AI
+features, subscriptions, and external calendar integrations remain deferred.
 
 ## Supported Platforms
 
@@ -52,6 +64,7 @@ deferred.
 - React 19.2.3
 - TypeScript 6
 - Expo SQLite for native storage
+- Expo Notifications for native local reminders
 - IndexedDB for web storage
 - Node test runner with `tsx`
 
@@ -116,8 +129,10 @@ or cross-device transfer yet.
 4. Run `npm run android`.
 5. If Expo asks, choose the available Android target.
 
-Native task, calendar-event, and Recovery Mode data use Expo SQLite and versioned
-SQL migrations.
+Native task, calendar-event, Recovery Mode, and Settings data use Expo SQLite
+and versioned SQL migrations. Local reminders are optional and request
+notification permission only after the user turns them on. Web does not schedule
+notifications and shows an accurate Android-app-only state.
 
 ## Development Commands
 
@@ -147,28 +162,36 @@ app/
   events/new.web.tsx         Browser event creation
   tasks/new.tsx              Native task creation
   tasks/new.web.tsx          Browser task creation
+  tasks/[id]/schedule.tsx    Native scheduling confirmation workflow
+  tasks/[id]/schedule.web.tsx Browser scheduling confirmation workflow
 src/
   components/                Shared and web-specific UI primitives
   database/                  Storage contract, adapters, migrations, repository
   features/calendar/         Local-date math, aggregation, and calendar hook
   features/recovery/         Recovery session hook and presentation helpers
   features/recap/            Daily recap hook and presentation helpers
+  features/reminders/        Native reminder selection controls
+  features/settings/         Repository-backed Settings hooks
+  features/scheduling/       Deterministic candidate engine and acceptance service
   features/tasks/            Shared hooks and platform task lists
   features/today/            Today plan aggregation hook
   styles/web.css             Responsive web styles
   types/                     Shared TypeScript domain types
+  notifications/             Reminder rules, service, and platform adapters
   utils/                     Shared date and ID helpers
 docs/                        Product and architecture documentation
 tests/                       SQLite repository and IndexedDB adapter tests
 ```
 
 See `docs/calendar-architecture.md`, `docs/recovery-architecture.md`,
-`docs/recap-architecture.md`, and `docs/web-architecture.md` for calendar,
-recovery, recap, persistence, responsive layout, and shared-code decisions.
+`docs/recap-architecture.md`, `docs/settings-architecture.md`,
+`docs/notifications-architecture.md`, and `docs/web-architecture.md` for
+calendar, recovery, recap, settings, reminders, persistence, responsive layout,
+and shared-code decisions. `docs/scheduling-architecture.md` documents the
+candidate-window, ranking, load, confirmation, and reminder rules.
 
 ## Known Limitations
 
-- Settings remains a placeholder.
 - Legacy completed tasks without a recorded completion timestamp remain
   readable but cannot be assigned to a historical Recap date.
 - Partial-progress recording is not implemented; Recap uses only completed
@@ -178,8 +201,18 @@ recovery, recap, persistence, responsive layout, and shared-code decisions.
 - Delegation stores only a local note; it does not contact another person.
 - Mobile date and time entry still use plain text fields.
 - Events can be created and viewed but not edited or deleted yet.
-- No task editing, deletion UI, filtering, sorting controls, drag-and-drop,
-  recurring items, reminders, or notifications exist.
+- Scheduling assistance uses one shared daily planning window rather than a
+  weekday-by-weekday availability editor.
+- A fixed event or timed task with no known duration conservatively blocks the
+  rest of that planning day; editing those records remains deferred.
+- Recovery Mode does not yet link directly into scheduling assistance after an
+  explicit Reschedule decision; Tasks is the supported entry point.
+- No task/event editing, deletion UI, filtering, sorting controls, drag-and-drop,
+  recurring items, quiet hours, default reminders, or multiple reminders exist.
+- Browser notifications are intentionally unsupported in this phase.
+- Android notification delivery, denial/grant flows, battery behavior, and
+  release-build configuration still need emulator or physical-device testing;
+  Expo Go behavior is not production proof.
 - Web and mobile stores do not sync and cannot import from one another.
 - Browser storage has no backup flow and may be cleared by the user or browser.
 - No component testing framework is configured; automated coverage focuses on

@@ -24,6 +24,10 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="tasks/[id]/schedule"
+          options={{ title: "Help me schedule" }}
+        />
+        <Stack.Screen
           name="events/new"
           options={{
             title: "New event",

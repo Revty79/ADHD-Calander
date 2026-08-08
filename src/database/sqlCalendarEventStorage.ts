@@ -12,6 +12,7 @@ type CalendarEventRow = {
   endTime: LocalTimeString | null;
   durationMinutes: number | null;
   notes: string | null;
+  reminderOffsetMinutes: CalendarEvent["reminderOffsetMinutes"];
   createdAt: string;
   updatedAt: string;
 };
@@ -26,6 +27,7 @@ const eventSelect = `
     end_time AS endTime,
     duration_minutes AS durationMinutes,
     notes,
+    reminder_offset_minutes AS reminderOffsetMinutes,
     created_at AS createdAt,
     updated_at AS updatedAt
   FROM calendar_events
@@ -46,9 +48,10 @@ export class SqlCalendarEventStorage implements CalendarEventStorage {
           end_time,
           duration_minutes,
           notes,
+          reminder_offset_minutes,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       event.id,
       event.title,
@@ -58,6 +61,7 @@ export class SqlCalendarEventStorage implements CalendarEventStorage {
       event.endTime,
       event.durationMinutes,
       event.notes,
+      event.reminderOffsetMinutes,
       event.createdAt,
       event.updatedAt
     );
@@ -88,6 +92,12 @@ export class SqlCalendarEventStorage implements CalendarEventStorage {
 
     return rows.map(mapCalendarEventRow);
   }
+
+  async getAllEvents(): Promise<CalendarEvent[]> {
+    const rows = await this.database.getAllAsync<CalendarEventRow>(eventSelect);
+
+    return rows.map(mapCalendarEventRow);
+  }
 }
 
 function mapCalendarEventRow(row: CalendarEventRow): CalendarEvent {
@@ -100,6 +110,7 @@ function mapCalendarEventRow(row: CalendarEventRow): CalendarEvent {
     endTime: row.endTime,
     durationMinutes: row.durationMinutes,
     notes: row.notes,
+    reminderOffsetMinutes: row.reminderOffsetMinutes,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };

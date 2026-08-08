@@ -53,6 +53,23 @@
   placement.
 - Factual fixed-event context, Recovery decision summaries, and calm still-open
   context without grades, streaks, or productivity scores.
+- A functional, calm Settings destination with local reminder control,
+  permission status, accessibility guidance, local-data facts, and app version.
+- One optional local reminder for a native scheduled task or fixed event, using
+  a small set of offsets and safe future-time validation.
+- Reminder cancellation on task completion and synchronization for Keep,
+  Reschedule, Break Down, Delegate, Remove, and reopen Recovery actions.
+- SQLite and IndexedDB settings persistence behind a shared repository boundary.
+- Accurate web notification-unavailable status without requesting browser
+  permission or adding fake notification behavior.
+- Optional task deadlines that remain distinct from scheduled dates.
+- A pure deterministic scheduler that considers fixed events, timed tasks,
+  estimates, deadlines, local planning hours, fixed-event transition buffers,
+  and a daily suggested-task-time limit.
+- A Tasks entry point that shows at most three suggestions and requires a
+  separate confirmation before updating the existing task.
+- Planning preferences persisted in SQLite and IndexedDB with calm native and
+  web controls.
 
 ## Out Of Scope For First Build
 
@@ -61,10 +78,14 @@
 - General task-step/project hierarchy outside Recovery Mode breakdown
 - Task editing
 - Soft deletion UI
-- Notifications
+- Advanced notifications, quiet hours, snooze, and multiple reminders
 - Recurring calendar events
 - External calendar integration
 - Event and task editing or deletion
 - Cloud services
 - AI services
 - Payments
+- AI, natural-language scheduling, predictive energy modeling, or behavioral
+  profiling
+- Automatic schedule filling, optimization, or Recovery rescheduling
+- Weekly availability grids and preferred-time or energy fields

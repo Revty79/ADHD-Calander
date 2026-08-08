@@ -15,6 +15,9 @@ import {
 import { ErrorNotice } from "../../src/components/ErrorNotice";
 import { useTaskRepository } from "../../src/database/DatabaseProvider";
 import { TaskValidationError } from "../../src/database/repositories/errors";
+import { ReminderOffsetSelector } from "../../src/features/reminders/components/ReminderOffsetSelector";
+import { useReminderSettings } from "../../src/features/settings/hooks/useReminderSettings";
+import { ReminderOffsetMinutes } from "../../src/types/reminder";
 import { normalizeLocalDateInput } from "../../src/utils/dates";
 
 type NewTaskParams = {
@@ -28,6 +31,7 @@ export default function NewTaskScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<NewTaskParams>();
   const taskRepository = useTaskRepository();
+  const reminderSettings = useReminderSettings();
   const initialDate = useMemo(
     () => normalizeLocalDateInput(params.scheduledDate ?? "") ?? "",
     [params.scheduledDate]
@@ -38,6 +42,9 @@ export default function NewTaskScreen() {
   const [scheduledDate, setScheduledDate] = useState<string>(initialDate);
   const [scheduledTime, setScheduledTime] = useState("");
   const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState("");
+  const [deadlineDate, setDeadlineDate] = useState("");
+  const [reminderOffsetMinutes, setReminderOffsetMinutes] =
+    useState<ReminderOffsetMinutes | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -55,7 +62,9 @@ export default function NewTaskScreen() {
         scheduledTime,
         estimatedDurationMinutes: estimatedDurationMinutes.trim()
           ? Number(estimatedDurationMinutes)
-          : null
+          : null,
+        deadlineDate,
+        reminderOffsetMinutes
       });
 
       if (params.returnTo === "calendar") {
@@ -163,6 +172,27 @@ export default function NewTaskScreen() {
         </View>
 
         <View style={styles.formGroup}>
+          <Text style={styles.label}>Deadline (optional)</Text>
+          <TextInput
+            accessibilityLabel="Deadline in year month day format"
+            autoCapitalize="none"
+            keyboardType="numbers-and-punctuation"
+            onChangeText={setDeadlineDate}
+            placeholder="YYYY-MM-DD"
+            style={[styles.input, fieldErrors.deadlineDate ? styles.inputError : null]}
+            value={deadlineDate}
+          />
+          <Text style={styles.helpText}>
+            A deadline is the last day to finish, not the time you plan to work.
+          </Text>
+          {fieldErrors.deadlineDate ? (
+            <Text accessibilityRole="alert" style={styles.validationText}>
+              {fieldErrors.deadlineDate}
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={styles.formGroup}>
           <Text style={styles.label}>Scheduled time</Text>
           <TextInput
             accessibilityLabel="Scheduled time in twenty four hour format"
@@ -179,6 +209,16 @@ export default function NewTaskScreen() {
             </Text>
           ) : null}
         </View>
+
+        <ReminderOffsetSelector
+          disabled={
+            reminderSettings.isLoading ||
+            reminderSettings.status?.settings.remindersEnabled !== true
+          }
+          error={fieldErrors.reminderOffsetMinutes}
+          onChange={setReminderOffsetMinutes}
+          value={reminderOffsetMinutes}
+        />
 
         {errorMessage ? (
           <ErrorNotice message={errorMessage} onRetry={() => setErrorMessage(null)} />
@@ -240,6 +280,11 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: "#a53f3f"
+  },
+  helpText: {
+    color: "#68645e",
+    fontSize: 13,
+    lineHeight: 19
   },
   multilineInput: {
     minHeight: 96
