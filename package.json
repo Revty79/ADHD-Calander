@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "expo start",
     "start": "expo start",
-    "android": "expo start --android",
+    "android": "expo run:android",
     "web": "expo start --web",
     "web:export": "expo export --platform web",
     "format": "prettier --write .",

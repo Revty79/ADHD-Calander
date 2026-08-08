@@ -7,7 +7,11 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "plugins": ["expo-router", "expo-sqlite", "expo-notifications"],
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-notifications"
+    ],
     "android": {
       "package": "com.adhdcalendar.app"
     },
@@ -16,6 +20,12 @@
     },
     "experiments": {
       "typedRoutes": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "81d52229-359d-4d92-a68d-d9a8e7991a17"
+      }
     }
   }
 }
