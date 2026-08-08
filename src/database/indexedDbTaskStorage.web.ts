@@ -44,7 +44,7 @@ type StoredTask = {
   estimatedDurationMinutes?: number | null;
   createdAt: string;
   updatedAt: string;
-  completedAt: string | null;
+  completedAt?: string | null;
   deletedAt: string | null;
 };
 
@@ -179,6 +179,7 @@ export function deserializeTaskFromWeb(value: unknown): Task {
   const scheduledDate = value.scheduledDate;
   const scheduledTime = value.scheduledTime;
   const estimatedDurationMinutes = value.estimatedDurationMinutes ?? null;
+  const completedAt = value.completedAt ?? null;
 
   if (
     typeof value.id !== "string" ||
@@ -191,7 +192,7 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     !isValidStoredDuration(estimatedDurationMinutes) ||
     typeof value.createdAt !== "string" ||
     typeof value.updatedAt !== "string" ||
-    !isNullableString(value.completedAt) ||
+    !isNullableString(completedAt) ||
     !isNullableString(value.deletedAt)
   ) {
     throw new WebStorageDataError("Stored task data has an invalid shape.");
@@ -211,7 +212,7 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     estimatedDurationMinutes,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
-    completedAt: value.completedAt,
+    completedAt,
     deletedAt: value.deletedAt
   };
 }
@@ -599,6 +600,29 @@ class IndexedDbRecoveryStorage implements RecoveryStorage {
       )[0];
 
     return session ? this.loadSession(session) : null;
+  }
+
+  async getSessionsForDate(sourceDate: string): Promise<RecoverySession[]> {
+    const transaction = this.database.transaction(
+      RECOVERY_SESSION_STORE_NAME,
+      "readonly"
+    );
+    const completion = transactionComplete(transaction);
+    const records = await requestResult(
+      transaction.objectStore(RECOVERY_SESSION_STORE_NAME).getAll()
+    );
+
+    await completion;
+
+    const sessions = records
+      .map(deserializeRecoverySessionFromWeb)
+      .filter((session) => session.sourceDate === sourceDate)
+      .sort(
+        (left, right) =>
+          left.startedAt.localeCompare(right.startedAt) || left.id.localeCompare(right.id)
+      );
+
+    return Promise.all(sessions.map((session) => this.loadSession(session)));
   }
 
   async saveDecision(mutation: RecoveryDecisionMutation): Promise<void> {

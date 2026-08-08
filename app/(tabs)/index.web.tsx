@@ -152,6 +152,12 @@ export default function WebTodayScreen() {
             <p className="web-summary-note">
               These counts describe today without treating unfinished work as a failure.
             </p>
+            <Link
+              className="web-text-link web-today-recap-link"
+              href={{ pathname: "/recap", params: { date: today } }}
+            >
+              Review today&apos;s recap
+            </Link>
           </aside>
         </div>
       ) : null}

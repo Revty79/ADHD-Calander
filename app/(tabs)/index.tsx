@@ -73,6 +73,16 @@ export default function TodayScreen() {
         </Pressable>
       </Link>
 
+      <Link href={{ pathname: "/recap", params: { date: today } }} asChild>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Review today's recap"
+          style={({ pressed }) => [styles.recapLink, pressed && styles.pressed]}
+        >
+          <Text style={styles.recapLinkText}>Review today&apos;s recap</Text>
+        </Pressable>
+      </Link>
+
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator accessibilityLabel="Loading today's plan" />
@@ -207,6 +217,21 @@ const styles = StyleSheet.create({
     color: "#24565c",
     fontSize: 14,
     fontWeight: "800"
+  },
+  recapLink: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    marginBottom: 22,
+    marginTop: -10,
+    minHeight: 48,
+    paddingHorizontal: 4
+  },
+  recapLinkText: {
+    color: "#24565c",
+    fontSize: 15,
+    fontWeight: "800",
+    textDecorationLine: "underline"
   },
   centered: {
     alignItems: "center",

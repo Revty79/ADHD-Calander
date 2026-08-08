@@ -203,6 +203,28 @@ describe("task database", () => {
     assert.equal(restoredTask.completedAt, null);
   });
 
+  it("records a new completion time after completion is undone", async () => {
+    const database = await createSqlJsDatabase();
+    await initializeDatabase(database);
+    let currentTime = new Date("2026-08-04T14:30:00.000Z");
+    const repository = new TaskRepository(
+      new SqlTaskStorage(database),
+      () => "recompleted-task",
+      () => currentTime
+    );
+    const task = await repository.createTask({ title: "Try this again" });
+    currentTime = new Date("2026-08-04T15:00:00.000Z");
+    const firstCompletion = await repository.completeTask(task.id);
+    currentTime = new Date("2026-08-04T15:30:00.000Z");
+    const undone = await repository.undoTaskCompletion(task.id);
+    currentTime = new Date("2026-08-04T16:00:00.000Z");
+    const secondCompletion = await repository.completeTask(task.id);
+
+    assert.equal(firstCompletion.completedAt, "2026-08-04T15:00:00.000Z");
+    assert.equal(undone.completedAt, null);
+    assert.equal(secondCompletion.completedAt, "2026-08-04T16:00:00.000Z");
+  });
+
   it("persists tasks through repository and database reinitialization", async () => {
     const { database, repository } = await createRepository();
     await repository.createTask({

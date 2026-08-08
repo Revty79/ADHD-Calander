@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { createRepositories } from "./createRepositories";
 import { CalendarEventRepository } from "./repositories/calendarEventRepository";
+import { DailyRecapRepository } from "./repositories/dailyRecapRepository";
 import { RecoveryRepository } from "./repositories/recoveryRepository";
 import { TaskRepository } from "./repositories/taskRepository";
 
@@ -21,6 +22,7 @@ type DatabaseState =
       taskRepository: TaskRepository;
       calendarEventRepository: CalendarEventRepository;
       recoveryRepository: RecoveryRepository;
+      dailyRecapRepository: DailyRecapRepository;
     }
   | { status: "error"; message: string };
 
@@ -29,6 +31,7 @@ const CalendarEventRepositoryContext = createContext<CalendarEventRepository | n
   null
 );
 const RecoveryRepositoryContext = createContext<RecoveryRepository | null>(null);
+const DailyRecapRepositoryContext = createContext<DailyRecapRepository | null>(null);
 
 export function DatabaseProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<DatabaseState>({ status: "loading" });
@@ -109,13 +112,15 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
   }
 
   return (
-    <RecoveryRepositoryContext.Provider value={state.recoveryRepository}>
-      <CalendarEventRepositoryContext.Provider value={state.calendarEventRepository}>
-        <TaskRepositoryContext.Provider value={state.taskRepository}>
-          {children}
-        </TaskRepositoryContext.Provider>
-      </CalendarEventRepositoryContext.Provider>
-    </RecoveryRepositoryContext.Provider>
+    <DailyRecapRepositoryContext.Provider value={state.dailyRecapRepository}>
+      <RecoveryRepositoryContext.Provider value={state.recoveryRepository}>
+        <CalendarEventRepositoryContext.Provider value={state.calendarEventRepository}>
+          <TaskRepositoryContext.Provider value={state.taskRepository}>
+            {children}
+          </TaskRepositoryContext.Provider>
+        </CalendarEventRepositoryContext.Provider>
+      </RecoveryRepositoryContext.Provider>
+    </DailyRecapRepositoryContext.Provider>
   );
 }
 
@@ -144,6 +149,16 @@ export function useRecoveryRepository(): RecoveryRepository {
 
   if (!repository) {
     throw new Error("RecoveryRepository is not available.");
+  }
+
+  return repository;
+}
+
+export function useDailyRecapRepository(): DailyRecapRepository {
+  const repository = useContext(DailyRecapRepositoryContext);
+
+  if (!repository) {
+    throw new Error("DailyRecapRepository is not available.");
   }
 
   return repository;

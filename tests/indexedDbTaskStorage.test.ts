@@ -24,6 +24,7 @@ import {
 } from "../src/database/repositories/errors";
 import { TaskRepository } from "../src/database/repositories/taskRepository";
 import { CalendarEventRepository } from "../src/database/repositories/calendarEventRepository";
+import { DailyRecapRepository } from "../src/database/repositories/dailyRecapRepository";
 import { RecoveryRepository } from "../src/database/repositories/recoveryRepository";
 import { CalendarEvent } from "../src/types/calendarEvent";
 import { RecoveryItem, RecoverySession } from "../src/types/recovery";
@@ -199,6 +200,22 @@ describe("IndexedDB task storage", () => {
     assert.equal(deserializeTaskFromWeb(legacyTask).estimatedDurationMinutes, null);
   });
 
+  it("reads legacy task records without completion timestamp data", () => {
+    const legacyCompletedTask = {
+      id: "legacy-completed-task",
+      title: "Older completed task",
+      description: null,
+      status: "completed",
+      scheduledDate: "2026-08-06",
+      scheduledTime: null,
+      createdAt: "2026-08-06T15:00:00.000Z",
+      updatedAt: "2026-08-06T15:00:00.000Z",
+      deletedAt: null
+    };
+
+    assert.equal(deserializeTaskFromWeb(legacyCompletedTask).completedAt, null);
+  });
+
   it("upgrades an existing version one task database", async () => {
     const indexedDB = new IDBFactory();
     const databaseName = "version-one-upgrade-test";
@@ -338,6 +355,40 @@ describe("IndexedDB recovery storage", () => {
       (await completedRepository.recoveryRepository.getLatestCompletedSession())?.id,
       completed.id
     );
+    assert.deepEqual(
+      (await completedRepository.recoveryRepository.getSessionsForDate("2026-08-06")).map(
+        (storedSession) => storedSession.id
+      ),
+      [completed.id]
+    );
+  });
+
+  it("derives a daily recap after browser storage is reopened", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "recap-persistence-test";
+    const first = await createRecoveryRepositories(databaseName, indexedDB);
+    const task = await first.taskRepository.createTask({
+      title: "Browser accomplishment",
+      scheduledDate: "2026-08-05"
+    });
+    await first.taskRepository.completeTask(task.id);
+    await first.calendarEventRepository.createEvent({
+      title: "Browser calendar event",
+      date: "2026-08-07",
+      startTime: "11:00"
+    });
+
+    const reopened = await createRecoveryRepositories(databaseName, indexedDB);
+    const recap = await reopened.dailyRecapRepository.getDailyRecap("2026-08-07");
+
+    assert.deepEqual(
+      recap.accomplishedTasks.map((completedTask) => completedTask.title),
+      ["Browser accomplishment"]
+    );
+    assert.deepEqual(
+      recap.fixedEvents.map((event) => event.title),
+      ["Browser calendar event"]
+    );
   });
 
   it("applies breakdown, delegation, and removal mutations in browser storage", async () => {
@@ -442,30 +493,45 @@ describe("IndexedDB recovery storage", () => {
 });
 
 async function createRecoveryRepositories(databaseName: string, indexedDB: IDBFactory) {
-  const { taskStorage, recoveryStorage } = await openIndexedDbStorages({
-    databaseName,
-    indexedDB,
-    keyRange: IDBKeyRange
-  });
+  const { taskStorage, calendarEventStorage, recoveryStorage } =
+    await openIndexedDbStorages({
+      databaseName,
+      indexedDB,
+      keyRange: IDBKeyRange
+    });
   let taskId = 0;
   let smallerTaskId = 0;
   let itemId = 0;
   let sessionId = 0;
+  let eventId = 0;
   const clock = () => new Date("2026-08-07T15:00:00.000Z");
+  const taskRepository = new TaskRepository(
+    taskStorage,
+    () => `web-recovery-task-${++taskId}`,
+    clock
+  );
+  const calendarEventRepository = new CalendarEventRepository(
+    calendarEventStorage,
+    () => `web-recap-event-${++eventId}`,
+    clock
+  );
+  const recoveryRepository = new RecoveryRepository(
+    recoveryStorage,
+    taskStorage,
+    () => `web-session-${++sessionId}`,
+    () => `web-item-${++itemId}`,
+    () => `web-smaller-task-${++smallerTaskId}`,
+    clock
+  );
 
   return {
-    taskRepository: new TaskRepository(
-      taskStorage,
-      () => `web-recovery-task-${++taskId}`,
-      clock
-    ),
-    recoveryRepository: new RecoveryRepository(
-      recoveryStorage,
-      taskStorage,
-      () => `web-session-${++sessionId}`,
-      () => `web-item-${++itemId}`,
-      () => `web-smaller-task-${++smallerTaskId}`,
-      clock
+    taskRepository,
+    calendarEventRepository,
+    recoveryRepository,
+    dailyRecapRepository: new DailyRecapRepository(
+      taskRepository,
+      calendarEventRepository,
+      recoveryRepository
     )
   };
 }

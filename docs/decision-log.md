@@ -2,6 +2,42 @@
 
 ## 2026-08-07
 
+### Daily Recap Is Derived
+
+Decision: Build Daily Recap from task completion timestamps, fixed calendar
+events, and Recovery sessions instead of storing a recap record or cache.
+
+Reason: The source records already contain the facts. Derivation avoids stale
+summaries after completion undo or a changed active Recovery decision and
+requires no migration.
+
+### Completion Date Is Not Scheduled Date
+
+Decision: Count a task under Accomplished only when its non-null `completedAt`
+instant falls on the selected device-local date.
+
+Reason: A task completed today is an accomplishment today even when it was
+scheduled for another date. Legacy completed records with unknown timestamps
+remain readable without invented history.
+
+### Recovery Decisions Count As Plan Adjustments
+
+Decision: Show final Keep, Reschedule, Break Down, Delegate, and Remove decisions
+as factual plan adjustments. Keep the underlying active work and Decide Later
+items under calm still-open context.
+
+Reason: Reducing or clarifying the plan is legitimate recorded work, but it is
+not task completion and must stay separate from Accomplished.
+
+### No Recap Score Or Partial-Progress Percentage
+
+Decision: Use deterministic supportive messages and factual counts only. Defer
+partial-progress measurement until the task workflow can record meaningful
+progress directly.
+
+Reason: A percentage added solely for Recap would become an arbitrary grade and
+would introduce project tracking beyond the approved scope.
+
 ### One Active Recovery Session
 
 Decision: Persist one active Recovery Mode session at a time and resume it even
@@ -190,3 +226,5 @@ of scope for the first build and require product-owner approval.
   introduced?
 - What retention or backup guidance should the web UI provide before the
   prototype is used for important long-term planning data?
+- What user action and data shape should represent partial progress without
+  requiring percentage-based project tracking?

@@ -384,6 +384,11 @@ textarea:focus-visible {
   line-height: 1.55;
 }
 
+.web-today-recap-link {
+  display: inline-block;
+  margin-top: 4px;
+}
+
 .web-text-link,
 .web-back-link,
 .web-cancel-link {
@@ -468,6 +473,225 @@ textarea:focus-visible {
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.web-recap-page {
+  max-width: 1180px;
+}
+
+.web-recap-header {
+  align-items: stretch;
+}
+
+.web-recap-date-controls {
+  display: grid;
+  flex: 0 1 370px;
+  gap: 12px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #d9d4ca;
+  border-radius: 10px;
+}
+
+.web-recap-day-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.web-recap-date-form {
+  display: grid;
+  gap: 7px;
+}
+
+.web-recap-date-form label {
+  color: #46423d;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.web-recap-date-form > div {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) auto;
+  gap: 10px;
+}
+
+.web-recap-date-form input {
+  min-width: 0;
+  min-height: 48px;
+  padding: 9px 11px;
+  color: #2f2d2a;
+  font: inherit;
+  background: #ffffff;
+  border: 1px solid #aaa49a;
+  border-radius: 8px;
+}
+
+.web-recap-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 340px);
+  align-items: start;
+  gap: clamp(24px, 4vw, 48px);
+}
+
+.web-recap-layout-solo {
+  grid-template-columns: minmax(0, 760px);
+}
+
+.web-recap-main,
+.web-recap-context {
+  display: grid;
+  gap: 26px;
+  min-width: 0;
+}
+
+.web-accomplished {
+  padding: clamp(20px, 3vw, 30px);
+  background: #eef2ed;
+  border: 1px solid #b7c8bd;
+  border-radius: 14px;
+}
+
+.web-accomplished h2 {
+  margin: 0;
+  color: #263f38;
+  font-size: 1.65rem;
+}
+
+.web-recap-encouragement {
+  margin: 12px 0 0;
+  color: #344b43;
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.web-recap-estimate {
+  margin: 8px 0 0;
+  color: #526058;
+  font-size: 0.86rem;
+}
+
+.web-recap-empty {
+  padding: 18px;
+  margin: 20px 0 0;
+  color: #68645e;
+  line-height: 1.5;
+  background: #ffffff;
+  border-radius: 9px;
+}
+
+.web-recap-accomplishment-list,
+.web-recap-open ul,
+.web-recap-event-list,
+.web-recap-adjustment-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 20px 0 0;
+  list-style: none;
+}
+
+.web-recap-accomplishment-list li {
+  display: grid;
+  gap: 6px;
+  padding: 17px 18px;
+  background: #ffffff;
+  border: 1px solid #c9d7ce;
+  border-left: 5px solid #4e7c70;
+  border-radius: 9px;
+}
+
+.web-recap-accomplishment-list strong,
+.web-recap-open strong,
+.web-recap-event-list strong {
+  overflow-wrap: anywhere;
+  color: #2f2d2a;
+}
+
+.web-recap-accomplishment-list span,
+.web-recap-open span {
+  color: #68645e;
+  font-size: 0.82rem;
+}
+
+.web-recap-open {
+  padding-top: 22px;
+  border-top: 1px solid #ded9cf;
+}
+
+.web-recap-open h2,
+.web-recap-panel h2 {
+  margin: 0;
+  color: #55514b;
+  font-size: 1.15rem;
+}
+
+.web-recap-open > p,
+.web-recap-panel > p {
+  margin: 8px 0 0;
+  color: #6b665f;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.web-recap-open li {
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  background: #f4f2ed;
+  border: 1px solid #ddd8cf;
+  border-radius: 8px;
+}
+
+.web-recap-context {
+  position: sticky;
+  top: 28px;
+}
+
+.web-recap-panel {
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #d9d4ca;
+  border-radius: 11px;
+}
+
+.web-recap-event-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid #e2ded6;
+}
+
+.web-recap-event-list li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.web-recap-event-list time {
+  color: #2f5d62;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.web-recap-event-list span {
+  display: grid;
+  gap: 4px;
+}
+
+.web-recap-event-list small {
+  color: #68645e;
+  font-size: 0.75rem;
+}
+
+.web-recap-adjustment-list li {
+  color: #344b43;
+  line-height: 1.45;
+}
+
+.web-recap-adjustment-list .web-recap-waiting {
+  color: #67615a;
 }
 
 .web-recovery-page {
@@ -792,6 +1016,14 @@ textarea:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .web-recap-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .web-recap-context {
+    position: static;
+  }
+
   .web-summary-panel {
     position: static;
     order: -1;
@@ -865,6 +1097,15 @@ textarea:focus-visible {
 
   .web-primary-link {
     align-self: stretch;
+  }
+
+  .web-recap-day-buttons,
+  .web-recap-date-form > div {
+    grid-template-columns: 1fr;
+  }
+
+  .web-recap-date-controls {
+    flex-basis: auto;
   }
 
   .web-today-recovery-link {

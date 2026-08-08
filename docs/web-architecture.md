@@ -27,6 +27,8 @@ Platform-specific files own:
 - `app/(tabs)/index.web.tsx`: desktop-oriented Today layout and factual counts.
 - `app/(tabs)/tasks.web.tsx`: wider all-tasks layout.
 - `app/(tabs)/recovery.web.tsx`: one-task recovery review and semantic forms.
+- `app/(tabs)/recap.web.tsx`: semantic date controls and a responsive derived
+  daily recap.
 - `app/tasks/new.web.tsx`: semantic browser form controls.
 - `app/events/new.web.tsx`: semantic browser event form controls.
 - `src/components/Screen.web.tsx`: web page sizing for shared placeholder pages.
@@ -61,6 +63,11 @@ shapes, while validation and recovery rules remain in shared repositories.
 IndexedDB recovery decisions update task records and recovery items in one
 transaction.
 
+`DailyRecapRepository` composes those shared repositories and persists nothing.
+IndexedDB recovery sessions are filtered by source date in the adapter without
+an object-store version change. Legacy task records that omit `completedAt` are
+read as having an unknown completion time.
+
 IndexedDB was selected because Expo SQLite web support in the installed SDK 57
 is documented as alpha and requires WebAssembly configuration plus
 cross-origin-isolation response headers. IndexedDB is built into supported
@@ -81,6 +88,8 @@ sharing with native SQLite.
   stack vertically.
 - Recovery uses a prominent review card plus a sticky progress summary on wide
   screens and a single stacked column on narrower screens.
+- Recap uses a wide accomplishment area with smaller factual calendar and
+  Recovery context panels, then stacks into one column below 960 pixels.
 
 Content uses maximum widths, flexible grid columns, wrapping metadata, and
 breakable task text to avoid ordinary horizontal scrolling. Browser zoom and
@@ -92,7 +101,9 @@ larger text remain supported because sizing is primarily fluid and relative.
 - Private browsing, user-cleared site data, storage pressure, or browser policy
   can remove IndexedDB data.
 - Web and native tasks are separate and cannot currently be imported or synced.
-- Recap and Settings stay as calm placeholders.
+- Settings stays as a calm placeholder.
+- Completed legacy tasks without a known completion timestamp cannot appear on
+  a historical Recap date.
 - Completed recovery sessions are retained but do not yet have a history browser.
 - Event/task editing, deletion, filtering, sorting controls, notifications, and
   recurring items are not implemented.

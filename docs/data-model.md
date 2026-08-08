@@ -9,9 +9,10 @@ start time. This separation is required for future scheduling and Recovery Mode
 logic.
 
 All platforms use the shared `TaskRepository`, `CalendarEventRepository`, and
-`RecoveryRepository`. Repositories own validation and domain behavior and depend
-on platform-neutral storage contracts. Screens never issue SQL or IndexedDB
-requests directly.
+`RecoveryRepository`. `DailyRecapRepository` composes those repositories as a
+read-only derived-data service. Repositories own validation and domain behavior
+and depend on platform-neutral storage contracts. Screens never issue SQL or
+IndexedDB requests directly.
 
 ## Local Date And Time Strategy
 
@@ -22,6 +23,11 @@ in the user's local calendar.
 
 Creation and update timestamps are ISO instants. They describe record history,
 not calendar placement.
+
+`completed_at` is also an ISO instant. It is set when a task is completed,
+cleared when completion is undone, and set to a new instant when that task is
+completed again. Daily Recap converts this instant to the device's local date;
+it does not use `scheduled_date` as a substitute for completion history.
 
 ## Native Persistence
 
@@ -134,6 +140,12 @@ existing task unchanged, recreates task indexes, and creates the
 expanded recovery status constraint while copying every existing row, recreates
 task indexes, and adds recovery session and item tables plus their indexes.
 
+### Daily Recap Foundation
+
+No migration is required. Recap derives its view from the existing nullable
+`tasks.completed_at`, calendar-event, and Recovery session/item records. It
+does not persist duplicate daily summary rows.
+
 ## Web Persistence
 
 The web build uses IndexedDB database version 3. It has:
@@ -145,8 +157,10 @@ The web build uses IndexedDB database version 3. It has:
 
 Version 2 preserves the existing version 1 task store and adds the event store.
 Version 3 preserves both stores and adds recovery storage. Older task records
-without `estimatedDurationMinutes` deserialize with a `null` estimate. Stored
-records are validated when read.
+without `estimatedDurationMinutes` deserialize with a `null` estimate. Older
+task records that omit `completedAt` deserialize with a `null` completion time
+and are not assigned to a historical Recap date. Stored records are validated
+when read.
 
 Browser data is local to the browser profile and application origin. It remains
 after refreshes and ordinary browser restarts, but private browsing, storage
@@ -157,8 +171,8 @@ native data are intentionally separate.
 
 Recurring events, event editing/deletion, task editing/deletion, time zones,
 all-day events, external calendar identifiers, notifications, day plans,
-recovery analytics, import/export, accounts, and cloud synchronization are not
-part of this foundation.
+recovery analytics, partial-progress measurement, import/export, accounts, and
+cloud synchronization are not part of this foundation.
 
 Cloud synchronization remains unapproved. A future design must explicitly
 address privacy, authentication, conflict resolution, offline reconciliation,

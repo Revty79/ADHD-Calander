@@ -70,6 +70,12 @@ and item session ID are indexed. Browser writes update tasks and recovery items
 in one transaction, and session creation checks for an existing active session.
 Stored values are validated when read.
 
+Daily Recap reads every active or completed Recovery session whose `sourceDate`
+matches the selected recap date. Final decisions are summarized as plan
+adjustments, while pending and Decide Later items remain waiting for a decision.
+Recovery decisions never become completed-task accomplishments. Because Recap
+is derived, reopening an active decision immediately changes the next summary.
+
 ## Deliberately Deferred
 
 - Automatic scheduling, “best time” placement, or tomorrow rollover

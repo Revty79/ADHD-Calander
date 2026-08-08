@@ -120,6 +120,19 @@ export class SqlRecoveryStorage implements RecoveryStorage {
     return row ? this.loadSession(row) : null;
   }
 
+  async getSessionsForDate(sourceDate: string): Promise<RecoverySession[]> {
+    const rows = await this.database.getAllAsync<RecoverySessionRow>(
+      `
+        ${sessionSelect}
+        WHERE source_date = ?
+        ORDER BY started_at, id;
+      `,
+      sourceDate
+    );
+
+    return Promise.all(rows.map((row) => this.loadSession(row)));
+  }
+
   async saveDecision(mutation: RecoveryDecisionMutation): Promise<void> {
     await this.runTransaction(async () => {
       for (const task of mutation.updatedTasks) {

@@ -19,6 +19,9 @@ Calendar aggregation reads both repositories and keeps these categories
 separate. Recovery Mode may update tasks only after an explicit decision, but
 never reads fixed events as movable recovery work.
 
+Daily Recap preserves the same boundary. Fixed events appear as “On your
+calendar” facts and never as completed or attended accomplishments.
+
 ## Views
 
 - Month uses a six-row traditional grid. Cells show compact fixed, task, and
@@ -62,6 +65,11 @@ Calendar arithmetic constructs local `Date` objects from validated components
 and converts them back with local year, month, and day accessors. It does not
 parse date-only strings as UTC. Local date/time fields are stored as strings,
 while record-history timestamps use ISO instants.
+
+Recap intentionally maps one record-history instant to a local date:
+`completedAt` is converted with local date accessors to determine the day on
+which completion actually occurred. It never substitutes the task's scheduled
+date.
 
 ## Deliberately Deferred
 

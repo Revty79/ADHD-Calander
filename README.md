@@ -25,6 +25,10 @@ code structure for future iOS work. It includes:
   unscheduled tasks, delegating locally, removing from active planning, or deciding
   later.
 - Persisting active Recovery Mode progress and its decision history locally.
+- Reviewing a selected local date in Recap, with tasks grouped by their actual
+  completion timestamp rather than their scheduled date.
+- Showing fixed calendar commitments factually, summarizing Recovery decisions,
+  and keeping still-open work calm and secondary.
 - Native persistence in Expo SQLite.
 - Browser persistence in IndexedDB.
 - Desktop sidebar navigation and compact navigation at smaller browser widths.
@@ -148,6 +152,7 @@ src/
   database/                  Storage contract, adapters, migrations, repository
   features/calendar/         Local-date math, aggregation, and calendar hook
   features/recovery/         Recovery session hook and presentation helpers
+  features/recap/            Daily recap hook and presentation helpers
   features/tasks/            Shared hooks and platform task lists
   features/today/            Today plan aggregation hook
   styles/web.css             Responsive web styles
@@ -157,13 +162,17 @@ docs/                        Product and architecture documentation
 tests/                       SQLite repository and IndexedDB adapter tests
 ```
 
-See `docs/calendar-architecture.md`, `docs/recovery-architecture.md`, and
-`docs/web-architecture.md` for calendar, recovery, persistence, responsive
-layout, and shared-code decisions.
+See `docs/calendar-architecture.md`, `docs/recovery-architecture.md`,
+`docs/recap-architecture.md`, and `docs/web-architecture.md` for calendar,
+recovery, recap, persistence, responsive layout, and shared-code decisions.
 
 ## Known Limitations
 
-- Recap and Settings are placeholders.
+- Settings remains a placeholder.
+- Legacy completed tasks without a recorded completion timestamp remain
+  readable but cannot be assigned to a historical Recap date.
+- Partial-progress recording is not implemented; Recap uses only completed
+  tasks and explicit Recovery decisions.
 - Recovery decisions can be changed while a session is active, but completed
   recovery sessions are currently read-only.
 - Delegation stores only a local note; it does not contact another person.

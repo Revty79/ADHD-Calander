@@ -48,10 +48,15 @@
   recovery decisions.
 - Persisted recovery progress that resumes after leaving or restarting the app.
 - Reversible recovery decisions while a session remains active.
+- A derived Daily Recap for today and recent local dates.
+- Accomplishments based on actual completion timestamps rather than schedule
+  placement.
+- Factual fixed-event context, Recovery decision summaries, and calm still-open
+  context without grades, streaks, or productivity scores.
 
 ## Out Of Scope For First Build
 
-- Recap implementation
+- Partial-progress entry or percentage tracking
 - Three-priority planning system
 - General task-step/project hierarchy outside Recovery Mode breakdown
 - Task editing

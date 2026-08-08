@@ -89,6 +89,19 @@ export class RecoveryRepository {
     }
   }
 
+  async getSessionsForDate(sourceDateInput: string): Promise<RecoverySession[]> {
+    const sourceDate = requireLocalDate(sourceDateInput, "sourceDate");
+
+    try {
+      return await this.recoveryStorage.getSessionsForDate(sourceDate);
+    } catch (error) {
+      throw new RecoveryPersistenceError(
+        "Unable to load recovery history for the selected date.",
+        error
+      );
+    }
+  }
+
   async keepTask(itemId: string): Promise<RecoverySession> {
     return this.applyFinalDecision(itemId, "keep", (task, item, timestamp) => ({
       item: resolveItem(item, "keep", timestamp),

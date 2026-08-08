@@ -17,6 +17,8 @@ without creating an alarming overdue pile. The detailed technical design is in
 - Leave and resume an active session with saved progress.
 - Change a resolved decision while the session remains active.
 - Finish only after every item has a resolved decision.
+- See final decisions summarized as plan adjustments in the source date's Daily
+  Recap without counting them as completed tasks.
 
 Fixed appointments are never placed in a recovery session. Completed and
 already resolved tasks are excluded. No action automatically schedules work for
