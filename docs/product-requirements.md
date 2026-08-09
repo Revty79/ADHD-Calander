@@ -30,6 +30,23 @@ day.
 6. Reschedule unfinished work without simply pushing everything to tomorrow.
 7. Review a factual, encouraging recap based on recorded actions.
 
+## Global Functional Definition Of Done
+
+This acceptance standard applies globally to Today, Tasks, Calendar, Recovery,
+Recap, Scheduling, Reminders, Settings, Accessibility, future onboarding,
+future monetization, and every future feature.
+
+The existence of a screen, label, button, toggle, route, database column,
+repository or service, placeholder UI, or test that can instantiate a feature
+is not evidence that the feature is implemented. A feature is implemented only
+when a real user can perform the intended action, receives understandable
+feedback, sees the correct result on every applicable app surface, and sees a
+persistent result survive reload or app restart.
+
+Acceptance and handoff review must exercise the complete user path. Every
+handoff must explicitly identify anything that appears functional in the UI but
+is not wired to functioning behavior.
+
 ## MVP Feature Boundary
 
 The MVP should include local task creation, today planning, completion tracking,

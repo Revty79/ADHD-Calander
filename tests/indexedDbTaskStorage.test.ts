@@ -186,7 +186,9 @@ describe("IndexedDB task storage", () => {
       id: "serialization-task",
       title: "Review notes",
       description: null,
+      importance: "normal",
       status: "not_started",
+      parentTaskId: null,
       scheduledDate: "2026-08-06",
       scheduledTime: null,
       estimatedDurationMinutes: null,
@@ -228,6 +230,8 @@ describe("IndexedDB task storage", () => {
 
     assert.equal(deserializeTaskFromWeb(legacyTask).estimatedDurationMinutes, null);
     assert.equal(deserializeTaskFromWeb(legacyTask).deadlineDate, null);
+    assert.equal(deserializeTaskFromWeb(legacyTask).importance, "normal");
+    assert.equal(deserializeTaskFromWeb(legacyTask).parentTaskId, null);
   });
 
   it("reads legacy task records without completion timestamp data", () => {
@@ -257,6 +261,38 @@ describe("IndexedDB task storage", () => {
 
     assert.equal(tasks[0]?.title, "Version one task");
     assert.equal(tasks[0]?.estimatedDurationMinutes, null);
+    assert.equal(tasks[0]?.importance, "normal");
+    assert.equal(tasks[0]?.parentTaskId, null);
+  });
+
+  it("persists edits, breakdown relationships, removal, and restoration", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "functional-task-lifecycle-test";
+    const firstRepository = await createRepository(databaseName, indexedDB);
+    const parent = await firstRepository.createTask({ title: "Plan workshop" });
+    await firstRepository.updateTask(parent.id, {
+      ...parent,
+      title: "Plan team workshop",
+      importance: "important",
+      scheduledDate: "2026-08-08"
+    });
+    const children = await firstRepository.breakDownTask(parent.id, {
+      titles: ["Choose format", "Send invite"]
+    });
+    await firstRepository.removeTask(children[0]!.id);
+
+    const reopenedRepository = await createRepository(databaseName, indexedDB);
+    const reopenedParent = await reopenedRepository.getTaskById(parent.id);
+    const reopenedChildren = await reopenedRepository.getChildTasks(parent.id);
+
+    assert.equal(reopenedParent.title, "Plan team workshop");
+    assert.equal(reopenedParent.importance, "important");
+    assert.equal(reopenedParent.status, "broken_down");
+    assert.ok(reopenedChildren.every((child) => child.parentTaskId === parent.id));
+    assert.equal(reopenedChildren[0]?.status, "removed");
+
+    const restoredChild = await reopenedRepository.restoreTask(children[0]!.id);
+    assert.equal(restoredChild.status, "not_started");
   });
 });
 
@@ -463,8 +499,14 @@ describe("IndexedDB recovery storage", () => {
     assert.deepEqual(
       tasks
         .filter((task) => task.id.startsWith("web-smaller-task-"))
-        .map((task) => task.scheduledDate),
-      [null, null]
+        .map((task) => ({
+          parentTaskId: task.parentTaskId,
+          scheduledDate: task.scheduledDate
+        })),
+      [
+        { parentTaskId: breakdownTask.id, scheduledDate: null },
+        { parentTaskId: breakdownTask.id, scheduledDate: null }
+      ]
     );
   });
 

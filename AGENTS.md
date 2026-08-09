@@ -24,6 +24,35 @@ persistence, navigation, or user-facing text.
 15. The application is a planning tool, not a therapist, diagnostic service, or
     medical device.
 
+## Global Functional Definition Of Done
+
+This definition applies to Today, Tasks, Calendar, Recovery, Recap, Scheduling,
+Reminders, Settings, Accessibility, future onboarding, future monetization, and
+every other current or future feature.
+
+A feature is not implemented merely because a screen, label, button, toggle,
+route, database column, repository or service, placeholder UI, or instantiating
+automated test exists.
+
+A feature is implemented only when a real user can:
+
+1. Perform the intended action through the app.
+2. Receive understandable feedback about the outcome.
+3. See the correct result elsewhere in the app when the feature affects other
+   surfaces.
+4. See the result persist correctly across reload or app restart when the
+   outcome is persistent.
+
+Never substitute labels or placeholder controls for functioning behavior and
+report the feature as complete. Every handoff must explicitly identify anything
+that appears functional in the UI but is not wired to functioning behavior.
+
+Do not implement advertising, subscriptions, entitlements, or Google Play
+Billing during the current Tasks phase. Monetization requires its own approved
+implementation phase. Preserve separation between core planning logic and any
+future advertising, entitlement, or billing adapters without speculatively
+building those systems now.
+
 ## Coding Instructions
 
 - State important assumptions in documentation or the final handoff.

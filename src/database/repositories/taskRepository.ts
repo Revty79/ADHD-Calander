@@ -1,4 +1,13 @@
-import { CreateTaskInput, isTaskActive, ScheduleTaskInput, Task } from "../../types/task";
+import {
+  BreakDownTaskInput,
+  CreateTaskInput,
+  isTaskActive,
+  ScheduleTaskInput,
+  taskImportances,
+  Task,
+  TaskImportance,
+  UpdateTaskInput
+} from "../../types/task";
 import {
   getReminderTriggerDate,
   isReminderOffsetMinutes
@@ -15,6 +24,18 @@ import { TaskNotFoundError, TaskPersistenceError, TaskValidationError } from "./
 type Clock = () => Date;
 type IdGenerator = () => string;
 
+type NormalizedTaskInput = Pick<
+  Task,
+  | "title"
+  | "description"
+  | "importance"
+  | "scheduledDate"
+  | "scheduledTime"
+  | "estimatedDurationMinutes"
+  | "deadlineDate"
+  | "reminderOffsetMinutes"
+>;
+
 export class TaskRepository {
   constructor(
     private readonly storage: TaskStorage,
@@ -24,30 +45,19 @@ export class TaskRepository {
   ) {}
 
   async createTask(input: CreateTaskInput): Promise<Task> {
-    const normalizedInput = normalizeCreateTaskInput(input);
+    const normalizedInput = normalizeTaskInput(input);
     const now = this.clock();
     const timestamp = now.toISOString();
 
-    if (normalizedInput.reminderOffsetMinutes !== null) {
-      const reminderDate = getReminderTriggerDate(
-        normalizedInput.scheduledDate!,
-        normalizedInput.scheduledTime!,
-        normalizedInput.reminderOffsetMinutes
-      );
-
-      if (!reminderDate || reminderDate.getTime() <= now.getTime()) {
-        throw new TaskValidationError(
-          "Choose a future date and time for this reminder.",
-          "reminderOffsetMinutes"
-        );
-      }
-    }
+    validateFutureReminder(normalizedInput, now);
 
     const task: Task = {
       id: this.idGenerator(),
       title: normalizedInput.title,
       description: normalizedInput.description,
+      importance: normalizedInput.importance,
       status: "not_started",
+      parentTaskId: null,
       scheduledDate: normalizedInput.scheduledDate,
       scheduledTime: normalizedInput.scheduledTime,
       estimatedDurationMinutes: normalizedInput.estimatedDurationMinutes,
@@ -70,12 +80,53 @@ export class TaskRepository {
     return task;
   }
 
+  async updateTask(id: string, input: UpdateTaskInput): Promise<Task> {
+    const normalizedInput = normalizeTaskInput(input);
+    const now = this.clock();
+
+    try {
+      const existingTask = await this.requireStoredTask(id);
+      let reminderOffsetMinutes = normalizedInput.reminderOffsetMinutes;
+
+      if (!isTaskActive(existingTask)) {
+        reminderOffsetMinutes = null;
+      } else if (reminderOffsetMinutes !== null) {
+        const reminderDate = getReminderTriggerDate(
+          normalizedInput.scheduledDate!,
+          normalizedInput.scheduledTime!,
+          reminderOffsetMinutes
+        );
+
+        if (!reminderDate || reminderDate.getTime() <= now.getTime()) {
+          reminderOffsetMinutes = null;
+        }
+      }
+
+      const updatedTask: Task = {
+        ...existingTask,
+        ...normalizedInput,
+        reminderOffsetMinutes,
+        updatedAt: now.toISOString()
+      };
+
+      if (!(await this.storage.updateTask(updatedTask))) {
+        throw new TaskNotFoundError();
+      }
+
+      await this.reminderSynchronizer.syncTaskReminder(updatedTask);
+
+      return updatedTask;
+    } catch (error) {
+      throw wrapTaskError("Unable to update the task.", error);
+    }
+  }
+
   async getTasksForDate(date: string): Promise<Task[]> {
     const scheduledDate = normalizeLocalDateInput(date);
 
     if (!scheduledDate) {
       throw new TaskValidationError(
-        "Use a scheduled date in YYYY-MM-DD format.",
+        "Use a planned date in YYYY-MM-DD format.",
         "scheduledDate"
       );
     }
@@ -104,19 +155,25 @@ export class TaskRepository {
 
   async getTaskById(id: string): Promise<Task> {
     try {
-      const task = await this.storage.getTaskById(id);
+      const task = await this.requireStoredTask(id);
 
-      if (!task || !isVisibleTask(task)) {
+      if (!isVisibleTask(task)) {
         throw new TaskNotFoundError();
       }
 
       return task;
     } catch (error) {
-      if (error instanceof TaskNotFoundError) {
-        throw error;
-      }
+      throw wrapTaskError("Unable to load the task.", error);
+    }
+  }
 
-      throw new TaskPersistenceError("Unable to load the task.", error);
+  async getChildTasks(parentTaskId: string): Promise<Task[]> {
+    try {
+      const tasks = await this.storage.getChildTasks(parentTaskId);
+
+      return tasks.filter(isVisibleTask).sort(compareTasks);
+    } catch (error) {
+      throw new TaskPersistenceError("Unable to load the smaller tasks.", error);
     }
   }
 
@@ -137,11 +194,7 @@ export class TaskRepository {
     }
 
     try {
-      const existingTask = await this.storage.getTaskById(id);
-
-      if (!existingTask) {
-        throw new TaskNotFoundError();
-      }
+      const existingTask = await this.requireStoredTask(id);
 
       if (!isTaskActive(existingTask)) {
         throw new TaskValidationError(
@@ -193,11 +246,103 @@ export class TaskRepository {
 
       return scheduledTask;
     } catch (error) {
-      if (error instanceof TaskNotFoundError || error instanceof TaskValidationError) {
-        throw error;
+      throw wrapTaskError("Unable to schedule the task.", error);
+    }
+  }
+
+  async breakDownTask(id: string, input: BreakDownTaskInput): Promise<Task[]> {
+    const titles = normalizeBreakdownTitles(input.titles);
+    const timestamp = this.clock().toISOString();
+
+    try {
+      const parentTask = await this.requireStoredTask(id);
+
+      if (!isTaskActive(parentTask)) {
+        throw new TaskValidationError(
+          "Only an active task can be broken into smaller tasks.",
+          "breakdownTitles"
+        );
       }
 
-      throw new TaskPersistenceError("Unable to schedule the task.", error);
+      const resolvedParent: Task = {
+        ...parentTask,
+        status: "broken_down",
+        reminderOffsetMinutes: null,
+        updatedAt: timestamp
+      };
+      const childTasks = titles.map<Task>((title) => ({
+        id: this.idGenerator(),
+        title,
+        description: null,
+        importance: "normal",
+        status: "not_started",
+        parentTaskId: parentTask.id,
+        scheduledDate: null,
+        scheduledTime: null,
+        estimatedDurationMinutes: null,
+        deadlineDate: null,
+        reminderOffsetMinutes: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        completedAt: null,
+        deletedAt: null
+      }));
+
+      await this.storage.saveTaskGroup([resolvedParent], childTasks);
+      await this.reminderSynchronizer.syncTaskReminder(resolvedParent);
+
+      return childTasks;
+    } catch (error) {
+      throw wrapTaskError("Unable to create the smaller tasks.", error);
+    }
+  }
+
+  async undoTaskBreakdown(id: string): Promise<Task> {
+    const timestamp = this.clock().toISOString();
+
+    try {
+      const parentTask = await this.requireStoredTask(id);
+
+      if (parentTask.status !== "broken_down") {
+        throw new TaskValidationError(
+          "This task is not currently broken into smaller tasks.",
+          "breakdownTitles"
+        );
+      }
+
+      const childTasks = await this.storage.getChildTasks(id);
+
+      if (
+        childTasks.some(
+          (task) => task.status !== "not_started" && task.status !== "removed"
+        )
+      ) {
+        throw new TaskValidationError(
+          "A smaller task already has progress, so this breakdown cannot be undone.",
+          "breakdownTitles"
+        );
+      }
+
+      const restoredParent: Task = {
+        ...parentTask,
+        status: "not_started",
+        updatedAt: timestamp
+      };
+      const removedChildren = childTasks.map<Task>((task) => ({
+        ...task,
+        status: "removed",
+        reminderOffsetMinutes: null,
+        updatedAt: timestamp
+      }));
+
+      await this.storage.saveTaskGroup([restoredParent, ...removedChildren], []);
+      await Promise.all(
+        removedChildren.map((task) => this.reminderSynchronizer.syncTaskReminder(task))
+      );
+
+      return restoredParent;
+    } catch (error) {
+      throw wrapTaskError("Unable to undo the task breakdown.", error);
     }
   }
 
@@ -205,17 +350,17 @@ export class TaskRepository {
     const timestamp = this.clock().toISOString();
 
     try {
-      const existingTask = await this.storage.getTaskById(id);
+      const existingTask = await this.requireStoredTask(id);
 
-      if (!existingTask) {
-        throw new TaskNotFoundError();
+      if (!isTaskActive(existingTask)) {
+        throw new TaskValidationError("Only an active task can be completed.", "title");
       }
 
       const completedTask: Task = {
         ...existingTask,
         status: "completed",
         reminderOffsetMinutes: null,
-        completedAt: existingTask.completedAt ?? timestamp,
+        completedAt: timestamp,
         updatedAt: timestamp
       };
 
@@ -227,11 +372,7 @@ export class TaskRepository {
 
       return completedTask;
     } catch (error) {
-      if (error instanceof TaskNotFoundError) {
-        throw error;
-      }
-
-      throw new TaskPersistenceError("Unable to complete the task.", error);
+      throw wrapTaskError("Unable to complete the task.", error);
     }
   }
 
@@ -239,10 +380,13 @@ export class TaskRepository {
     const timestamp = this.clock().toISOString();
 
     try {
-      const existingTask = await this.storage.getTaskById(id);
+      const existingTask = await this.requireStoredTask(id);
 
-      if (!existingTask) {
-        throw new TaskNotFoundError();
+      if (existingTask.status !== "completed") {
+        throw new TaskValidationError(
+          "Only a completed task can have completion undone.",
+          "title"
+        );
       }
 
       const restoredTask: Task = {
@@ -258,31 +402,104 @@ export class TaskRepository {
 
       return restoredTask;
     } catch (error) {
-      if (error instanceof TaskNotFoundError) {
-        throw error;
+      throw wrapTaskError("Unable to undo task completion.", error);
+    }
+  }
+
+  async removeTask(id: string): Promise<Task> {
+    return this.changeResolutionStatus(
+      id,
+      "removed",
+      "Only an active task can be removed from active tasks.",
+      "Unable to remove the task from active tasks."
+    );
+  }
+
+  async restoreTask(id: string): Promise<Task> {
+    const timestamp = this.clock().toISOString();
+
+    try {
+      const existingTask = await this.requireStoredTask(id);
+
+      if (existingTask.status !== "removed") {
+        throw new TaskValidationError("Only a removed task can be restored.", "title");
       }
 
-      throw new TaskPersistenceError("Unable to undo task completion.", error);
+      const restoredTask: Task = {
+        ...existingTask,
+        status: "not_started",
+        completedAt: null,
+        updatedAt: timestamp
+      };
+
+      if (!(await this.storage.updateTask(restoredTask))) {
+        throw new TaskNotFoundError();
+      }
+
+      return restoredTask;
+    } catch (error) {
+      throw wrapTaskError("Unable to restore the task.", error);
     }
+  }
+
+  private async changeResolutionStatus(
+    id: string,
+    status: "removed",
+    validationMessage: string,
+    persistenceMessage: string
+  ): Promise<Task> {
+    const timestamp = this.clock().toISOString();
+
+    try {
+      const existingTask = await this.requireStoredTask(id);
+
+      if (!isTaskActive(existingTask)) {
+        throw new TaskValidationError(validationMessage, "title");
+      }
+
+      const updatedTask: Task = {
+        ...existingTask,
+        status,
+        reminderOffsetMinutes: null,
+        updatedAt: timestamp
+      };
+
+      if (!(await this.storage.updateTask(updatedTask))) {
+        throw new TaskNotFoundError();
+      }
+
+      await this.reminderSynchronizer.syncTaskReminder(updatedTask);
+
+      return updatedTask;
+    } catch (error) {
+      throw wrapTaskError(persistenceMessage, error);
+    }
+  }
+
+  private async requireStoredTask(id: string): Promise<Task> {
+    const task = await this.storage.getTaskById(id);
+
+    if (!task) {
+      throw new TaskNotFoundError();
+    }
+
+    return task;
   }
 }
 
-function normalizeCreateTaskInput(
-  input: CreateTaskInput
-): Pick<
-  Task,
-  | "title"
-  | "description"
-  | "scheduledDate"
-  | "scheduledTime"
-  | "estimatedDurationMinutes"
-  | "deadlineDate"
-  | "reminderOffsetMinutes"
-> {
+function normalizeTaskInput(
+  input: CreateTaskInput | UpdateTaskInput
+): NormalizedTaskInput {
   const title = input.title.trim();
 
   if (!title) {
     throw new TaskValidationError("Enter a task title.", "title");
+  }
+
+  const importance = input.importance ?? "normal";
+
+  if (!taskImportances.some((candidate) => candidate === importance)) {
+    throw new TaskValidationError("Choose an available importance.", "importance");
   }
 
   const rawScheduledDate = input.scheduledDate?.trim() ?? "";
@@ -292,7 +509,7 @@ function normalizeCreateTaskInput(
 
   if (rawScheduledDate && !scheduledDate) {
     throw new TaskValidationError(
-      "Use a scheduled date in YYYY-MM-DD format.",
+      "Use a planned date in YYYY-MM-DD format.",
       "scheduledDate"
     );
   }
@@ -309,7 +526,7 @@ function normalizeCreateTaskInput(
 
   if (scheduledTime && !scheduledDate) {
     throw new TaskValidationError(
-      "Choose a scheduled date before adding a time.",
+      "Choose a planned date before adding a time.",
       "scheduledDate"
     );
   }
@@ -336,7 +553,7 @@ function normalizeCreateTaskInput(
 
   if (scheduledDate && deadlineDate && scheduledDate > deadlineDate) {
     throw new TaskValidationError(
-      "Choose a deadline on or after the scheduled date.",
+      "Choose a deadline on or after the planned date.",
       "deadlineDate"
     );
   }
@@ -360,12 +577,32 @@ function normalizeCreateTaskInput(
   return {
     title,
     description,
+    importance,
     scheduledDate,
     scheduledTime,
     estimatedDurationMinutes,
     deadlineDate,
     reminderOffsetMinutes
   };
+}
+
+function validateFutureReminder(input: NormalizedTaskInput, now: Date): void {
+  if (input.reminderOffsetMinutes === null) {
+    return;
+  }
+
+  const reminderDate = getReminderTriggerDate(
+    input.scheduledDate!,
+    input.scheduledTime!,
+    input.reminderOffsetMinutes
+  );
+
+  if (!reminderDate || reminderDate.getTime() <= now.getTime()) {
+    throw new TaskValidationError(
+      "Choose a future date and time for this reminder.",
+      "reminderOffsetMinutes"
+    );
+  }
 }
 
 function normalizeScheduleTaskInput(input: ScheduleTaskInput): {
@@ -409,6 +646,40 @@ function normalizeScheduleTaskInput(input: ScheduleTaskInput): {
   };
 }
 
+function normalizeBreakdownTitles(titles: string[]): string[] {
+  const normalizedTitles = titles.map((title) => title.trim());
+
+  if (
+    normalizedTitles.length < 2 ||
+    normalizedTitles.length > 20 ||
+    normalizedTitles.some((title) => !title)
+  ) {
+    throw new TaskValidationError(
+      "Add between 2 and 20 clear smaller-task titles.",
+      "breakdownTitles"
+    );
+  }
+
+  const uniqueTitles = new Set(normalizedTitles.map((title) => title.toLowerCase()));
+
+  if (uniqueTitles.size !== normalizedTitles.length) {
+    throw new TaskValidationError(
+      "Give each smaller task a different title.",
+      "breakdownTitles"
+    );
+  }
+
+  return normalizedTitles;
+}
+
+function wrapTaskError(message: string, error: unknown): Error {
+  if (error instanceof TaskNotFoundError || error instanceof TaskValidationError) {
+    return error;
+  }
+
+  return new TaskPersistenceError(message, error);
+}
+
 function isVisibleTask(task: Task): boolean {
   return task.deletedAt === null;
 }
@@ -447,6 +718,18 @@ function compareTasks(first: Task, second: Task): number {
 
   if (timeOrder !== 0) {
     return timeOrder;
+  }
+
+  const importanceOrder: Record<TaskImportance, number> = {
+    important: 0,
+    normal: 1,
+    low: 2
+  };
+  const priorityOrder =
+    importanceOrder[first.importance] - importanceOrder[second.importance];
+
+  if (priorityOrder !== 0) {
+    return priorityOrder;
   }
 
   return first.createdAt.localeCompare(second.createdAt);

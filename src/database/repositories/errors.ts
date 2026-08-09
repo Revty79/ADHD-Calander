@@ -1,10 +1,12 @@
 export type TaskValidationField =
   | "title"
+  | "importance"
   | "scheduledDate"
   | "scheduledTime"
   | "estimatedDurationMinutes"
   | "deadlineDate"
-  | "reminderOffsetMinutes";
+  | "reminderOffsetMinutes"
+  | "breakdownTitles";
 
 export class TaskValidationError extends Error {
   readonly field: TaskValidationField;

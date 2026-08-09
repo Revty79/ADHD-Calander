@@ -52,7 +52,9 @@ Android and future iOS builds use Expo SQLite with versioned SQL migrations.
 | `id`                         | text    | Unique task ID.                                                                               |
 | `title`                      | text    | Required trimmed title.                                                                       |
 | `description`                | text    | Optional trimmed description.                                                                 |
+| `importance`                 | text    | `low`, `normal`, or `important`; legacy rows default to `normal`.                             |
 | `status`                     | text    | Implemented values are `not_started`, `completed`, `delegated`, `removed`, and `broken_down`. |
+| `parent_task_id`             | text    | Optional self-reference for a smaller task created by breakdown.                              |
 | `scheduled_date`             | text    | Optional local `YYYY-MM-DD` date.                                                             |
 | `scheduled_time`             | text    | Optional local `HH:MM` time; requires a scheduled date.                                       |
 | `estimated_duration_minutes` | integer | Optional positive whole-number estimate.                                                      |
@@ -63,8 +65,14 @@ Android and future iOS builds use Expo SQLite with versioned SQL migrations.
 | `completed_at`               | text    | Optional ISO timestamp set on completion.                                                     |
 | `deleted_at`                 | text    | Optional ISO timestamp reserved for future soft deletion.                                     |
 
-Delegated, removed, and broken-down tasks remain stored as recovery history but
-are excluded from active Today and Calendar work. The status constraint also
+Planning state is derived rather than stored redundantly: no date is Flexible,
+a date without a time is Planned, and a date with a time is Scheduled. A
+deadline remains independent from all three states.
+
+Delegated, removed, and broken-down tasks remain stored as task history but are
+excluded from active Today and Calendar work. A manual or Recovery breakdown
+marks the original `broken_down` and creates unscheduled child tasks whose
+`parent_task_id` references it. The status constraint also
 reserves future values so later migrations do not
 need to rewrite rows only to recognize planned states: `started`,
 `partially_completed`, `intentionally_skipped`, `rescheduled`,
@@ -176,6 +184,13 @@ reminder fields and remain otherwise unchanged.
 `tasks.deadline_date`. Existing tasks receive `null`; scheduled dates, estimates,
 status, reminders, and identity remain unchanged.
 
+### Version 6: `task_functional_core`
+
+`src/database/migrations/006_task_functional_core.ts` adds constrained
+`tasks.importance`, nullable `tasks.parent_task_id`, and a parent-task index.
+Existing rows receive `normal` importance and no parent while preserving every
+other field and task identity.
+
 ### Daily Recap Foundation
 
 No migration is required. Recap derives its view from the existing nullable
@@ -184,9 +199,10 @@ does not persist duplicate daily summary rows.
 
 ## Web Persistence
 
-The web build uses IndexedDB database version 5. It has:
+The web build uses IndexedDB database version 6. It has:
 
-- `tasks`, keyed by task ID with `scheduledDate` and `updatedAt` indexes.
+- `tasks`, keyed by task ID with `scheduledDate`, `updatedAt`, and `parentTaskId`
+  indexes.
 - `calendarEvents`, keyed by event ID with `date` and `updatedAt` indexes.
 - `recoverySessions`, keyed by session ID with `status` and `completedAt` indexes.
 - `recoveryItems`, keyed by item ID with `sessionId` and `status` indexes.
@@ -195,12 +211,14 @@ The web build uses IndexedDB database version 5. It has:
 Version 2 preserves the existing version 1 task store and adds the event store.
 Version 3 preserves both stores and adds recovery storage. Version 4 preserves
 all existing stores and adds `appSettings`. Version 5 keeps those stores and
-introduces the scheduling task shape without rewriting records. Older task,
+introduces the scheduling task shape without rewriting records. Version 6 adds
+the parent-task index without rewriting records. Older task,
 event, and Recovery item records without reminder metadata deserialize with
 `null` reminder intent.
 Older task records without `estimatedDurationMinutes` deserialize with a `null`
 estimate, and records without `deadlineDate` receive a `null` deadline. Older
-task records that omit `completedAt` deserialize with a `null`
+task records without `importance` receive `normal`, records without
+`parentTaskId` receive `null`, and records that omit `completedAt` deserialize with a `null`
 completion time and are not assigned to a historical Recap date. Stored records
 are validated when read.
 
@@ -211,10 +229,11 @@ native data are intentionally separate.
 
 ## Deferred Data Work
 
-Recurring events, event editing/deletion, task editing/deletion, time zones,
+Recurring events, event editing/deletion, time zones,
 all-day events, external calendar identifiers, advanced notification policy,
 quiet hours, default reminders, day plans,
-recovery analytics, partial-progress measurement, earliest-start constraints,
+recovery analytics, multi-level projects, partial-progress measurement,
+earliest-start constraints,
 preferred work periods, energy requirements, import/export, accounts, and cloud
 synchronization are not part of this foundation.
 

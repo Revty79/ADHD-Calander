@@ -25,11 +25,19 @@ export const taskStatuses = [
 
 export type ImplementedTaskStatus = (typeof implementedTaskStatuses)[number];
 export type TaskStatus = (typeof taskStatuses)[number];
+
+export const taskImportances = ["low", "normal", "important"] as const;
+export type TaskImportance = (typeof taskImportances)[number];
+
+export type TaskPlanningState = "flexible" | "planned" | "scheduled";
+
 export type Task = {
   id: string;
   title: string;
   description: string | null;
+  importance: TaskImportance;
   status: TaskStatus;
+  parentTaskId: string | null;
   scheduledDate: LocalDateString | null;
   scheduledTime: LocalTimeString | null;
   estimatedDurationMinutes: number | null;
@@ -44,11 +52,18 @@ export type Task = {
 export type CreateTaskInput = {
   title: string;
   description?: string | null;
+  importance?: TaskImportance;
   scheduledDate?: string | null;
   scheduledTime?: string | null;
   estimatedDurationMinutes?: number | null;
   deadlineDate?: string | null;
   reminderOffsetMinutes?: number | null;
+};
+
+export type UpdateTaskInput = CreateTaskInput;
+
+export type BreakDownTaskInput = {
+  titles: string[];
 };
 
 export type ScheduleTaskInput = {
@@ -75,6 +90,14 @@ export function isTaskResolved(task: Task): boolean {
 
 export function isTaskActive(task: Task): boolean {
   return !isTaskCompleted(task) && !isTaskResolved(task);
+}
+
+export function getTaskPlanningState(task: Task): TaskPlanningState {
+  if (task.scheduledDate === null) {
+    return "flexible";
+  }
+
+  return task.scheduledTime === null ? "planned" : "scheduled";
 }
 
 export type { LocalDateString, LocalTimeString } from "./dateTime";

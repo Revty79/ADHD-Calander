@@ -1,6 +1,13 @@
+import { Link } from "expo-router";
+
 import { formatReminderOffset } from "../../../notifications/reminderRules";
 import { isTaskActive, Task } from "../../../types/task";
 import { formatLocalDateForDisplay } from "../../../utils/dates";
+import {
+  getTaskImportanceLabel,
+  getTaskPlanningLabel,
+  getTaskStatusLabel
+} from "../taskPresentation";
 
 type TaskListProps = {
   title: string;
@@ -37,7 +44,14 @@ export function TaskList({
           {tasks.map((task) => (
             <li className="web-task-card" key={task.id}>
               <div className="web-task-copy">
-                <h3>{task.title}</h3>
+                <h3>
+                  <Link
+                    className="web-task-title-link"
+                    href={{ pathname: "/tasks/[id]", params: { id: task.id } }}
+                  >
+                    {task.title}
+                  </Link>
+                </h3>
                 {task.description ? <p>{task.description}</p> : null}
                 <div className="web-task-meta">
                   {showDate ? (
@@ -46,7 +60,7 @@ export function TaskList({
                         {formatLocalDateForDisplay(task.scheduledDate)}
                       </time>
                     ) : (
-                      <span>Unscheduled</span>
+                      <span>No planned date</span>
                     )
                   ) : null}
                   {task.scheduledTime ? (
@@ -63,6 +77,9 @@ export function TaskList({
                       Reminder: {formatReminderOffset(task.reminderOffsetMinutes)}
                     </span>
                   ) : null}
+                  <span>{getTaskPlanningLabel(task)}</span>
+                  <span>{getTaskImportanceLabel(task.importance)}</span>
+                  {task.parentTaskId ? <span>Smaller task</span> : null}
                   <span>Status: {getTaskStatusLabel(task.status)}</span>
                 </div>
               </div>
@@ -94,19 +111,4 @@ export function TaskList({
       )}
     </section>
   );
-}
-
-function getTaskStatusLabel(status: Task["status"]): string {
-  switch (status) {
-    case "completed":
-      return "Completed";
-    case "delegated":
-      return "Delegated";
-    case "removed":
-      return "Removed from active tasks";
-    case "broken_down":
-      return "Broken into smaller tasks";
-    default:
-      return "Not started";
-  }
 }

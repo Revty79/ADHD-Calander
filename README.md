@@ -14,8 +14,14 @@ code structure for future iOS work. It includes:
   summaries.
 - Creating fixed events with a local date, start time, optional end time or
   duration, and optional notes.
-- Creating scheduled or unscheduled tasks with optional date, time, duration
-  estimate, and a deadline that remains separate from the planned date.
+- Quick task capture plus optional notes, importance, Flexible/Planned/Scheduled
+  state, duration estimate, deadline, and reminder.
+- Opening and editing a persisted task without changing its identity or creating
+  a duplicate.
+- Breaking tasks into related smaller tasks outside or inside Recovery Mode,
+  then editing and completing those steps individually.
+- Confirmed removal from active tasks, restoration, and reversible completion or
+  breakdown actions where recorded progress permits it.
 - Distinct calendar treatment for fixed commitments, planned tasks, and flexible
   date-associated tasks.
 - Viewing today's tasks and all current non-deleted tasks.
@@ -162,6 +168,9 @@ app/
   events/new.web.tsx         Browser event creation
   tasks/new.tsx              Native task creation
   tasks/new.web.tsx          Browser task creation
+  tasks/[id]/index.tsx       Native task detail and actions
+  tasks/[id]/edit.tsx        Native task editing
+  tasks/[id]/breakdown.tsx   Native manual breakdown
   tasks/[id]/schedule.tsx    Native scheduling confirmation workflow
   tasks/[id]/schedule.web.tsx Browser scheduling confirmation workflow
 src/
@@ -204,11 +213,13 @@ candidate-window, ranking, load, confirmation, and reminder rules.
 - Scheduling assistance uses one shared daily planning window rather than a
   weekday-by-weekday availability editor.
 - A fixed event or timed task with no known duration conservatively blocks the
-  rest of that planning day; editing those records remains deferred.
+  rest of that planning day; event editing remains deferred.
 - Recovery Mode does not yet link directly into scheduling assistance after an
   explicit Reschedule decision; Tasks is the supported entry point.
-- No task/event editing, deletion UI, filtering, sorting controls, drag-and-drop,
+- No event editing/deletion, task filtering or sorting controls, drag-and-drop,
   recurring items, quiet hours, default reminders, or multiple reminders exist.
+- Task breakdown is intentionally direct parent-to-child structure, not a
+  multi-level project-management system.
 - Browser notifications are intentionally unsupported in this phase.
 - Android notification delivery, denial/grant flows, battery behavior, and
   release-build configuration still need emulator or physical-device testing;

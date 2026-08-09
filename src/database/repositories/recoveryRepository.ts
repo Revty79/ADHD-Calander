@@ -164,7 +164,7 @@ export class RecoveryRepository {
 
     return this.applyFinalDecision(itemId, "break_down", (task, item, timestamp) => {
       const createdTasks = titles.map((title) =>
-        createUnscheduledTask(this.taskIdGenerator(), title, timestamp)
+        createUnscheduledTask(this.taskIdGenerator(), task.id, title, timestamp)
       );
 
       return {
@@ -451,12 +451,19 @@ function createRecoveryItem(
   };
 }
 
-function createUnscheduledTask(id: string, title: string, timestamp: string): Task {
+function createUnscheduledTask(
+  id: string,
+  parentTaskId: string,
+  title: string,
+  timestamp: string
+): Task {
   return {
     id,
     title,
     description: null,
+    importance: "normal",
     status: "not_started",
+    parentTaskId,
     scheduledDate: null,
     scheduledTime: null,
     estimatedDurationMinutes: null,

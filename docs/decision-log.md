@@ -2,6 +2,68 @@
 
 ## 2026-08-08
 
+### Functional Completion Requires An End-To-End User Outcome
+
+Decision: Apply one global definition of done to every current and future app
+feature. A feature is complete only when a real user can perform the intended
+action, receives understandable feedback, sees the correct result across
+applicable surfaces, and sees persistent outcomes survive reload or app
+restart. Every handoff must disclose UI that appears functional but is not
+wired end to end.
+
+Reason: Screens, labels, controls, routes, storage fields, services, placeholder
+UI, and instantiating tests can all exist without delivering a usable outcome.
+Treating those artifacts as implementation would hide broken user paths and
+overstate product progress.
+
+### Monetization Requires A Separate Phase And Boundary
+
+Decision: Do not implement advertising, subscriptions, ad-free entitlements,
+or Google Play Billing during the current Tasks phase. Keep future monetization
+adapters separate from core planning logic, without adding speculative
+monetization UI or services now.
+
+Reason: Monetization needs its own product and implementation decisions. A
+clean boundary allows later integration without making offline planning,
+scheduling, or Recovery depend on advertising or billing systems.
+
+### Planning State Is Derived
+
+Decision: Derive Flexible, Planned, and Scheduled from nullable task date/time
+fields instead of persisting a second planning-state column.
+
+Reason: One source of truth prevents impossible combinations. Flexible clears
+date, time, and reminder; Planned stores a date without a time or reminder; and
+Scheduled stores both date and time.
+
+### One Breakdown Model
+
+Decision: Use the same resolved-parent and unscheduled-child model for manual
+and Recovery breakdown. Store a nullable direct `parentTaskId` on each smaller
+task and keep the original as a visible `broken_down` container.
+
+Reason: One model keeps Recovery, Tasks, persistence, and undo behavior
+coherent without introducing a full project system. Breakdown undo is allowed
+only while smaller tasks have no recorded progress.
+
+### Removal Preserves History
+
+Decision: Require confirmation before setting an active task to `removed`, keep
+the row locally, and offer restoration. Do not convert completed tasks to
+removed tasks.
+
+Reason: The user can reduce the active list without losing task history or
+corrupting completion-based Recap behavior.
+
+### Task Editing Preserves Identity
+
+Decision: Route every task edit through `TaskRepository.updateTask`, preserve
+the task ID and relationship fields, and synchronize the deterministic reminder
+identifier after persistence.
+
+Reason: Today, Calendar, reminders, and scheduling must update from one task
+record rather than accumulate duplicates or stale notification intent.
+
 ### Scheduling Suggestions Never Mutate Automatically
 
 Decision: Keep candidate generation pure, show at most three options, and
@@ -338,14 +400,12 @@ of scope for the first build and require product-owner approval.
 - How should the future three-priority system choose or suggest daily
   priorities?
 - What should count as an essential task during Recovery Mode?
-- Should task editing be included before or after the first Recovery Mode slice?
 - What accessibility settings should be configurable beyond system defaults?
 - Should a future local import/export feature bridge browser and mobile data
   before cloud synchronization is considered?
 - Should week view start on Sunday, Monday, or follow a configurable locale
   preference? The foundation currently starts on Sunday.
-- When should event and task editing, deletion, and reversible undo flows be
-  introduced?
+- When should event editing and reversible removal be introduced?
 - What retention or backup guidance should the web UI provide before the
   prototype is used for important long-term planning data?
 - What user action and data shape should represent partial progress without

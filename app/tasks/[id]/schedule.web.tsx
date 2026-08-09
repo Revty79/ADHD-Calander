@@ -32,8 +32,8 @@ export default function WebScheduleTaskScreen() {
 
     if (task?.scheduledDate) {
       router.replace({
-        pathname: "/(tabs)/calendar",
-        params: { date: task.scheduledDate }
+        pathname: "/tasks/[id]",
+        params: { id: task.id }
       });
     }
   }
@@ -41,8 +41,11 @@ export default function WebScheduleTaskScreen() {
   return (
     <main className="web-form-shell">
       <div className="web-scheduling-page">
-        <Link className="web-back-link" href="/tasks">
-          Back to Tasks
+        <Link
+          className="web-back-link"
+          href={{ pathname: "/tasks/[id]", params: { id: taskId } }}
+        >
+          Back to task
         </Link>
 
         <header className="web-form-header">
@@ -244,8 +247,11 @@ export default function WebScheduleTaskScreen() {
           </>
         ) : null}
 
-        <Link className="web-cancel-link web-scheduling-leave" href="/tasks">
-          Leave task unscheduled
+        <Link
+          className="web-cancel-link web-scheduling-leave"
+          href={{ pathname: "/tasks/[id]", params: { id: taskId } }}
+        >
+          Back to task
         </Link>
       </div>
     </main>

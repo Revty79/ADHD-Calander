@@ -123,7 +123,7 @@ for reduced motion.
 - Completed legacy tasks without a known completion timestamp cannot appear on
   a historical Recap date.
 - Completed recovery sessions are retained but do not yet have a history browser.
-- Event/task editing, deletion, filtering, sorting controls, advanced
+- Event editing/deletion, task filtering and sorting controls, advanced
   notifications, and recurring items are not implemented.
 
 ## Future Cross-Platform Work

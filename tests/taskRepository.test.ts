@@ -13,6 +13,8 @@ import { TaskRepository } from "../src/database/repositories/taskRepository";
 import { SqlExecutor } from "../src/database/sql";
 import { SqlTaskStorage } from "../src/database/sqlTaskStorage";
 import { createTasksMigration } from "../src/database/migrations/001_create_tasks";
+import { ReminderSynchronizer } from "../src/notifications/reminderSynchronizer";
+import { Task } from "../src/types/task";
 import { getLocalDateString } from "../src/utils/dates";
 import { createSqlJsDatabase } from "./helpers/sqlJsDatabase";
 
@@ -30,7 +32,7 @@ async function createRepository() {
 }
 
 describe("task database", () => {
-  it("applies the scheduling assistance foundation migrations", async () => {
+  it("applies the task functional core migrations", async () => {
     const database = await createSqlJsDatabase();
 
     await initializeDatabase(database);
@@ -64,8 +66,15 @@ describe("task database", () => {
       { version: 2, name: "calendar_foundation" },
       { version: 3, name: "recovery_foundation" },
       { version: 4, name: "settings_reminders_foundation" },
-      { version: 5, name: "scheduling_assistance_foundation" }
+      { version: 5, name: "scheduling_assistance_foundation" },
+      { version: 6, name: "task_functional_core" }
     ]);
+
+    const taskColumns = await database.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(tasks);"
+    );
+    assert.ok(taskColumns.some((column) => column.name === "importance"));
+    assert.ok(taskColumns.some((column) => column.name === "parent_task_id"));
   });
 
   it("preserves existing tasks when upgrading to calendar storage", async () => {
@@ -113,6 +122,8 @@ describe("task database", () => {
     assert.equal(tasks[0]?.estimatedDurationMinutes, null);
     assert.equal(tasks[0]?.deadlineDate, null);
     assert.equal(tasks[0]?.reminderOffsetMinutes, null);
+    assert.equal(tasks[0]?.importance, "normal");
+    assert.equal(tasks[0]?.parentTaskId, null);
   });
 
   it("creates a task with normalized input", async () => {
@@ -130,6 +141,7 @@ describe("task database", () => {
     assert.equal(task.id, "task-1");
     assert.equal(task.title, "Pay electric bill");
     assert.equal(task.description, "Use checking account");
+    assert.equal(task.importance, "normal");
     assert.equal(task.status, "not_started");
     assert.equal(task.scheduledDate, "2026-08-04");
     assert.equal(task.scheduledTime, "09:15");
@@ -137,6 +149,142 @@ describe("task database", () => {
     assert.equal(task.deadlineDate, "2026-08-08");
     assert.equal(task.completedAt, null);
     assert.equal(task.deletedAt, null);
+  });
+
+  it("edits one task identity across planning states and persists the changes", async () => {
+    const { database, repository } = await createRepository();
+    const original = await repository.createTask({ title: "Draft outline" });
+
+    const planned = await repository.updateTask(original.id, {
+      title: "Draft project outline",
+      description: "Start with the three main sections",
+      importance: "important",
+      scheduledDate: "2026-08-06",
+      estimatedDurationMinutes: 45,
+      deadlineDate: "2026-08-08"
+    });
+
+    assert.equal(planned.id, original.id);
+    assert.equal(planned.scheduledDate, "2026-08-06");
+    assert.equal(planned.scheduledTime, null);
+    assert.equal(planned.importance, "important");
+    assert.equal((await repository.getAllTasks()).length, 1);
+
+    const scheduled = await repository.updateTask(original.id, {
+      ...planned,
+      scheduledDate: "2026-08-06",
+      scheduledTime: "10:00",
+      reminderOffsetMinutes: 10
+    });
+    assert.equal(scheduled.scheduledTime, "10:00");
+    assert.equal(scheduled.reminderOffsetMinutes, 10);
+
+    const flexible = await repository.updateTask(original.id, {
+      ...scheduled,
+      scheduledDate: null,
+      scheduledTime: null,
+      reminderOffsetMinutes: null
+    });
+    assert.equal(flexible.scheduledDate, null);
+    assert.equal(flexible.scheduledTime, null);
+    assert.equal(flexible.reminderOffsetMinutes, null);
+
+    const restoredDatabase = await createSqlJsDatabase(database.exportData());
+    await initializeDatabase(restoredDatabase);
+    const restoredTask = await new TaskRepository(
+      new SqlTaskStorage(restoredDatabase)
+    ).getTaskById(original.id);
+    assert.equal(restoredTask.title, "Draft project outline");
+    assert.equal(restoredTask.importance, "important");
+    assert.equal(restoredTask.scheduledDate, null);
+  });
+
+  it("clears a stale reminder when an edited schedule moves into the past", async () => {
+    const database = await createSqlJsDatabase();
+    await initializeDatabase(database);
+    const synchronizer = new RecordingTaskReminderSynchronizer();
+    const repository = new TaskRepository(
+      new SqlTaskStorage(database),
+      () => "reminded-task",
+      () => new Date(2026, 7, 4, 12, 0, 0),
+      synchronizer
+    );
+    const task = await repository.createTask({
+      title: "Prepare notes",
+      scheduledDate: "2026-08-06",
+      scheduledTime: "10:00",
+      reminderOffsetMinutes: 10
+    });
+
+    const edited = await repository.updateTask(task.id, {
+      ...task,
+      scheduledDate: "2026-08-04",
+      scheduledTime: "09:00",
+      reminderOffsetMinutes: 10
+    });
+
+    assert.equal(edited.reminderOffsetMinutes, null);
+    assert.equal(synchronizer.tasks.at(-1)?.reminderOffsetMinutes, null);
+  });
+
+  it("breaks down a task with persisted parent relationships and reversible children", async () => {
+    const { database, repository } = await createRepository();
+    const parent = await repository.createTask({
+      title: "Prepare presentation",
+      importance: "important",
+      scheduledDate: "2026-08-06"
+    });
+
+    const children = await repository.breakDownTask(parent.id, {
+      titles: ["Choose examples", "Draft slides"]
+    });
+    assert.equal((await repository.getTaskById(parent.id)).status, "broken_down");
+    assert.ok(children.every((child) => child.parentTaskId === parent.id));
+    assert.ok(children.every((child) => child.scheduledDate === null));
+    assert.deepEqual(
+      (await repository.getChildTasks(parent.id)).map((task) => task.title),
+      ["Choose examples", "Draft slides"]
+    );
+
+    const restoredDatabase = await createSqlJsDatabase(database.exportData());
+    await initializeDatabase(restoredDatabase);
+    const restoredRepository = new TaskRepository(new SqlTaskStorage(restoredDatabase));
+    assert.equal((await restoredRepository.getChildTasks(parent.id)).length, 2);
+
+    const restoredParent = await restoredRepository.undoTaskBreakdown(parent.id);
+    assert.equal(restoredParent.status, "not_started");
+    assert.ok(
+      (await restoredRepository.getChildTasks(parent.id)).every(
+        (child) => child.status === "removed"
+      )
+    );
+  });
+
+  it("protects completed smaller tasks when undoing a breakdown", async () => {
+    const { repository } = await createRepository();
+    const parent = await repository.createTask({ title: "Organize records" });
+    const [firstChild] = await repository.breakDownTask(parent.id, {
+      titles: ["Collect records", "File records"]
+    });
+    await repository.completeTask(firstChild!.id);
+
+    await assert.rejects(
+      () => repository.undoTaskBreakdown(parent.id),
+      (error) => error instanceof TaskValidationError && error.field === "breakdownTitles"
+    );
+  });
+
+  it("removes and restores an active task without deleting its history", async () => {
+    const { repository } = await createRepository();
+    const task = await repository.createTask({ title: "Optional errand" });
+
+    const removed = await repository.removeTask(task.id);
+    assert.equal(removed.status, "removed");
+    assert.equal((await repository.getAllTasks()).length, 1);
+
+    const restored = await repository.restoreTask(task.id);
+    assert.equal(restored.id, task.id);
+    assert.equal(restored.status, "not_started");
   });
 
   it("creates and persists an unscheduled task", async () => {
@@ -339,3 +487,13 @@ describe("task database", () => {
     );
   });
 });
+
+class RecordingTaskReminderSynchronizer implements ReminderSynchronizer {
+  readonly tasks: Task[] = [];
+
+  async syncTaskReminder(task: Task) {
+    this.tasks.push({ ...task });
+  }
+
+  async syncEventReminder() {}
+}

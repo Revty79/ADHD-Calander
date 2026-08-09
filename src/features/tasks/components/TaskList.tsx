@@ -1,8 +1,14 @@
+import { Link } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { formatReminderOffset } from "../../../notifications/reminderRules";
 import { isTaskActive, Task } from "../../../types/task";
 import { formatLocalDateForDisplay } from "../../../utils/dates";
+import {
+  getTaskImportanceLabel,
+  getTaskPlanningLabel,
+  getTaskStatusLabel
+} from "../taskPresentation";
 
 type TaskListProps = {
   title: string;
@@ -35,7 +41,13 @@ export function TaskList({
           {tasks.map((task) => (
             <View key={task.id} style={styles.taskCard}>
               <View style={styles.taskContent}>
-                <Text style={styles.taskTitle}>{task.title}</Text>
+                <Link
+                  accessibilityLabel={`Open ${task.title}`}
+                  href={{ pathname: "/tasks/[id]", params: { id: task.id } }}
+                  style={styles.taskTitle}
+                >
+                  {task.title}
+                </Link>
                 {task.description ? (
                   <Text style={styles.taskDescription}>{task.description}</Text>
                 ) : null}
@@ -44,7 +56,7 @@ export function TaskList({
                     <Text style={styles.metaText}>
                       {task.scheduledDate
                         ? formatLocalDateForDisplay(task.scheduledDate)
-                        : "Unscheduled"}
+                        : "No planned date"}
                     </Text>
                   ) : null}
                   {task.scheduledTime ? (
@@ -64,6 +76,13 @@ export function TaskList({
                     <Text style={styles.metaText}>
                       Reminder: {formatReminderOffset(task.reminderOffsetMinutes)}
                     </Text>
+                  ) : null}
+                  <Text style={styles.metaText}>{getTaskPlanningLabel(task)}</Text>
+                  <Text style={styles.metaText}>
+                    {getTaskImportanceLabel(task.importance)}
+                  </Text>
+                  {task.parentTaskId ? (
+                    <Text style={styles.metaText}>Smaller task</Text>
                   ) : null}
                   <Text style={styles.metaText}>{getTaskStatusLabel(task.status)}</Text>
                 </View>
@@ -102,21 +121,6 @@ export function TaskList({
       )}
     </View>
   );
-}
-
-function getTaskStatusLabel(status: Task["status"]): string {
-  switch (status) {
-    case "completed":
-      return "Completed";
-    case "delegated":
-      return "Delegated";
-    case "removed":
-      return "Removed from active tasks";
-    case "broken_down":
-      return "Broken into smaller tasks";
-    default:
-      return "Not started";
-  }
 }
 
 const styles = StyleSheet.create({

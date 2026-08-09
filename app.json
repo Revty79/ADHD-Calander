@@ -7,11 +7,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "plugins": [
-      "expo-router",
-      "expo-sqlite",
-      "expo-notifications"
-    ],
+    "plugins": ["expo-router", "expo-sqlite", "expo-notifications"],
     "android": {
       "package": "com.adhdcalendar.app"
     },

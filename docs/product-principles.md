@@ -53,6 +53,21 @@ plan into a larger next-day burden.
 - Use factual timing copy without blame, fake urgency, repeated nagging, or
   productivity judgment.
 
+## Functional Completeness
+
+- Judge every current and future feature by real user outcomes, not by the
+  presence of screens, labels, controls, routes, storage fields, service
+  boundaries, placeholder UI, or tests that only instantiate it.
+- A complete feature lets a real user perform its intended action, gives
+  understandable feedback, updates every applicable app surface, and persists
+  the result across reload or app restart when the outcome is persistent.
+- Apply this standard to Today, Tasks, Calendar, Recovery, Recap, Scheduling,
+  Reminders, Settings, Accessibility, onboarding, monetization, and every future
+  feature.
+- Never present decorative or unwired UI as functioning behavior. Every project
+  handoff must explicitly disclose controls or surfaces that appear functional
+  but are not wired end to end.
+
 ## Privacy And Scope
 
 - Core task-management features must work offline.
@@ -61,3 +76,5 @@ plan into a larger next-day burden.
   approval.
 - The app is a planning tool, not a therapist, diagnostic service, or medical
   device.
+- Keep future advertising, entitlement, and billing integrations separate from
+  core planning logic.

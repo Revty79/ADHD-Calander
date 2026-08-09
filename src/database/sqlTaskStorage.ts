@@ -1,4 +1,10 @@
-import { LocalDateString, LocalTimeString, Task, TaskStatus } from "../types/task";
+import {
+  LocalDateString,
+  LocalTimeString,
+  Task,
+  TaskImportance,
+  TaskStatus
+} from "../types/task";
 import { SqlExecutor } from "./sql";
 import { TaskStorage } from "./taskStorage";
 
@@ -6,7 +12,9 @@ type TaskRow = {
   id: string;
   title: string;
   description: string | null;
+  importance: TaskImportance;
   status: TaskStatus;
+  parentTaskId: string | null;
   scheduledDate: LocalDateString | null;
   scheduledTime: LocalTimeString | null;
   estimatedDurationMinutes: number | null;
@@ -23,7 +31,9 @@ const taskSelect = `
     id,
     title,
     description,
+    importance,
     status,
+    parent_task_id AS parentTaskId,
     scheduled_date AS scheduledDate,
     scheduled_time AS scheduledTime,
     estimated_duration_minutes AS estimatedDurationMinutes,
@@ -46,7 +56,9 @@ export class SqlTaskStorage implements TaskStorage {
           id,
           title,
           description,
+          importance,
           status,
+          parent_task_id,
           scheduled_date,
           scheduled_time,
           estimated_duration_minutes,
@@ -56,12 +68,14 @@ export class SqlTaskStorage implements TaskStorage {
           updated_at,
           completed_at,
           deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       task.id,
       task.title,
       task.description,
+      task.importance,
       task.status,
+      task.parentTaskId,
       task.scheduledDate,
       task.scheduledTime,
       task.estimatedDurationMinutes,
@@ -110,6 +124,20 @@ export class SqlTaskStorage implements TaskStorage {
     return row ? mapTaskRow(row) : null;
   }
 
+  async getChildTasks(parentTaskId: string): Promise<Task[]> {
+    const rows = await this.database.getAllAsync<TaskRow>(
+      `
+        ${taskSelect}
+        WHERE parent_task_id = ?
+          AND deleted_at IS NULL
+        ORDER BY created_at, id;
+      `,
+      parentTaskId
+    );
+
+    return rows.map(mapTaskRow);
+  }
+
   async updateTask(task: Task): Promise<boolean> {
     const result = await this.database.runAsync(
       `
@@ -117,7 +145,9 @@ export class SqlTaskStorage implements TaskStorage {
         SET
           title = ?,
           description = ?,
+          importance = ?,
           status = ?,
+          parent_task_id = ?,
           scheduled_date = ?,
           scheduled_time = ?,
           estimated_duration_minutes = ?,
@@ -132,7 +162,9 @@ export class SqlTaskStorage implements TaskStorage {
       `,
       task.title,
       task.description,
+      task.importance,
       task.status,
+      task.parentTaskId,
       task.scheduledDate,
       task.scheduledTime,
       task.estimatedDurationMinutes,
@@ -147,6 +179,30 @@ export class SqlTaskStorage implements TaskStorage {
 
     return result.changes !== 0;
   }
+
+  async saveTaskGroup(updatedTasks: Task[], createdTasks: Task[]): Promise<void> {
+    await this.database.execAsync("BEGIN IMMEDIATE;");
+
+    try {
+      for (const task of updatedTasks) {
+        if (!(await this.updateTask(task))) {
+          throw new Error(`Task ${task.id} could not be updated.`);
+        }
+      }
+
+      for (const task of createdTasks) {
+        await this.insertTask(task);
+      }
+
+      await this.database.execAsync("COMMIT;");
+    } catch (error) {
+      try {
+        await this.database.execAsync("ROLLBACK;");
+      } catch {}
+
+      throw error;
+    }
+  }
 }
 
 function mapTaskRow(row: TaskRow): Task {
@@ -154,7 +210,9 @@ function mapTaskRow(row: TaskRow): Task {
     id: row.id,
     title: row.title,
     description: row.description,
+    importance: row.importance,
     status: row.status,
+    parentTaskId: row.parentTaskId,
     scheduledDate: row.scheduledDate,
     scheduledTime: row.scheduledTime,
     estimatedDurationMinutes: row.estimatedDurationMinutes,

@@ -23,6 +23,9 @@ export default function RootLayout() {
             presentation: "modal"
           }}
         />
+        <Stack.Screen name="tasks/[id]/index" options={{ title: "Task" }} />
+        <Stack.Screen name="tasks/[id]/edit" options={{ title: "Edit task" }} />
+        <Stack.Screen name="tasks/[id]/breakdown" options={{ title: "Smaller tasks" }} />
         <Stack.Screen
           name="tasks/[id]/schedule"
           options={{ title: "Help me schedule" }}

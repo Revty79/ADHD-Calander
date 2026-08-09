@@ -35,8 +35,8 @@ export default function ScheduleTaskScreen() {
 
     if (task?.scheduledDate) {
       router.replace({
-        pathname: "/(tabs)/calendar",
-        params: { date: task.scheduledDate }
+        pathname: "/tasks/[id]",
+        params: { id: task.id }
       });
     }
   }
@@ -252,12 +252,12 @@ export default function ScheduleTaskScreen() {
         </>
       ) : null}
 
-      <Link href="/(tabs)/tasks" asChild>
+      <Link href={{ pathname: "/tasks/[id]", params: { id: taskId } }} asChild>
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [styles.leaveLink, pressed && styles.pressed]}
         >
-          <Text style={styles.leaveLinkText}>Leave task unscheduled</Text>
+          <Text style={styles.leaveLinkText}>Back to task</Text>
         </Pressable>
       </Link>
     </Screen>

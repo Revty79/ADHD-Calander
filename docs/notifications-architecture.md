@@ -75,8 +75,10 @@ productivity judgment, and invented urgency.
 - Master disabled: preserve intent but schedule nothing.
 - Startup/enable: schedule only active future tasks and future events.
 
-General task and event editing is not yet implemented. When editing is added, it
-must use the same cancel-before-reschedule service path.
+Task editing uses the same cancel-before-reschedule service path. Changing a
+task to Flexible or Planned clears reminder intent because there is no exact
+trigger. A scheduled edit keeps a valid future selection, but clears a stale
+trigger before synchronization. General event editing remains deferred.
 
 Accepting a scheduling suggestion uses `TaskRepository.scheduleTask` rather
 than writing storage directly. The repository preserves reminder intent when
@@ -120,7 +122,7 @@ development/release build.
 - Quiet hours, because fixed-event behavior and boundary cases need product rules
 - Default reminder offsets
 - Multiple reminders per item
-- Event/task reminder editing UI
+- Event reminder editing UI
 - Recurring reminder rules
 - Snooze, notification actions, badges, sounds, and urgency tiers
 - Location reminders

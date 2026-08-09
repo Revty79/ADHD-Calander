@@ -22,6 +22,19 @@
 - Final visual brand system
 - Cross-device account model
 
+## Monetization Boundary
+
+Advertising, subscriptions, ad-free entitlements, and Google Play Billing are
+not part of the current Tasks phase and must not be implemented during it.
+Monetization will have a separate approved implementation phase.
+
+Core planning domain logic, repositories, scheduling, Recovery, and offline
+task behavior must not depend on advertising or billing implementations. A
+future monetization phase should add advertising, entitlement, and Google Play
+Billing adapters at explicit boundaries without coupling them to core planning
+behavior. This is an architecture constraint, not approval to add placeholder
+monetization controls or speculative services now.
+
 ## Current First-Build Scope
 
 - Expo Router navigation for Today, Calendar, Tasks, Recovery, Recap, and Settings on
@@ -31,8 +44,15 @@
   summaries.
 - Basic fixed-event creation with title, date, start time, optional end time or
   duration, and optional notes.
-- Local task creation with optional description, scheduled date, scheduled
-  time, and duration estimate. Unscheduled tasks are valid.
+- Quick task creation with optional notes, importance, derived Flexible/Planned/
+  Scheduled state, duration estimate, deadline, and reminder. A title alone is
+  valid.
+- Task detail and editing that preserve identity and update Today, Calendar,
+  scheduling, and reminder behavior through the shared repository.
+- Manual and Recovery breakdown using the same persisted parent/child task
+  relationship, with individually editable and completable smaller tasks.
+- Confirmed removal from active tasks, restoration, completion undo, and
+  breakdown undo when no smaller task has recorded progress.
 - SQLite-backed task and event persistence through app restarts.
 - Task completion and completion undo.
 - Versioned migrations that preserve existing task data.
@@ -75,16 +95,15 @@
 
 - Partial-progress entry or percentage tracking
 - Three-priority planning system
-- General task-step/project hierarchy outside Recovery Mode breakdown
-- Task editing
-- Soft deletion UI
+- Multi-level project management beyond direct task breakdown
 - Advanced notifications, quiet hours, snooze, and multiple reminders
 - Recurring calendar events
 - External calendar integration
-- Event and task editing or deletion
+- Event editing or deletion
 - Cloud services
 - AI services
 - Payments
+- Advertising, subscriptions, entitlements, and Google Play Billing
 - AI, natural-language scheduling, predictive energy modeling, or behavioral
   profiling
 - Automatic schedule filling, optimization, or Recovery rescheduling

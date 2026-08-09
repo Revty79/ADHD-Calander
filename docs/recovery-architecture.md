@@ -34,7 +34,8 @@ would lose meaning.
 - `reschedule`: updates the original task identity with the explicitly chosen
   date and optional time.
 - `break_down`: creates two or more uniquely titled, unscheduled tasks and marks
-  the original `broken_down`.
+  the original `broken_down`. Each smaller task stores the original task ID as
+  its direct parent, matching manual breakdown from Task detail.
 - `delegate`: marks the original `delegated` and stores an optional note on the
   recovery item. No message is sent.
 - `remove`: marks the original `removed`; the record is not deleted.

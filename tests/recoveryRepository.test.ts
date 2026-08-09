@@ -140,6 +140,7 @@ describe("RecoveryRepository", () => {
       ["Gather notes", "Write first paragraph"]
     );
     assert.ok(children.every((child) => child.scheduledDate === null));
+    assert.ok(children.every((child) => child.parentTaskId === task.id));
     assert.deepEqual(
       updatedSession.items[0]?.createdTaskIds,
       children.map((child) => child.id)

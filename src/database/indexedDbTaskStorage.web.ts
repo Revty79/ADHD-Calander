@@ -14,7 +14,13 @@ import {
   RecoverySessionStatus
 } from "../types/recovery";
 import { isReminderOffsetMinutes } from "../notifications/reminderRules";
-import { taskStatuses, Task, TaskStatus } from "../types/task";
+import {
+  taskImportances,
+  taskStatuses,
+  Task,
+  TaskImportance,
+  TaskStatus
+} from "../types/task";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../utils/dates";
 import { CalendarEventStorage } from "./calendarEventStorage";
 import { RecoveryDecisionMutation, RecoveryStorage } from "./recoveryStorage";
@@ -22,7 +28,7 @@ import { SettingsStorage, StoredSetting } from "./settingsStorage";
 import { TaskStorage } from "./taskStorage";
 
 const WEB_DATABASE_NAME = "adhd-calendar-web";
-const WEB_DATABASE_VERSION = 5;
+const WEB_DATABASE_VERSION = 6;
 const TASK_STORE_NAME = "tasks";
 const EVENT_STORE_NAME = "calendarEvents";
 const RECOVERY_SESSION_STORE_NAME = "recoverySessions";
@@ -41,7 +47,9 @@ type StoredTask = {
   id: string;
   title: string;
   description: string | null;
+  importance?: TaskImportance;
   status: TaskStatus;
+  parentTaskId?: string | null;
   scheduledDate: string | null;
   scheduledTime: string | null;
   estimatedDurationMinutes?: number | null;
@@ -191,6 +199,8 @@ export function deserializeTaskFromWeb(value: unknown): Task {
   }
 
   const status = value.status;
+  const importance = value.importance ?? "normal";
+  const parentTaskId = value.parentTaskId ?? null;
   const scheduledDate = value.scheduledDate;
   const scheduledTime = value.scheduledTime;
   const estimatedDurationMinutes = value.estimatedDurationMinutes ?? null;
@@ -202,8 +212,11 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     typeof value.id !== "string" ||
     typeof value.title !== "string" ||
     !isNullableString(value.description) ||
+    typeof importance !== "string" ||
+    !isTaskImportance(importance) ||
     typeof status !== "string" ||
     !isTaskStatus(status) ||
+    !isNullableString(parentTaskId) ||
     !isValidStoredDate(scheduledDate) ||
     !isValidStoredTime(scheduledTime) ||
     !isValidStoredDuration(estimatedDurationMinutes) ||
@@ -225,7 +238,9 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     id: value.id,
     title: value.title,
     description: value.description,
+    importance,
     status,
+    parentTaskId,
     scheduledDate,
     scheduledTime,
     estimatedDurationMinutes,
@@ -479,6 +494,18 @@ class IndexedDbTaskStorage implements TaskStorage {
     return record === undefined ? null : deserializeTaskFromWeb(record);
   }
 
+  async getChildTasks(parentTaskId: string): Promise<Task[]> {
+    const transaction = this.database.transaction(TASK_STORE_NAME, "readonly");
+    const completion = transactionComplete(transaction);
+    const records = await requestResult(
+      transaction.objectStore(TASK_STORE_NAME).index("parentTaskId").getAll(parentTaskId)
+    );
+
+    await completion;
+
+    return records.map(deserializeTaskFromWeb);
+  }
+
   async updateTask(task: Task): Promise<boolean> {
     const transaction = this.database.transaction(TASK_STORE_NAME, "readwrite");
     const completion = transactionComplete(transaction);
@@ -494,6 +521,34 @@ class IndexedDbTaskStorage implements TaskStorage {
     await completion;
 
     return true;
+  }
+
+  async saveTaskGroup(updatedTasks: Task[], createdTasks: Task[]): Promise<void> {
+    const transaction = this.database.transaction(TASK_STORE_NAME, "readwrite");
+    const completion = transactionComplete(transaction);
+    const taskStore = transaction.objectStore(TASK_STORE_NAME);
+
+    try {
+      for (const task of updatedTasks) {
+        const existingRecord = await requestResult(taskStore.get(task.id));
+
+        if (existingRecord === undefined) {
+          throw new Error(`Task ${task.id} could not be updated.`);
+        }
+
+        await requestResult(taskStore.put(serializeTaskForWeb(task)));
+      }
+
+      for (const task of createdTasks) {
+        await requestResult(taskStore.add(serializeTaskForWeb(task)));
+      }
+    } catch (error) {
+      abortTransaction(transaction);
+      await ignoreTransactionResult(completion);
+      throw error;
+    }
+
+    await completion;
   }
 }
 
@@ -800,13 +855,20 @@ function openDatabase(
 
     request.onupgradeneeded = () => {
       const database = request.result;
+      let taskStore: IDBObjectStore;
 
       if (!database.objectStoreNames.contains(TASK_STORE_NAME)) {
-        const taskStore = database.createObjectStore(TASK_STORE_NAME, {
+        taskStore = database.createObjectStore(TASK_STORE_NAME, {
           keyPath: "id"
         });
         taskStore.createIndex("scheduledDate", "scheduledDate", { unique: false });
         taskStore.createIndex("updatedAt", "updatedAt", { unique: false });
+      } else {
+        taskStore = request.transaction!.objectStore(TASK_STORE_NAME);
+      }
+
+      if (!taskStore.indexNames.contains("parentTaskId")) {
+        taskStore.createIndex("parentTaskId", "parentTaskId", { unique: false });
       }
 
       if (!database.objectStoreNames.contains(EVENT_STORE_NAME)) {
@@ -883,6 +945,10 @@ function isNullableString(value: unknown): value is string | null {
 
 function isTaskStatus(value: string): value is TaskStatus {
   return taskStatuses.some((status) => status === value);
+}
+
+function isTaskImportance(value: string): value is TaskImportance {
+  return taskImportances.some((importance) => importance === value);
 }
 
 function isCalendarEventKind(value: string): value is CalendarEventKind {

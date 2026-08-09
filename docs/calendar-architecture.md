@@ -82,8 +82,9 @@ stored reminder as text, so its state is not communicated by color.
 `ReminderService` builds a local trigger from the item's validated local date
 and time. A master setting controls OS scheduling without erasing item intent.
 Web keeps the same domain shape but does not schedule browser notifications.
-General event/task editing remains deferred; future edits must cancel the old
-identifier before scheduling against a changed date or time.
+Task editing updates the existing record through `TaskRepository`; reminder
+synchronization cancels the old identifier before scheduling against a changed
+date or time. General event editing remains deferred.
 
 ## Scheduling Assistance Integration
 
@@ -104,7 +105,7 @@ behavior does not invent duration or label a day overloaded.
 - Automatic Recovery Mode scheduling
 - Weekly availability and inferred capacity or overload labels
 - Recurring or all-day events
-- Event and task editing/deletion
+- Event editing/deletion
 - Drag-and-drop
 - Advanced notifications, quiet hours, and reminder editing
 - Time-zone-aware travel behavior

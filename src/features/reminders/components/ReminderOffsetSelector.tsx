@@ -5,6 +5,7 @@ import { formatReminderOffset } from "../../../notifications/reminderRules";
 
 type Props = {
   disabled: boolean;
+  disabledMessage?: string | undefined;
   error?: string | undefined;
   onChange(value: ReminderOffsetMinutes | null): void;
   value: ReminderOffsetMinutes | null;
@@ -12,13 +13,19 @@ type Props = {
 
 const options: (ReminderOffsetMinutes | null)[] = [null, ...reminderOffsetOptions];
 
-export function ReminderOffsetSelector({ disabled, error, onChange, value }: Props) {
+export function ReminderOffsetSelector({
+  disabled,
+  disabledMessage,
+  error,
+  onChange,
+  value
+}: Props) {
   return (
     <View accessibilityRole="radiogroup" style={styles.group}>
       <Text style={styles.label}>Reminder</Text>
       <Text style={styles.helper}>
         {disabled
-          ? "Turn on reminders in Settings to choose one here."
+          ? (disabledMessage ?? "Turn on reminders in Settings to choose one here.")
           : "Optional. Choose at most one gentle reminder."}
       </Text>
       <View style={styles.options}>
