@@ -26,7 +26,7 @@ export type RecoveryItem = {
   originalScheduledDate: LocalDateString;
   originalScheduledTime: LocalTimeString | null;
   originalEstimatedDurationMinutes: number | null;
-  originalReminderOffsetMinutes: ReminderOffsetMinutes | null;
+  originalReminderOffsets: ReminderOffsetMinutes[];
   status: RecoveryItemStatus;
   decision: RecoveryDecisionType | null;
   note: string | null;

@@ -45,8 +45,11 @@ monetization controls or speculative services now.
 - Basic fixed-event creation with title, date, start time, optional end time or
   duration, and optional notes.
 - Quick task creation with optional notes, importance, derived Flexible/Planned/
-  Scheduled state, duration estimate, deadline, and reminder. A title alone is
-  valid.
+  Scheduled state, duration estimate, deadline, and reminders. Native pickers,
+  browser controls, and quick local-date choices avoid formatted date/time
+  entry. A title alone is valid.
+- Persisted Start task and Pause for now actions, with execution state shown
+  separately from Flexible, Planned, and Scheduled planning state.
 - Task detail and editing that preserve identity and update Today, Calendar,
   scheduling, and reminder behavior through the shared repository.
 - Manual and Recovery breakdown using the same persisted parent/child task
@@ -75,8 +78,9 @@ monetization controls or speculative services now.
   context without grades, streaks, or productivity scores.
 - A functional, calm Settings destination with local reminder control,
   permission status, accessibility guidance, local-data facts, and app version.
-- One optional local reminder for a native scheduled task or fixed event, using
-  a small set of offsets and safe future-time validation.
+- Up to five optional local reminders for a native scheduled task or fixed
+  event, using a small set of offsets, distinct notification identities, and
+  safe future-trigger filtering.
 - Reminder cancellation on task completion and synchronization for Keep,
   Reschedule, Break Down, Delegate, Remove, and reopen Recovery actions.
 - SQLite and IndexedDB settings persistence behind a shared repository boundary.
@@ -90,13 +94,15 @@ monetization controls or speculative services now.
   separate confirmation before updating the existing task.
 - Planning preferences persisted in SQLite and IndexedDB with calm native and
   web controls.
+- Comparable Calendar Add event/Add task actions, a prominent Tasks Add task
+  action, and a global confirmation-gated Plans changed? Recovery shortcut.
 
 ## Out Of Scope For First Build
 
 - Partial-progress entry or percentage tracking
 - Three-priority planning system
 - Multi-level project management beyond direct task breakdown
-- Advanced notifications, quiet hours, snooze, and multiple reminders
+- Advanced notifications, quiet hours, snooze, and arbitrary custom reminders
 - Recurring calendar events
 - External calendar integration
 - Event editing or deletion

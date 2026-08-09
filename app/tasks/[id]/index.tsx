@@ -11,12 +11,13 @@ import {
 
 import { ErrorNotice } from "../../../src/components/ErrorNotice";
 import { Screen } from "../../../src/components/Screen";
-import { formatReminderOffset } from "../../../src/notifications/reminderRules";
+import { formatReminderOffsets } from "../../../src/notifications/reminderRules";
 import { useTaskDetail } from "../../../src/features/tasks/hooks/useTaskDetail";
 import {
   getTaskImportanceLabel,
   getTaskPlanningLabel,
-  getTaskStatusLabel
+  getTaskStatusLabel,
+  getTaskTimingNote
 } from "../../../src/features/tasks/taskPresentation";
 import { getTaskPlanningState, isTaskActive, Task } from "../../../src/types/task";
 import { formatLocalDateForDisplay } from "../../../src/utils/dates";
@@ -104,6 +105,9 @@ export default function TaskDetailScreen() {
           {task.title}
         </Text>
         <Text style={styles.status}>{getTaskStatusLabel(task.status)}</Text>
+        {getTaskTimingNote(task) ? (
+          <Text style={styles.timingNote}>{getTaskTimingNote(task)}</Text>
+        ) : null}
       </View>
 
       {task.description ? (
@@ -143,9 +147,25 @@ export default function TaskDetailScreen() {
           }
         />
         <DetailRow
-          label="Reminder"
-          value={formatReminderOffset(task.reminderOffsetMinutes)}
+          label="Reminders"
+          value={formatReminderOffsets(task.reminderOffsets)}
         />
+        {task.reminderOffsets.length > 0 ? (
+          <DetailRow
+            label="Reminder delivery"
+            value={
+              task.scheduledDate && task.scheduledTime
+                ? "Future reminder times are scheduled when reminders are enabled."
+                : "Saved and inactive until this task has a date and time."
+            }
+          />
+        ) : null}
+        {task.startedAt ? (
+          <DetailRow
+            label={task.status === "started" ? "Started" : "Last started"}
+            value={new Date(task.startedAt).toLocaleString()}
+          />
+        ) : null}
         {task.completedAt ? (
           <DetailRow
             label="Completed"
@@ -218,6 +238,33 @@ export default function TaskDetailScreen() {
 
         {isTaskActive(task) ? (
           <>
+            {task.status === "started" ? (
+              <Pressable
+                accessibilityLabel={`Pause ${task.title} for now`}
+                accessibilityRole="button"
+                disabled={isUpdating}
+                onPress={() => runAction(() => detail.repository.pauseTask(task.id))}
+                style={({ pressed }) => [
+                  styles.executionButton,
+                  pressed && styles.pressed
+                ]}
+              >
+                <Text style={styles.executionButtonText}>Pause for now</Text>
+              </Pressable>
+            ) : task.status === "not_started" ? (
+              <Pressable
+                accessibilityLabel={`Start task ${task.title}`}
+                accessibilityRole="button"
+                disabled={isUpdating}
+                onPress={() => runAction(() => detail.repository.startTask(task.id))}
+                style={({ pressed }) => [
+                  styles.executionButton,
+                  pressed && styles.pressed
+                ]}
+              >
+                <Text style={styles.executionButtonText}>Start task</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               disabled={isUpdating}
@@ -341,6 +388,7 @@ const styles = StyleSheet.create({
   },
   title: { color: "#292724", fontSize: 30, fontWeight: "800" },
   status: { color: "#68645e", fontSize: 15 },
+  timingNote: { color: "#53625b", fontSize: 14, fontWeight: "700" },
   loading: { alignItems: "center", gap: 8, paddingVertical: 40 },
   muted: { color: "#68645e", fontSize: 13 },
   notesPanel: {
@@ -410,6 +458,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   secondaryButtonText: { color: "#2f5d62", fontSize: 15, fontWeight: "800" },
+  executionButton: {
+    alignItems: "center",
+    backgroundColor: "#e7efeb",
+    borderColor: "#789087",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 50,
+    paddingHorizontal: 16
+  },
+  executionButtonText: { color: "#244b43", fontSize: 16, fontWeight: "800" },
   quietButton: {
     alignItems: "center",
     justifyContent: "center",

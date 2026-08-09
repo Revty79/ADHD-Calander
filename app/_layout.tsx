@@ -37,6 +37,10 @@ export default function RootLayout() {
             presentation: "modal"
           }}
         />
+        <Stack.Screen
+          name="recovery/start"
+          options={{ title: "Plans changed?", presentation: "modal" }}
+        />
       </Stack>
     </DatabaseProvider>
   );

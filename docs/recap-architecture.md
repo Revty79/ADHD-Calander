@@ -35,9 +35,10 @@ assigned invented history.
 Completing a task records the clock instant. Undoing completion clears
 `completedAt`. Completing the task again records the new instant. Known task
 estimates may be totaled as factual context; unknown estimates contribute zero.
-Completion also clears any future reminder intent and synchronizes cancellation.
-Undo restores active task status but does not silently recreate the cleared
-reminder. These reminder changes do not alter recap derivation.
+Completion preserves saved reminder choices while synchronizing cancellation of
+all future delivery requests. Undo restores active task status and the service
+re-evaluates those choices against the task's current schedule. These reminder
+changes do not alter recap derivation.
 
 Accepting a scheduling suggestion changes only the existing task's planned
 local date/time and, when necessary, its estimate. It does not count as a

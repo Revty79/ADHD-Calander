@@ -61,6 +61,32 @@ export function useTodayPlan(date: LocalDateString) {
     [refresh, taskRepository]
   );
 
+  const startTask = useCallback(
+    async (id: string) => {
+      try {
+        await taskRepository.startTask(id);
+        await refresh();
+      } catch (error) {
+        console.error("Failed to start task", error);
+        setErrorMessage("The task could not be started. Please try again.");
+      }
+    },
+    [refresh, taskRepository]
+  );
+
+  const pauseTask = useCallback(
+    async (id: string) => {
+      try {
+        await taskRepository.pauseTask(id);
+        await refresh();
+      } catch (error) {
+        console.error("Failed to pause task", error);
+        setErrorMessage("The task could not be paused. Please try again.");
+      }
+    },
+    [refresh, taskRepository]
+  );
+
   return {
     tasks,
     fixedEvents,
@@ -68,6 +94,8 @@ export function useTodayPlan(date: LocalDateString) {
     errorMessage,
     refresh,
     completeTask,
-    undoCompletion
+    undoCompletion,
+    startTask,
+    pauseTask
   };
 }

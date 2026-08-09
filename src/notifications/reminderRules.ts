@@ -6,12 +6,7 @@ import {
 } from "../types/reminder";
 import { isTaskActive, Task } from "../types/task";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../utils/dates";
-
-export function isReminderOffsetMinutes(value: unknown): value is ReminderOffsetMinutes {
-  return (
-    typeof value === "number" && reminderOffsetOptions.some((option) => option === value)
-  );
-}
+export { isReminderOffsetMinutes } from "./reminderOffsets";
 
 export function getReminderTriggerDate(
   dateInput: string,
@@ -39,73 +34,88 @@ export function getReminderTriggerDate(
   return triggerDate;
 }
 
-export function buildTaskReminderRequest(task: Task): ReminderNotificationRequest | null {
+export function buildTaskReminderRequests(task: Task): ReminderNotificationRequest[] {
   if (
     !isTaskActive(task) ||
     task.deletedAt !== null ||
     task.scheduledDate === null ||
-    task.scheduledTime === null ||
-    task.reminderOffsetMinutes === null
+    task.scheduledTime === null
   ) {
-    return null;
+    return [];
   }
 
-  const triggerDate = getReminderTriggerDate(
-    task.scheduledDate,
-    task.scheduledTime,
-    task.reminderOffsetMinutes
-  );
+  return task.reminderOffsets.flatMap((offset) => {
+    const triggerDate = getReminderTriggerDate(
+      task.scheduledDate!,
+      task.scheduledTime!,
+      offset
+    );
 
-  if (!triggerDate) {
-    return null;
-  }
-
-  return {
-    identifier: getTaskReminderIdentifier(task.id),
-    title: task.title,
-    body: `Planned for ${formatLocalTime(task.scheduledDate, task.scheduledTime)}.`,
-    triggerDate,
-    itemType: "task",
-    itemId: task.id
-  };
+    return triggerDate
+      ? [
+          {
+            identifier: getTaskReminderIdentifier(task.id, offset),
+            title: task.title,
+            body: `Planned for ${formatLocalTime(task.scheduledDate!, task.scheduledTime!)}.`,
+            triggerDate,
+            itemType: "task" as const,
+            itemId: task.id
+          }
+        ]
+      : [];
+  });
 }
 
-export function buildEventReminderRequest(
+export function buildEventReminderRequests(
   event: CalendarEvent
-): ReminderNotificationRequest | null {
-  if (event.reminderOffsetMinutes === null) {
-    return null;
-  }
+): ReminderNotificationRequest[] {
+  return event.reminderOffsets.flatMap((offset) => {
+    const triggerDate = getReminderTriggerDate(event.date, event.startTime, offset);
 
-  const triggerDate = getReminderTriggerDate(
-    event.date,
-    event.startTime,
-    event.reminderOffsetMinutes
-  );
-
-  if (!triggerDate) {
-    return null;
-  }
-
-  return {
-    identifier: getEventReminderIdentifier(event.id),
-    title: event.title,
-    body:
-      event.reminderOffsetMinutes === 0
-        ? "On your calendar now."
-        : `On your calendar in ${event.reminderOffsetMinutes} minutes.`,
-    triggerDate,
-    itemType: "event",
-    itemId: event.id
-  };
+    return triggerDate
+      ? [
+          {
+            identifier: getEventReminderIdentifier(event.id, offset),
+            title: event.title,
+            body:
+              offset === 0
+                ? "On your calendar now."
+                : `On your calendar ${formatReminderOffset(offset).toLowerCase()}.`,
+            triggerDate,
+            itemType: "event" as const,
+            itemId: event.id
+          }
+        ]
+      : [];
+  });
 }
 
-export function getTaskReminderIdentifier(taskId: string): string {
-  return `adhd-calendar-task-${taskId}`;
+export function getTaskReminderIdentifier(
+  taskId: string,
+  offset: ReminderOffsetMinutes
+): string {
+  return `adhd-calendar-task-${taskId}-${offset}`;
 }
 
-export function getEventReminderIdentifier(eventId: string): string {
-  return `adhd-calendar-event-${eventId}`;
+export function getEventReminderIdentifier(
+  eventId: string,
+  offset: ReminderOffsetMinutes
+): string {
+  return `adhd-calendar-event-${eventId}-${offset}`;
+}
+
+export function getAllTaskReminderIdentifiers(taskId: string): string[] {
+  return [
+    `adhd-calendar-task-${taskId}`,
+    ...reminderOffsetOptions.map((offset) => getTaskReminderIdentifier(taskId, offset))
+  ];
+}
+
+export function getAllEventReminderIdentifiers(eventId: string): string[] {
+  return [
+    `adhd-calendar-event-${eventId}`,
+    ...reminderOffsetOptions.map((offset) => getEventReminderIdentifier(eventId, offset))
+  ];
 }
 
 export function formatReminderOffset(offset: ReminderOffsetMinutes | null): string {
@@ -121,7 +131,19 @@ export function formatReminderOffset(offset: ReminderOffsetMinutes | null): stri
     return "1 hour before";
   }
 
+  if (offset === 1440) {
+    return "1 day before";
+  }
+
   return `${offset} minutes before`;
+}
+
+export function formatReminderOffsets(offsets: ReminderOffsetMinutes[]): string {
+  if (offsets.length === 0) {
+    return "No reminders";
+  }
+
+  return offsets.map(formatReminderOffset).join(", ");
 }
 
 function formatLocalTime(date: string, time: string): string {

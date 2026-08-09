@@ -2,6 +2,59 @@
 
 ## 2026-08-08
 
+### Execution State Is Separate From Planning State
+
+Decision: Implement `started` as the persisted In Progress state and store the
+most recent `startedAt` timestamp. Start changes `not_started` to `started`;
+Pause returns it to `not_started` without completion; completion always records
+`completedAt`. Flexible, Planned, and Scheduled remain derived only from task
+date/time fields.
+
+Reason: A user needs to say "I am doing this now" without starting a timer or
+claiming partial completion. Separate dimensions allow Scheduled + In Progress
+and Flexible + Not Started without corrupting Calendar or Recap meaning.
+
+### Multiple Reminder Arrays Supersede The Single Reminder Decision
+
+Decision: Store up to five unique reminder offsets on each task or fixed event.
+Use one deterministic native notification identity per item and offset. Preserve
+legacy 10- and 30-minute choices while presenting 1 day, 1 hour, 15 minutes, and
+At start as understandable options.
+
+Reason: Multiple reminders are a real testing need. Offset identities let every
+reschedule cancel stale notifications and rebuild valid future triggers without
+coupling OS identifiers to core planning storage.
+
+### Reminder Choices Persist When Delivery Is Inactive
+
+Decision: Keep reminder arrays when a task becomes untimed, completed, removed,
+delegated, or broken down. Cancel pending notifications when delivery is no
+longer applicable and explain that untimed choices are saved but inactive.
+
+Reason: Clearing configuration silently loses an explicit user choice. Stored
+intent can be truthful without scheduling a stale or impossible notification.
+
+### Recovery Entry Is Confirmation-Gated And Idempotent
+
+Decision: Expose Plans changed? from every primary navigation surface. Route it
+through an explanation with Start/Resume and Not now actions. Confirmation uses
+`RecoveryRepository.startSession`, which returns the existing active session
+before considering a new one.
+
+Reason: Curious or accidental taps must change no data. Reusing the existing
+repository preserves one Recovery mechanism and prevents duplicate active
+sessions or automatic rescheduling.
+
+### Task Date And Time Entry Uses Human Controls
+
+Decision: Use native date/time pickers on Android and semantic date/time inputs
+on web. Add quick planned-date and deadline choices resolved from local calendar
+days. Keep `YYYY-MM-DD` and `HH:MM` as internal storage formats only.
+
+Reason: Storage formats should not become a usability requirement. Platform
+controls improve discoverability, validation, accessibility, and local-time
+correctness without changing the domain model.
+
 ### Functional Completion Requires An End-To-End User Outcome
 
 Decision: Apply one global definition of done to every current and future app
@@ -33,8 +86,9 @@ Decision: Derive Flexible, Planned, and Scheduled from nullable task date/time
 fields instead of persisting a second planning-state column.
 
 Reason: One source of truth prevents impossible combinations. Flexible clears
-date, time, and reminder; Planned stores a date without a time or reminder; and
-Scheduled stores both date and time.
+date and time, Planned stores a date without a time, and Scheduled stores both.
+Reminder choices may remain saved while untimed but are inactive until an exact
+date and time exist.
 
 ### One Breakdown Model
 
@@ -59,7 +113,7 @@ corrupting completion-based Recap behavior.
 
 Decision: Route every task edit through `TaskRepository.updateTask`, preserve
 the task ID and relationship fields, and synchronize the deterministic reminder
-identifier after persistence.
+identifiers after persistence.
 
 Reason: Today, Calendar, reminders, and scheduling must update from one task
 record rather than accumulate duplicates or stale notification intent.
@@ -119,7 +173,10 @@ Reason: Preferences are local app state, not task or event properties. A shared
 repository keeps defaults and validation out of UI components while preserving
 the established platform-storage boundary.
 
-### One Optional Reminder Per Scheduled Item
+### One Optional Reminder Per Scheduled Item (Superseded)
+
+Status: Superseded by Multiple Reminder Arrays Supersede The Single Reminder
+Decision on 2026-08-08.
 
 Decision: Store one nullable offset of 0, 10, 30, or 60 minutes on a task or
 fixed event. Do not add a default offset or multiple reminders.
@@ -142,7 +199,7 @@ duplicate scheduled notifications.
 
 Decision: Put reminder rules in repositories and `ReminderService`, and isolate
 Expo APIs behind `NotificationAdapter`. Use deterministic IDs derived from item
-type and ID.
+type, ID, and reminder offset.
 
 Reason: Persistence and Recovery behavior can be tested without receiving a real
 OS notification. Cancel-before-schedule behavior prevents duplicates without a

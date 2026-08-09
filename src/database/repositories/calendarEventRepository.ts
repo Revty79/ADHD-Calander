@@ -1,8 +1,9 @@
 import { CalendarEvent, CreateCalendarEventInput } from "../../types/calendarEvent";
+import { getReminderTriggerDate } from "../../notifications/reminderRules";
 import {
-  getReminderTriggerDate,
-  isReminderOffsetMinutes
-} from "../../notifications/reminderRules";
+  isReminderOffsetList,
+  normalizeReminderOffsets
+} from "../../notifications/reminderOffsets";
 import {
   noOpReminderSynchronizer,
   ReminderSynchronizer
@@ -31,17 +32,17 @@ export class CalendarEventRepository {
     const now = this.clock();
     const timestamp = now.toISOString();
 
-    if (normalizedInput.reminderOffsetMinutes !== null) {
+    if (normalizedInput.reminderOffsets.length > 0) {
       const reminderDate = getReminderTriggerDate(
         normalizedInput.date,
         normalizedInput.startTime,
-        normalizedInput.reminderOffsetMinutes
+        0
       );
 
       if (!reminderDate || reminderDate.getTime() <= now.getTime()) {
         throw new CalendarEventValidationError(
           "Choose a future event time for this reminder.",
-          "reminderOffsetMinutes"
+          "reminderOffsets"
         );
       }
     }
@@ -55,7 +56,7 @@ export class CalendarEventRepository {
       endTime: normalizedInput.endTime,
       durationMinutes: normalizedInput.durationMinutes,
       notes: normalizedInput.notes,
-      reminderOffsetMinutes: normalizedInput.reminderOffsetMinutes,
+      reminderOffsets: normalizedInput.reminderOffsets,
       createdAt: timestamp,
       updatedAt: timestamp
     };
@@ -120,7 +121,7 @@ function normalizeCreateEventInput(
   | "endTime"
   | "durationMinutes"
   | "notes"
-  | "reminderOffsetMinutes"
+  | "reminderOffsets"
 > {
   const title = input.title.trim();
 
@@ -179,12 +180,12 @@ function normalizeCreateEventInput(
     );
   }
 
-  const reminderOffsetMinutes = input.reminderOffsetMinutes ?? null;
+  const reminderOffsets = input.reminderOffsets ?? [];
 
-  if (reminderOffsetMinutes !== null && !isReminderOffsetMinutes(reminderOffsetMinutes)) {
+  if (!isReminderOffsetList(reminderOffsets)) {
     throw new CalendarEventValidationError(
-      "Choose an available reminder time.",
-      "reminderOffsetMinutes"
+      "Choose up to five different reminder times.",
+      "reminderOffsets"
     );
   }
 
@@ -195,7 +196,7 @@ function normalizeCreateEventInput(
     endTime,
     durationMinutes,
     notes: input.notes?.trim() || null,
-    reminderOffsetMinutes
+    reminderOffsets: normalizeReminderOffsets(reminderOffsets)
   };
 }
 

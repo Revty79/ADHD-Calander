@@ -7,8 +7,16 @@ import { isTaskActive, isTaskCompleted, isTaskResolved } from "../../src/types/t
 
 export default function WebTasksScreen() {
   const router = useRouter();
-  const { tasks, isLoading, errorMessage, refresh, completeTask, undoCompletion } =
-    useAllTasks();
+  const {
+    tasks,
+    isLoading,
+    errorMessage,
+    refresh,
+    completeTask,
+    undoCompletion,
+    startTask,
+    pauseTask
+  } = useAllTasks();
 
   useFocusEffect(
     useCallback(() => {
@@ -62,9 +70,11 @@ export default function WebTasksScreen() {
             actionLabel="Complete"
             emptyMessage="No open tasks yet."
             onAction={completeTask}
+            onPause={pauseTask}
             onSchedule={(id) =>
               router.push({ pathname: "/tasks/[id]/schedule", params: { id } })
             }
+            onStart={startTask}
             showDate
             tasks={openTasks}
             title="Open tasks"

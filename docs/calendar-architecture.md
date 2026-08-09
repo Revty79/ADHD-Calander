@@ -16,6 +16,10 @@ for one flexible task, but never decides or moves work on its own.
 - Flexible on a date: a date without a start time.
 - Planned: a date with a start time.
 
+Planning placement and execution state are separate. A task can be unscheduled,
+flexible, or planned while its execution state is Not started, In progress, or
+Completed. Starting and pausing never invent or change a schedule.
+
 Calendar aggregation reads both repositories and keeps these categories
 separate. Recovery Mode may update tasks only after an explicit decision, but
 never reads fixed events as movable recovery work.
@@ -31,6 +35,9 @@ calendar” facts and never as completed or attended accomplishments.
   columns; narrow layouts use a vertical list.
 - Day groups items as Fixed, Planned, and Flexible and keeps completed tasks
   visible with a calm status label.
+- Calendar exposes Add event and Add task as equally visible primary actions.
+- Active tasks whose planned time or deadline has passed remain ordinary open
+  work and use factual, non-alarming timing text.
 - Tasks resolved as delegated, removed, or broken down remain in task history
   but no longer appear as active calendar work.
 
@@ -74,17 +81,26 @@ date.
 
 ## Reminder Integration
 
-A task or fixed event may store one optional reminder offset. Reminder intent
-does not change the Calendar grouping: fixed events remain fixed, timed tasks
-remain planned, and untimed tasks remain flexible. Native item cards show the
-stored reminder as text, so its state is not communicated by color.
+A task or fixed event may store up to five distinct reminder offsets from the
+supported choices. Reminder intent does not change Calendar grouping: fixed
+events remain fixed, timed tasks remain planned, and untimed tasks remain
+flexible. Native item cards describe stored reminders with text, so their state
+is not communicated by color.
 
-`ReminderService` builds a local trigger from the item's validated local date
-and time. A master setting controls OS scheduling without erasing item intent.
-Web keeps the same domain shape but does not schedule browser notifications.
-Task editing updates the existing record through `TaskRepository`; reminder
-synchronization cancels the old identifier before scheduling against a changed
-date or time. General event editing remains deferred.
+`ReminderService` builds one local trigger per valid offset from the item's
+validated local date and time. Each request identifier includes the item type,
+item ID, and offset. Synchronization cancels every supported current identifier
+and the legacy single-reminder identifier before rebuilding future triggers, so
+date and time changes cannot leave stale OS requests. A master setting controls
+OS scheduling without erasing item intent. Completed, removed, untimed, or
+past-trigger items keep their saved reminder choices while delivery remains
+inactive.
+
+Web keeps the same persisted domain shape but truthfully reports that browser
+notification delivery is unsupported and does not render fake reminder
+controls. Task editing updates the existing record through `TaskRepository`.
+Event reminders can be selected during event creation; general event editing,
+including later reminder changes, remains deferred.
 
 ## Scheduling Assistance Integration
 
@@ -107,7 +123,7 @@ behavior does not invent duration or label a day overloaded.
 - Recurring or all-day events
 - Event editing/deletion
 - Drag-and-drop
-- Advanced notifications, quiet hours, and reminder editing
+- Custom reminder offsets, quiet hours, and event reminder editing
 - Time-zone-aware travel behavior
 - External calendar sync
 - Accounts, cloud sync, analytics, and AI

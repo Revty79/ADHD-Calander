@@ -8,6 +8,10 @@ import {
   View
 } from "react-native";
 
+import {
+  NativeDatePickerButton,
+  NativeTimePickerButton
+} from "../../../components/NativeDateTimePickerButton";
 import { TaskValidationError } from "../../../database/repositories/errors";
 import { ReminderOffsetMinutes, ReminderPermissionStatus } from "../../../types/reminder";
 import {
@@ -19,6 +23,11 @@ import {
 } from "../../../types/task";
 import { ReminderOffsetSelector } from "../../reminders/components/ReminderOffsetSelector";
 import { useReminderSettings } from "../../settings/hooks/useReminderSettings";
+import {
+  getDeadlineQuickChoices,
+  getPlannedDateQuickChoices,
+  TaskDateQuickChoice
+} from "../taskDateChoices";
 
 type FieldErrors = Partial<Record<TaskValidationError["field"], string>>;
 
@@ -64,8 +73,10 @@ export function TaskEditorForm({
     initialTask?.estimatedDurationMinutes ?? null
   );
   const [deadlineDate, setDeadlineDate] = useState(initialTask?.deadlineDate ?? "");
-  const [reminderOffsetMinutes, setReminderOffsetMinutes] =
-    useState<ReminderOffsetMinutes | null>(initialTask?.reminderOffsetMinutes ?? null);
+  const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[]>(
+    initialTask?.reminderOffsets ?? []
+  );
+  const [referenceDate] = useState(() => new Date());
   const [showDetails, setShowDetails] = useState(Boolean(initialTask || initialDate));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -77,10 +88,10 @@ export function TaskEditorForm({
     if (nextState === "flexible") {
       setScheduledDate("");
       setScheduledTime("");
-      setReminderOffsetMinutes(null);
     } else if (nextState === "planned") {
       setScheduledTime("");
-      setReminderOffsetMinutes(null);
+    } else if (!scheduledDate) {
+      setScheduledDate(getPlannedDateQuickChoices(referenceDate)[0]?.value ?? "");
     }
   }
 
@@ -98,8 +109,7 @@ export function TaskEditorForm({
         scheduledTime: planningState === "scheduled" ? scheduledTime : null,
         estimatedDurationMinutes,
         deadlineDate,
-        reminderOffsetMinutes:
-          planningState === "scheduled" ? reminderOffsetMinutes : null
+        reminderOffsets
       });
     } catch (error) {
       if (error instanceof TaskValidationError) {
@@ -170,33 +180,32 @@ export function TaskEditorForm({
 
           {planningState !== "flexible" ? (
             <Field label="Planned date" error={fieldErrors.scheduledDate}>
-              <TextInput
-                accessibilityLabel="Planned date in year month day format"
-                autoCapitalize="none"
-                keyboardType="numbers-and-punctuation"
-                onChangeText={setScheduledDate}
-                placeholder="YYYY-MM-DD"
-                style={[
-                  styles.input,
-                  fieldErrors.scheduledDate ? styles.inputError : null
-                ]}
+              <DateQuickChoices
+                choices={getPlannedDateQuickChoices(referenceDate)}
+                onChange={(value) => setScheduledDate(value ?? "")}
                 value={scheduledDate}
               />
+              <NativeDatePickerButton
+                accessibilityLabel="Choose a planned date"
+                onChange={setScheduledDate}
+                value={scheduledDate}
+              />
+              <Pressable
+                accessibilityLabel="Clear planned date and make task flexible"
+                accessibilityRole="button"
+                onPress={() => choosePlanningState("flexible")}
+                style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.clearButtonText}>Clear date · Make flexible</Text>
+              </Pressable>
             </Field>
           ) : null}
 
           {planningState === "scheduled" ? (
             <Field label="Scheduled time" error={fieldErrors.scheduledTime}>
-              <TextInput
-                accessibilityLabel="Scheduled time in twenty four hour format"
-                autoCapitalize="none"
-                keyboardType="numbers-and-punctuation"
-                onChangeText={setScheduledTime}
-                placeholder="HH:MM"
-                style={[
-                  styles.input,
-                  fieldErrors.scheduledTime ? styles.inputError : null
-                ]}
+              <NativeTimePickerButton
+                accessibilityLabel="Choose a scheduled time"
+                onChange={setScheduledTime}
                 value={scheduledTime}
               />
             </Field>
@@ -239,13 +248,14 @@ export function TaskEditorForm({
           </View>
 
           <Field label="Deadline" error={fieldErrors.deadlineDate}>
-            <TextInput
-              accessibilityLabel="Deadline in year month day format"
-              autoCapitalize="none"
-              keyboardType="numbers-and-punctuation"
-              onChangeText={setDeadlineDate}
-              placeholder="Optional, YYYY-MM-DD"
-              style={[styles.input, fieldErrors.deadlineDate ? styles.inputError : null]}
+            <DateQuickChoices
+              choices={getDeadlineQuickChoices(referenceDate)}
+              onChange={(value) => setDeadlineDate(value ?? "")}
+              value={deadlineDate}
+            />
+            <NativeDatePickerButton
+              accessibilityLabel="Choose a custom deadline date"
+              onChange={setDeadlineDate}
               value={deadlineDate}
             />
             <Text style={styles.helpText}>
@@ -259,10 +269,16 @@ export function TaskEditorForm({
               {...(reminderDisabledMessage
                 ? { disabledMessage: reminderDisabledMessage }
                 : {})}
-              error={fieldErrors.reminderOffsetMinutes}
-              onChange={setReminderOffsetMinutes}
-              value={reminderOffsetMinutes}
+              error={fieldErrors.reminderOffsets}
+              onChange={setReminderOffsets}
+              value={reminderOffsets}
             />
+          ) : null}
+
+          {planningState !== "scheduled" && reminderOffsets.length > 0 ? (
+            <Text style={styles.helpText}>
+              Saved reminder choices are inactive until this task has a date and time.
+            </Text>
           ) : null}
         </View>
       )}
@@ -289,6 +305,43 @@ export function TaskEditorForm({
           <Text style={styles.saveButtonText}>{submitLabel}</Text>
         )}
       </Pressable>
+    </View>
+  );
+}
+
+function DateQuickChoices({
+  choices,
+  onChange,
+  value
+}: {
+  choices: TaskDateQuickChoice[];
+  onChange(value: string | null): void;
+  value: string;
+}) {
+  return (
+    <View style={styles.optionWrap}>
+      {choices.map((choice) => {
+        const choiceValue = choice.value ?? "";
+        const selected = value === choiceValue;
+
+        return (
+          <Pressable
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            key={choice.label}
+            onPress={() => onChange(choice.value)}
+            style={({ pressed }) => [
+              styles.choice,
+              selected && styles.choiceSelected,
+              pressed && styles.pressed
+            ]}
+          >
+            <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>
+              {choice.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -373,7 +426,7 @@ function getReminderDisabledMessage(
   }
 
   if (remindersEnabled !== true) {
-    return "Turn on reminders in Settings to choose one here.";
+    return "Turn on reminders in Settings to choose them here.";
   }
 
   return null;
@@ -423,6 +476,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   detailsButtonText: { color: "#2f5d62", fontSize: 16, fontWeight: "700" },
+  clearButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 4
+  },
+  clearButtonText: { color: "#24565c", fontSize: 14, fontWeight: "700" },
   saveButton: {
     alignItems: "center",
     backgroundColor: "#2f5d62",

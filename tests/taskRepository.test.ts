@@ -12,10 +12,16 @@ import {
 import { TaskRepository } from "../src/database/repositories/taskRepository";
 import { SqlExecutor } from "../src/database/sql";
 import { SqlTaskStorage } from "../src/database/sqlTaskStorage";
+import { SqlCalendarEventStorage } from "../src/database/sqlCalendarEventStorage";
 import { createTasksMigration } from "../src/database/migrations/001_create_tasks";
+import { migrations } from "../src/database/migrations";
 import { ReminderSynchronizer } from "../src/notifications/reminderSynchronizer";
 import { Task } from "../src/types/task";
 import { getLocalDateString } from "../src/utils/dates";
+import {
+  getDeadlineQuickChoices,
+  getPlannedDateQuickChoices
+} from "../src/features/tasks/taskDateChoices";
 import { createSqlJsDatabase } from "./helpers/sqlJsDatabase";
 
 async function createRepository() {
@@ -67,7 +73,8 @@ describe("task database", () => {
       { version: 3, name: "recovery_foundation" },
       { version: 4, name: "settings_reminders_foundation" },
       { version: 5, name: "scheduling_assistance_foundation" },
-      { version: 6, name: "task_functional_core" }
+      { version: 6, name: "task_functional_core" },
+      { version: 7, name: "execution_multiple_reminders" }
     ]);
 
     const taskColumns = await database.getAllAsync<{ name: string }>(
@@ -75,6 +82,8 @@ describe("task database", () => {
     );
     assert.ok(taskColumns.some((column) => column.name === "importance"));
     assert.ok(taskColumns.some((column) => column.name === "parent_task_id"));
+    assert.ok(taskColumns.some((column) => column.name === "started_at"));
+    assert.ok(taskColumns.some((column) => column.name === "reminder_offsets"));
   });
 
   it("preserves existing tasks when upgrading to calendar storage", async () => {
@@ -121,9 +130,88 @@ describe("task database", () => {
     assert.equal(tasks[0]?.scheduledDate, "2026-08-06");
     assert.equal(tasks[0]?.estimatedDurationMinutes, null);
     assert.equal(tasks[0]?.deadlineDate, null);
-    assert.equal(tasks[0]?.reminderOffsetMinutes, null);
+    assert.deepEqual(tasks[0]?.reminderOffsets, []);
+    assert.equal(tasks[0]?.startedAt, null);
     assert.equal(tasks[0]?.importance, "normal");
     assert.equal(tasks[0]?.parentTaskId, null);
+  });
+
+  it("migrates legacy single reminders without changing installed data", async () => {
+    const database = await createSqlJsDatabase();
+    await database.execAsync(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+    `);
+
+    for (const migration of migrations.filter((candidate) => candidate.version <= 6)) {
+      await migration.up(database);
+      await database.runAsync(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?);",
+        migration.version,
+        migration.name,
+        "2026-08-04T14:30:00.000Z"
+      );
+    }
+
+    await database.runAsync(
+      `
+        INSERT INTO tasks (
+          id, title, description, status, scheduled_date, scheduled_time,
+          estimated_duration_minutes, created_at, updated_at, completed_at,
+          deleted_at, reminder_offset_minutes, deadline_date, importance,
+          parent_task_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `,
+      "legacy-reminder-task",
+      "Existing reminded task",
+      null,
+      "not_started",
+      "2026-08-06",
+      "09:00",
+      30,
+      "2026-08-04T14:30:00.000Z",
+      "2026-08-04T14:30:00.000Z",
+      null,
+      null,
+      30,
+      null,
+      "normal",
+      null
+    );
+    await database.runAsync(
+      `
+        INSERT INTO calendar_events (
+          id, title, kind, date, start_time, end_time, duration_minutes,
+          notes, created_at, updated_at, reminder_offset_minutes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `,
+      "legacy-reminder-event",
+      "Existing reminded event",
+      "fixed",
+      "2026-08-06",
+      "11:00",
+      null,
+      30,
+      null,
+      "2026-08-04T14:30:00.000Z",
+      "2026-08-04T14:30:00.000Z",
+      60
+    );
+
+    await initializeDatabase(database);
+
+    assert.deepEqual(
+      (await new SqlTaskStorage(database).getTaskById("legacy-reminder-task"))
+        ?.reminderOffsets,
+      [30]
+    );
+    assert.deepEqual(
+      (await new SqlCalendarEventStorage(database).getAllEvents())[0]?.reminderOffsets,
+      [60]
+    );
   });
 
   it("creates a task with normalized input", async () => {
@@ -147,6 +235,8 @@ describe("task database", () => {
     assert.equal(task.scheduledTime, "09:15");
     assert.equal(task.estimatedDurationMinutes, 25);
     assert.equal(task.deadlineDate, "2026-08-08");
+    assert.deepEqual(task.reminderOffsets, []);
+    assert.equal(task.startedAt, null);
     assert.equal(task.completedAt, null);
     assert.equal(task.deletedAt, null);
   });
@@ -174,20 +264,20 @@ describe("task database", () => {
       ...planned,
       scheduledDate: "2026-08-06",
       scheduledTime: "10:00",
-      reminderOffsetMinutes: 10
+      reminderOffsets: [10]
     });
     assert.equal(scheduled.scheduledTime, "10:00");
-    assert.equal(scheduled.reminderOffsetMinutes, 10);
+    assert.deepEqual(scheduled.reminderOffsets, [10]);
 
     const flexible = await repository.updateTask(original.id, {
       ...scheduled,
       scheduledDate: null,
       scheduledTime: null,
-      reminderOffsetMinutes: null
+      reminderOffsets: scheduled.reminderOffsets
     });
     assert.equal(flexible.scheduledDate, null);
     assert.equal(flexible.scheduledTime, null);
-    assert.equal(flexible.reminderOffsetMinutes, null);
+    assert.deepEqual(flexible.reminderOffsets, [10]);
 
     const restoredDatabase = await createSqlJsDatabase(database.exportData());
     await initializeDatabase(restoredDatabase);
@@ -199,7 +289,7 @@ describe("task database", () => {
     assert.equal(restoredTask.scheduledDate, null);
   });
 
-  it("clears a stale reminder when an edited schedule moves into the past", async () => {
+  it("preserves reminder choices when an edited schedule moves into the past", async () => {
     const database = await createSqlJsDatabase();
     await initializeDatabase(database);
     const synchronizer = new RecordingTaskReminderSynchronizer();
@@ -213,18 +303,18 @@ describe("task database", () => {
       title: "Prepare notes",
       scheduledDate: "2026-08-06",
       scheduledTime: "10:00",
-      reminderOffsetMinutes: 10
+      reminderOffsets: [10]
     });
 
     const edited = await repository.updateTask(task.id, {
       ...task,
       scheduledDate: "2026-08-04",
       scheduledTime: "09:00",
-      reminderOffsetMinutes: 10
+      reminderOffsets: [10]
     });
 
-    assert.equal(edited.reminderOffsetMinutes, null);
-    assert.equal(synchronizer.tasks.at(-1)?.reminderOffsetMinutes, null);
+    assert.deepEqual(edited.reminderOffsets, [10]);
+    assert.deepEqual(synchronizer.tasks.at(-1)?.reminderOffsets, [10]);
   });
 
   it("breaks down a task with persisted parent relationships and reversible children", async () => {
@@ -370,6 +460,45 @@ describe("task database", () => {
     assert.equal(completedTask.completedAt, "2026-08-04T14:30:00.000Z");
   });
 
+  it("starts and pauses a task with persisted execution state", async () => {
+    const { database, repository } = await createRepository();
+    const task = await repository.createTask({ title: "Read the brief" });
+
+    const started = await repository.startTask(task.id);
+    assert.equal(started.status, "started");
+    assert.equal(started.startedAt, "2026-08-04T14:30:00.000Z");
+
+    let reopenedDatabase = await createSqlJsDatabase(database.exportData());
+    await initializeDatabase(reopenedDatabase);
+    let reopenedRepository = new TaskRepository(new SqlTaskStorage(reopenedDatabase));
+    assert.equal((await reopenedRepository.getTaskById(task.id)).status, "started");
+
+    const paused = await reopenedRepository.pauseTask(task.id);
+    assert.equal(paused.status, "not_started");
+    assert.equal(paused.startedAt, "2026-08-04T14:30:00.000Z");
+
+    reopenedDatabase = await createSqlJsDatabase(reopenedDatabase.exportData());
+    await initializeDatabase(reopenedDatabase);
+    reopenedRepository = new TaskRepository(new SqlTaskStorage(reopenedDatabase));
+    assert.equal((await reopenedRepository.getTaskById(task.id)).status, "not_started");
+  });
+
+  it("completes an in-progress task and undoes to a calm unfinished state", async () => {
+    const { repository } = await createRepository();
+    const task = await repository.createTask({ title: "Finish the summary" });
+    await repository.startTask(task.id);
+
+    const completed = await repository.completeTask(task.id);
+    assert.equal(completed.status, "completed");
+    assert.equal(completed.completedAt, "2026-08-04T14:30:00.000Z");
+    assert.equal(completed.startedAt, "2026-08-04T14:30:00.000Z");
+
+    const undone = await repository.undoTaskCompletion(task.id);
+    assert.equal(undone.status, "not_started");
+    assert.equal(undone.completedAt, null);
+    assert.equal(undone.startedAt, "2026-08-04T14:30:00.000Z");
+  });
+
   it("undoes task completion", async () => {
     const { repository } = await createRepository();
     const task = await repository.createTask({
@@ -448,6 +577,19 @@ describe("task database", () => {
     const lateLocalDate = new Date(2026, 0, 5, 23, 45);
 
     assert.equal(getLocalDateString(lateLocalDate), "2026-01-05");
+  });
+
+  it("resolves task date quick choices from local calendar days", () => {
+    const reference = new Date(2026, 0, 31, 23, 45);
+
+    assert.deepEqual(
+      getPlannedDateQuickChoices(reference).map((choice) => choice.value),
+      ["2026-01-31", "2026-02-01"]
+    );
+    assert.deepEqual(
+      getDeadlineQuickChoices(reference).map((choice) => choice.value),
+      [null, "2026-01-31", "2026-02-01", "2026-02-03", "2026-02-07"]
+    );
   });
 
   it("wraps database write errors", async () => {

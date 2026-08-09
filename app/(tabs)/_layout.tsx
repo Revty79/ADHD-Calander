@@ -1,4 +1,5 @@
-import { Tabs } from "expo-router";
+import { Link, Tabs } from "expo-router";
+import { Pressable, StyleSheet, Text } from "react-native";
 
 const tabScreenOptions = {
   tabBarActiveTintColor: "#2f5d62",
@@ -19,7 +20,8 @@ const tabScreenOptions = {
   headerTintColor: "#2f2d2a",
   headerTitleStyle: {
     fontWeight: "700" as const
-  }
+  },
+  headerRight: PlansChangedHeaderAction
 };
 
 export default function TabLayout() {
@@ -34,3 +36,28 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+function PlansChangedHeaderAction() {
+  return (
+    <Link href="/recovery/start" asChild>
+      <Pressable
+        accessibilityHint="Review unfinished work safely"
+        accessibilityLabel="Plans changed? Open Recovery Mode options"
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.recoveryAction, pressed && styles.pressed]}
+      >
+        <Text style={styles.recoveryActionText}>Plans changed?</Text>
+      </Pressable>
+    </Link>
+  );
+}
+
+const styles = StyleSheet.create({
+  recoveryAction: {
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 12
+  },
+  recoveryActionText: { color: "#24565c", fontSize: 14, fontWeight: "800" },
+  pressed: { opacity: 0.68 }
+});

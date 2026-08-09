@@ -7,12 +7,18 @@ unfinished work?” It replaces passive overdue accumulation with explicit,
 one-task-at-a-time choices. Language stays factual and every scheduling change
 comes from a user action.
 
+Every primary screen exposes a persistent "Plans changed?" entry. It opens an
+explanation and requires explicit confirmation before a session is created or
+resumed. Choosing Not now performs no persistence. Confirming repeatedly while
+a session is active resumes the same session rather than creating duplicates.
+
 ## Session Lifecycle
 
 `RecoveryRepository.startSession(sourceDate)` validates a local `YYYY-MM-DD`
 date and returns the existing active session if one already exists. Otherwise,
 it snapshots active unfinished tasks scheduled for that date. Completed,
-delegated, removed, and broken-down tasks are excluded.
+delegated, removed, and broken-down tasks are excluded. In-progress tasks remain
+eligible because execution state does not remove unfinished work from planning.
 
 Only one session can be active. Each item begins `pending`. A final decision
 changes it to `resolved`; Decide Later stores `skip` but intentionally leaves it
@@ -71,13 +77,17 @@ and item session ID are indexed. Browser writes update tasks and recovery items
 in one transaction, and session creation checks for an existing active session.
 Stored values are validated when read.
 
-SQLite migration 4 and IndexedDB version 4 add the original reminder offset to
-the Recovery item snapshot. Keep, Break Down, Delegate, and Remove clear the
-original task reminder. Reschedule retains it only when the user gives the task
-a new time, so the trigger is rebuilt from the new local schedule. Child tasks
-start without reminders. Reopening restores the original reminder snapshot
-along with the task schedule. Each persisted mutation is then synchronized
-through `ReminderService`; fixed events remain outside Recovery.
+SQLite migration 4 and IndexedDB version 4 originally added the single reminder
+offset to the Recovery item snapshot. SQLite migration 7 and IndexedDB version
+7 add reminder-offset arrays and execution timestamps while preserving that
+legacy data. Recovery now snapshots every selected reminder offset. Keep,
+Break Down, Delegate, and Remove preserve the original task's reminder choices
+while delivery becomes inactive for the resulting untimed or resolved task.
+Reschedule preserves the choices and rebuilds only future triggers from the new
+local schedule. Child tasks start without reminders. Reopening restores the
+original reminder snapshot, execution state, and schedule. Each persisted
+mutation is synchronized through `ReminderService`; fixed events remain outside
+Recovery.
 
 Daily Recap reads every active or completed Recovery session whose `sourceDate`
 matches the selected recap date. Final decisions are summarized as plan
@@ -94,7 +104,7 @@ is derived, reopening an active decision immediately changes the next summary.
 - Capacity scoring and essential-task selection
 - Full task hierarchy or project management
 - Sharing, contacts, or delegate messaging
-- Quiet hours, reminder pausing, and advanced notification actions
+- Quiet hours, custom reminder offsets, and advanced notification actions
 - Recurring work and external calendars
 - Recovery analytics, streaks, and performance scoring
 - Accounts, cloud sync, and AI

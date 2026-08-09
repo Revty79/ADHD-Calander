@@ -49,12 +49,40 @@ export function useTasksForDate(date: LocalDateString) {
     [refresh, repository]
   );
 
+  const startTask = useCallback(
+    async (id: string) => {
+      try {
+        await repository.startTask(id);
+        await refresh();
+      } catch (error) {
+        console.error("Failed to start task", error);
+        setErrorMessage("The task could not be started. Please try again.");
+      }
+    },
+    [refresh, repository]
+  );
+
+  const pauseTask = useCallback(
+    async (id: string) => {
+      try {
+        await repository.pauseTask(id);
+        await refresh();
+      } catch (error) {
+        console.error("Failed to pause task", error);
+        setErrorMessage("The task could not be paused. Please try again.");
+      }
+    },
+    [refresh, repository]
+  );
+
   return {
     tasks,
     isLoading,
     errorMessage,
     refresh,
     completeTask,
-    undoCompletion
+    undoCompletion,
+    startTask,
+    pauseTask
   };
 }

@@ -31,6 +31,7 @@ Platform-specific files own:
   daily recap.
 - `app/(tabs)/settings.web.tsx`: semantic accessibility, privacy, app-info, and
   accurate notification-support sections.
+- `app/recovery/start.web.tsx`: confirmation-gated Recovery start or resume.
 - `app/tasks/new.web.tsx`: semantic browser form controls.
 - `app/tasks/[id]/schedule.web.tsx`: semantic suggestion selection and explicit
   scheduling confirmation.
@@ -51,6 +52,10 @@ route has a visible `Current` label, a stronger border, and `aria-current` state
 At 760 pixels and below, navigation becomes a compact six-item header. Every
 destination remains a normal keyboard-focusable link.
 
+A persistent "Plans changed?" action appears alongside the primary navigation
+at every responsive size. It always opens the Recovery explanation first;
+cancelling does not create or mutate a session.
+
 Task and event forms are focused pages outside the tab shell. Task creation can
 return to Today, Tasks, or its selected Calendar date.
 
@@ -58,7 +63,7 @@ return to Today, Tasks, or its selected Calendar date.
 
 Native builds continue to initialize Expo SQLite, apply versioned SQL
 migrations, and use SQL storage adapters. The web build opens IndexedDB database
-`adhd-calendar-web` at version 5 with `tasks`, `calendarEvents`,
+`adhd-calendar-web` at version 7 with `tasks`, `calendarEvents`,
 `recoverySessions`, `recoveryItems`, and `appSettings` stores.
 
 `TaskRepository`, `CalendarEventRepository`, and `RecoveryRepository` depend on
@@ -66,6 +71,11 @@ platform-neutral storage contracts. Both platforms return the same domain
 shapes, while validation and recovery rules remain in shared repositories.
 IndexedDB recovery decisions update task records and recovery items in one
 transaction.
+
+IndexedDB version 7 stores task and event reminder-offset arrays, Recovery
+reminder snapshots, and task execution timestamps. Its upgrade path converts
+version 6 single-reminder records and preserves in-progress tasks. Legacy fields
+remain readable as a compatibility fallback.
 
 `SettingsRepository` uses the `appSettings` store through a shared storage
 contract. `ReminderService` is also composed on web, but receives
@@ -119,12 +129,12 @@ for reduced motion.
   can remove IndexedDB data.
 - Web and native tasks are separate and cannot currently be imported or synced.
 - Web notification scheduling is deliberately unsupported; Settings reports the
-  Android-app-only availability accurately.
+  Android-app-only availability accurately, and forms do not imply otherwise.
 - Completed legacy tasks without a known completion timestamp cannot appear on
   a historical Recap date.
 - Completed recovery sessions are retained but do not yet have a history browser.
-- Event editing/deletion, task filtering and sorting controls, advanced
-  notifications, and recurring items are not implemented.
+- Event editing/deletion, task filtering and sorting controls, custom reminder
+  offsets, and recurring items are not implemented.
 
 ## Future Cross-Platform Work
 

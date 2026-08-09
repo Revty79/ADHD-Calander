@@ -115,7 +115,6 @@ export class RecoveryRepository {
           ...task,
           scheduledDate: null,
           scheduledTime: null,
-          reminderOffsetMinutes: null,
           updatedAt: timestamp
         }
       ],
@@ -148,7 +147,6 @@ export class RecoveryRepository {
           ...task,
           scheduledDate,
           scheduledTime,
-          reminderOffsetMinutes: scheduledTime ? task.reminderOffsetMinutes : null,
           updatedAt: timestamp
         }
       ],
@@ -175,7 +173,6 @@ export class RecoveryRepository {
           {
             ...task,
             status: "broken_down",
-            reminderOffsetMinutes: null,
             updatedAt: timestamp
           }
         ],
@@ -196,7 +193,6 @@ export class RecoveryRepository {
         {
           ...task,
           status: "delegated",
-          reminderOffsetMinutes: null,
           updatedAt: timestamp
         }
       ],
@@ -211,7 +207,6 @@ export class RecoveryRepository {
         {
           ...task,
           status: "removed",
-          reminderOffsetMinutes: null,
           updatedAt: timestamp
         }
       ],
@@ -277,14 +272,13 @@ export class RecoveryRepository {
         status: item.originalStatus,
         scheduledDate: item.originalScheduledDate,
         scheduledTime: item.originalScheduledTime,
-        reminderOffsetMinutes: item.originalReminderOffsetMinutes,
+        reminderOffsets: item.originalReminderOffsets,
         completedAt: null,
         updatedAt: timestamp
       };
       const retiredCreatedTasks = createdTasks.map<Task>((task) => ({
         ...task,
         status: "removed",
-        reminderOffsetMinutes: null,
         updatedAt: timestamp
       }));
 
@@ -438,7 +432,7 @@ function createRecoveryItem(
     originalScheduledDate: sourceDate,
     originalScheduledTime: task.scheduledTime,
     originalEstimatedDurationMinutes: task.estimatedDurationMinutes,
-    originalReminderOffsetMinutes: task.reminderOffsetMinutes,
+    originalReminderOffsets: [...task.reminderOffsets],
     status: "pending",
     decision: null,
     note: null,
@@ -468,7 +462,8 @@ function createUnscheduledTask(
     scheduledTime: null,
     estimatedDurationMinutes: null,
     deadlineDate: null,
-    reminderOffsetMinutes: null,
+    reminderOffsets: [],
+    startedAt: null,
     createdAt: timestamp,
     updatedAt: timestamp,
     completedAt: null,

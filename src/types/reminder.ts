@@ -1,4 +1,8 @@
-export const reminderOffsetOptions = [0, 10, 30, 60] as const;
+export const reminderOffsetOptions = [0, 10, 15, 30, 60, 1440] as const;
+
+export const reminderSelectionOptions = [1440, 60, 30, 15, 10, 0] as const;
+
+export const maxRemindersPerItem = 5;
 
 export type ReminderOffsetMinutes = (typeof reminderOffsetOptions)[number];
 

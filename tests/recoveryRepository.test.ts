@@ -10,6 +10,7 @@ import { SqlCalendarEventStorage } from "../src/database/sqlCalendarEventStorage
 import { SqlRecoveryStorage } from "../src/database/sqlRecoveryStorage";
 import { SqlTaskStorage } from "../src/database/sqlTaskStorage";
 import { buildCalendarSchedule } from "../src/features/calendar/calendarSchedule";
+import { applyRecoveryEntryDecision } from "../src/features/recovery/recoveryEntry";
 import { createSqlJsDatabase } from "./helpers/sqlJsDatabase";
 
 const sourceDate = "2026-08-06";
@@ -55,7 +56,12 @@ async function createScheduledTask(
 describe("RecoveryRepository", () => {
   it("starts one persisted session with only unfinished tasks", async () => {
     const { database, taskRepository, recoveryRepository } = await createContext();
-    await createScheduledTask(taskRepository, "Unfinished task", "10:00");
+    const unfinishedTask = await createScheduledTask(
+      taskRepository,
+      "Unfinished task",
+      "10:00"
+    );
+    await taskRepository.startTask(unfinishedTask.id);
     const completedTask = await createScheduledTask(
       taskRepository,
       "Completed task",
@@ -82,6 +88,34 @@ describe("RecoveryRepository", () => {
       ["Unfinished task"]
     );
     assert.equal(session.items[0]?.originalScheduledTime, "10:00");
+    assert.equal(session.items[0]?.originalStatus, "started");
+  });
+
+  it("cancels Recovery entry without mutation and resumes one active session", async () => {
+    const { taskRepository, recoveryRepository } = await createContext();
+    await createScheduledTask(taskRepository, "Review this task");
+
+    const cancelled = await applyRecoveryEntryDecision(
+      "cancel",
+      recoveryRepository,
+      sourceDate
+    );
+    assert.equal(cancelled, null);
+    assert.equal(await recoveryRepository.getActiveSession(), null);
+
+    const started = await applyRecoveryEntryDecision(
+      "confirm",
+      recoveryRepository,
+      sourceDate
+    );
+    const resumed = await applyRecoveryEntryDecision(
+      "confirm",
+      recoveryRepository,
+      "2026-08-07"
+    );
+
+    assert.equal(resumed?.id, started?.id);
+    assert.equal((await recoveryRepository.getActiveSession())?.id, started?.id);
   });
 
   it("keeps a task unscheduled without flattening recorded progress", async () => {

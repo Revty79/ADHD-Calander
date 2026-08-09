@@ -300,7 +300,7 @@ describe("scheduling acceptance workflow", () => {
       scheduledTime: "18:00",
       estimatedDurationMinutes: 30,
       deadlineDate: "2026-08-13",
-      reminderOffsetMinutes: 10
+      reminderOffsets: [10]
     });
     await eventRepository.createEvent({
       title: "Appointment",
@@ -323,7 +323,7 @@ describe("scheduling acceptance workflow", () => {
     assert.equal(scheduled.scheduledDate, suggestion.date);
     assert.equal(scheduled.scheduledTime, suggestion.startTime);
     assert.equal(scheduled.deadlineDate, "2026-08-13");
-    assert.equal(scheduled.reminderOffsetMinutes, 10);
+    assert.deepEqual(scheduled.reminderOffsets, [10]);
     assert.equal((await taskStorage.getAllTasks()).length, 1);
     assert.equal(synchronizer.tasks.at(-1)?.id, task.id);
     assert.equal(synchronizer.tasks.at(-1)?.scheduledTime, suggestion.startTime);
@@ -428,7 +428,8 @@ function createTask(overrides: Partial<Task> = {}): Task {
     scheduledTime: null,
     estimatedDurationMinutes: 30,
     deadlineDate: null,
-    reminderOffsetMinutes: null,
+    reminderOffsets: [],
+    startedAt: null,
     createdAt: timestamp,
     updatedAt: timestamp,
     completedAt: null,
@@ -447,7 +448,7 @@ function createEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     endTime: null,
     durationMinutes: null,
     notes: null,
-    reminderOffsetMinutes: null,
+    reminderOffsets: [],
     createdAt: timestamp,
     updatedAt: timestamp,
     ...overrides

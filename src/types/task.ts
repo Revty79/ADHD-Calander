@@ -3,6 +3,7 @@ import { ReminderOffsetMinutes } from "./reminder";
 
 export const implementedTaskStatuses = [
   "not_started",
+  "started",
   "completed",
   "delegated",
   "removed",
@@ -10,7 +11,6 @@ export const implementedTaskStatuses = [
 ] as const;
 
 export const reservedTaskStatuses = [
-  "started",
   "partially_completed",
   "intentionally_skipped",
   "rescheduled",
@@ -42,7 +42,8 @@ export type Task = {
   scheduledTime: LocalTimeString | null;
   estimatedDurationMinutes: number | null;
   deadlineDate: LocalDateString | null;
-  reminderOffsetMinutes: ReminderOffsetMinutes | null;
+  reminderOffsets: ReminderOffsetMinutes[];
+  startedAt: string | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -57,7 +58,7 @@ export type CreateTaskInput = {
   scheduledTime?: string | null;
   estimatedDurationMinutes?: number | null;
   deadlineDate?: string | null;
-  reminderOffsetMinutes?: number | null;
+  reminderOffsets?: number[];
 };
 
 export type UpdateTaskInput = CreateTaskInput;

@@ -59,7 +59,8 @@ export default function SettingsScreen() {
           <View style={styles.settingCopy}>
             <Text style={styles.settingLabel}>Allow local reminders</Text>
             <Text style={styles.settingDescription}>
-              When enabled, a task or event can have one optional reminder on this device.
+              When enabled, a task or event can have several optional reminders on this
+              device.
             </Text>
           </View>
           {reminders.isLoading ? (

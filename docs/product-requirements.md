@@ -62,11 +62,17 @@ completion dates, keeps fixed commitments factual, and summarizes explicit
 Recovery decisions without scoring the day. Recovery supports explicit
 task-by-task decisions without automatic next-day scheduling. Settings provides
 a local reminder master control, accessibility and privacy guidance, and app
-information. Native scheduled tasks and fixed events may each have one optional
-local reminder; web reports that notification scheduling is unavailable there.
+information. Task planning uses human date/time controls with quick local-date
+choices instead of requiring formatted strings. Tasks can be started, paused,
+and completed while keeping planning state separate from execution state.
+Native scheduled tasks and fixed events may each have up to five optional local
+reminders; web reports that notification scheduling is unavailable there.
 Flexible tasks can request deterministic scheduling suggestions inside local
 planning boundaries. The user reviews no more than three factual options and
 must choose and confirm one before the existing task schedule changes.
+Calendar gives Add event and Add task comparable primary discoverability. A
+consistent Plans changed? action opens a confirmation step, then starts or
+resumes the one active Recovery session without automatic task changes.
 
 ## Explicit Non-MVP Features
 
@@ -81,15 +87,17 @@ must choose and confirm one before the existing task schedule changes.
 
 ## Product Success Test
 
-A user can add a task, see it on the correct local day, mark it complete, undo
-that completion, deliberately process unfinished work in Recovery Mode, and
+A user can add a task without typing storage-formatted dates, see it on the
+correct local day, start and pause it, mark it complete, undo that completion,
+deliberately process unfinished work in Recovery Mode, and
 review recorded accomplishments for the date they were actually completed.
 Closing and reopening the app preserves task, recovery, and derived recap
 accuracy without punitive language or alarming overdue treatment.
 
-Optional reminders pass the same success test when enabled: they follow the
-item's explicit local schedule, stop after completion or a resolving Recovery
-decision, and never prevent planning when permission is unavailable.
+Optional reminders pass the same success test when enabled: multiple choices
+persist, follow the item's explicit local schedule, cancel pending delivery
+after completion or a resolving Recovery decision, and never prevent planning
+when permission is unavailable.
 
 Scheduling assistance passes when a flexible task with a duration can receive
 bounded, non-overlapping local-time suggestions around fixed events and timed

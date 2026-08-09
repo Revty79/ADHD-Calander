@@ -2,129 +2,126 @@
 
 ## Purpose
 
-Reminders help users notice a plan without adding pressure or shame. This phase
-adds one optional local reminder per scheduled task or fixed event. It does not
-add scheduling intelligence, cloud push, urgency scoring, overdue alerts, or
-repeated nagging.
+Reminders help users notice a plan without adding pressure or shame. A task or
+fixed event can store zero to five local reminder choices. This does not add
+cloud push, urgency scoring, overdue alerts, repeated nagging, or scheduling
+intelligence.
 
 ## Domain Intent
 
-`Task.reminderOffsetMinutes` and `CalendarEvent.reminderOffsetMinutes` store
-nullable reminder intent. Supported offsets are:
+`Task.reminderOffsets` and `CalendarEvent.reminderOffsets` store unique arrays.
+Supported offsets are:
 
 - `0`: at the scheduled time
-- `10`: 10 minutes before
-- `30`: 30 minutes before
+- `10`: 10 minutes before, retained for legacy choices
+- `15`: 15 minutes before
+- `30`: 30 minutes before, retained for legacy choices
 - `60`: 1 hour before
+- `1440`: 1 day before
 
-A reminder requires a valid local date and wall-clock time, and its trigger must
-be in the future when the item is created. Date and time components are used to
-construct a local `Date`; date-only strings are never parsed through UTC.
+The UI presents understandable check controls and limits each item to five
+choices. Offset arrays remain stored when a task becomes Flexible, Planned,
+completed, removed, delegated, or broken down. This prevents silent loss. A
+choice schedules only while the item is active, has an exact local date/time,
+the trigger is still in the future, reminders are enabled, and native
+permission is granted.
 
-Reminder intent is stored even while the master setting is off. This lets the
-user turn reminders back on without losing item choices. Disabling reminders
-cancels all currently scheduled notifications. Re-enabling reconciles all
-eligible future task and event reminders from local storage.
+Date and time components construct a local `Date`; date-only strings are never
+parsed through UTC. A past offset is skipped rather than scheduled late, but
+its stored choice remains visible. Re-enabling reminders or rescheduling the
+item reconciles every newly valid trigger.
 
 ## Adapter Boundary
 
 `ReminderService` translates repository state into notification operations. It
-depends on:
+depends on `SettingsRepository`, task and event storage, a platform-neutral
+`NotificationAdapter`, and a clock. `ExpoNotificationAdapter` schedules native
+local notifications. `UnsupportedNotificationAdapter` is used on web and never
+requests browser permission or schedules fake delivery.
 
-- `SettingsRepository`
-- `TaskStorage` and `CalendarEventStorage`
-- the platform-neutral `NotificationAdapter`
-- a clock for future-trigger checks
+Each reminder has a deterministic, distinct identifier:
 
-`ExpoNotificationAdapter` is the native implementation. It creates the Android
-`planning-reminders` channel, requests permission only after an explicit enable
-action, schedules local date-trigger notifications, and cancels by deterministic
-identifier. `UnsupportedNotificationAdapter` is used on web and performs no
-notification scheduling.
+- `adhd-calendar-task-{taskId}-{offset}`
+- `adhd-calendar-event-{eventId}-{offset}`
 
-Identifiers are deterministic:
+Before synchronizing one item, the service cancels every supported offset
+identity plus the legacy single identity. It then schedules only valid future
+requests. This removes stale notifications after changing a time or deselecting
+an offset without requiring a notification-ID table. Startup reconciliation
+cancels the full app schedule and rebuilds it from local intent.
 
-- `adhd-calendar-task-{taskId}`
-- `adhd-calendar-event-{eventId}`
-
-The service cancels an item's identifier before any reschedule, preventing
-duplicates without a second notification-ID table. Startup reconciliation also
-cancels and rebuilds the future schedule from stored intent. Adapter failures
-are logged and do not prevent task, event, completion, or Recovery persistence.
+Adapter failures are logged and do not roll back task, event, completion, or
+Recovery persistence.
 
 ## Permission Behavior
 
 - Permission is never requested at startup.
 - Turning reminders on requests permission only when status is undetermined.
-- Denial leaves the app fully usable and stores the master setting as off.
-- Settings explains the state and offers the system-settings route after denial.
-- The app does not repeatedly prompt after denial.
-- Turning reminders off cancels every scheduled local reminder.
+- Denial leaves planning fully usable and stores the master setting as off.
+- Settings offers the system-settings route after denial without nagging.
+- Turning reminders off cancels every scheduled local notification while
+  preserving item choices.
 
-Notification copy uses stored titles and factual timing, such as a planned time
-or minutes until an event. It avoids overdue language, blame, exclamation points,
-productivity judgment, and invented urgency.
+Notification copy uses stored titles and factual timing. It avoids overdue
+language, blame, exclamation points, productivity judgment, and invented
+urgency.
 
-## Task And Event Synchronization
+## Task Synchronization
 
-- Create: store optional reminder intent, then synchronize its deterministic ID.
-- Complete task: clear reminder intent and cancel the future notification.
-- Undo completion: restore active status but do not invent or silently restore a
-  reminder the user did not explicitly reselect.
-- Fixed event creation: store and synchronize one optional reminder.
-- Master disabled: preserve intent but schedule nothing.
-- Startup/enable: schedule only active future tasks and future events.
+- Create/edit/reschedule: persist the reminder array, cancel every old identity,
+  then schedule all valid future triggers.
+- Start/Pause: keep the task active and do not alter reminder intent.
+- Complete/remove/resolve: preserve reminder choices but cancel pending native
+  notifications because the task is no longer active.
+- Undo completion/restore/reopen: the task becomes active again; synchronization
+  schedules only choices whose trigger remains in the future.
+- Flexible or Planned transition: preserve choices, cancel timed notifications,
+  and report that choices are inactive until an exact time exists.
 
-Task editing uses the same cancel-before-reschedule service path. Changing a
-task to Flexible or Planned clears reminder intent because there is no exact
-trigger. A scheduled edit keeps a valid future selection, but clears a stale
-trigger before synchronization. General event editing remains deferred.
+Accepting a scheduling suggestion continues to use `TaskRepository.scheduleTask`.
+The existing task identity and reminder array are preserved, then every trigger
+is rebuilt against the confirmed local date/time.
 
-Accepting a scheduling suggestion uses `TaskRepository.scheduleTask` rather
-than writing storage directly. The repository preserves reminder intent when
-the recalculated trigger remains in the future, clears intent when it cannot be
-valid, persists the task, and then synchronizes the deterministic notification
-identifier. Candidate generation itself never calls notification APIs.
+## Event Synchronization
+
+Fixed-event creation persists and schedules zero to five reminders. General
+event editing is not implemented, so the app does not display a fake event
+reminder editor. Editing/removing events and their reminders remains part of a
+later Calendar functional-hardening phase.
 
 ## Recovery Integration
 
-Recovery items snapshot the original reminder offset so a reversible decision
-can restore it while the session remains active.
+Recovery items snapshot `originalReminderOffsets`. Recovery decisions preserve
+the original task's choices while active notification delivery changes with the
+task state:
 
-- Keep unscheduled clears date, time, and reminder.
-- Reschedule keeps the reminder only when the user supplies a new time; the
-  reminder is recalculated from the new local date and time.
-- Break Down clears the original reminder and creates children without reminders.
-- Delegate clears the personal reminder.
-- Remove clears the active reminder.
-- Reopen restores the original task reminder snapshot and retires generated
-  children without reminders.
+- Keep unscheduled and date-only Reschedule keep choices but schedule nothing.
+- Timed Reschedule rebuilds every valid trigger.
+- Break Down, Delegate, and Remove preserve original history but cancel active
+  notifications; new smaller tasks begin without reminder choices.
+- Reopen restores the original reminder snapshot and resynchronizes it.
 
-Every task mutation is persisted before its reminder is synchronized. Fixed
-events are not part of Recovery and are never moved.
+Every task mutation is persisted before synchronization. Fixed events never
+enter Recovery and are never moved.
 
 ## Platform And Release Limits
 
-The Android app is the primary notification target. `expo-notifications` and its
-Expo config plugin are installed. Web intentionally reports reminders as
-unsupported and requests no browser permission.
+Android is the current notification target. Web reports reminders as
+unsupported and offers no controls that imply browser delivery. This phase does
+not request Android exact-alarm access.
 
-Local notifications can be exercised in Expo Go, but Expo Go is not proof of a
-production Android build. Delivery timing is subject to Android scheduling and
-battery behavior. This phase does not request Android exact-alarm permission;
-whether the release needs that policy-sensitive capability must be reviewed in
-the Google Play preparation track. Permission, channel behavior, delivery, and
-cancellation still require physical-device or emulator verification in a
-development/release build.
+Automated tests verify intent persistence, distinct identifiers, stale
+cancellation, completion/removal cancellation, rescheduling, Recovery, and
+legacy upgrades. Android permission, channel behavior, delivery timing, and OS
+cancellation still require a physical-device preview-build test.
 
 ## Deliberately Deferred
 
-- Quiet hours, because fixed-event behavior and boundary cases need product rules
-- Default reminder offsets
-- Multiple reminders per item
-- Event reminder editing UI
-- Recurring reminder rules
-- Snooze, notification actions, badges, sounds, and urgency tiers
-- Location reminders
-- Browser notifications
-- Cloud push, Firebase messaging, accounts, analytics, and cross-device sync
+- Quiet hours and default offsets
+- Arbitrary custom reminder offsets
+- Event reminder editing after creation
+- Recurring reminders, snooze, notification actions, badges, sounds, and
+  urgency tiers
+- Location reminders and browser notifications
+- Exact-alarm policy work
+- Cloud push, accounts, analytics, and cross-device sync

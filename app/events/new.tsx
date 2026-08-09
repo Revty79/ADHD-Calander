@@ -37,8 +37,7 @@ export default function NewEventScreen() {
   const [endTime, setEndTime] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [notes, setNotes] = useState("");
-  const [reminderOffsetMinutes, setReminderOffsetMinutes] =
-    useState<ReminderOffsetMinutes | null>(null);
+  const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,7 +55,7 @@ export default function NewEventScreen() {
         endTime,
         durationMinutes: durationMinutes.trim() ? Number(durationMinutes) : null,
         notes,
-        reminderOffsetMinutes
+        reminderOffsets
       });
 
       router.replace({ pathname: "/(tabs)/calendar", params: { date } });
@@ -165,9 +164,9 @@ export default function NewEventScreen() {
             reminderSettings.isLoading ||
             reminderSettings.status?.settings.remindersEnabled !== true
           }
-          error={fieldErrors.reminderOffsetMinutes}
-          onChange={setReminderOffsetMinutes}
-          value={reminderOffsetMinutes}
+          error={fieldErrors.reminderOffsets}
+          onChange={setReminderOffsets}
+          value={reminderOffsets}
         />
 
         {errorMessage ? (

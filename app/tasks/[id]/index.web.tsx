@@ -1,12 +1,13 @@
 import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 
-import { formatReminderOffset } from "../../../src/notifications/reminderRules";
+import { formatReminderOffsets } from "../../../src/notifications/reminderRules";
 import { useTaskDetail } from "../../../src/features/tasks/hooks/useTaskDetail";
 import {
   getTaskImportanceLabel,
   getTaskPlanningLabel,
-  getTaskStatusLabel
+  getTaskStatusLabel,
+  getTaskTimingNote
 } from "../../../src/features/tasks/taskPresentation";
 import { getTaskPlanningState, isTaskActive } from "../../../src/types/task";
 import { formatLocalDateForDisplay } from "../../../src/utils/dates";
@@ -89,6 +90,9 @@ export default function WebTaskDetailScreen() {
             <p className="web-eyebrow">{getTaskPlanningLabel(task)} task</p>
             <h1>{task.title}</h1>
             <p>{getTaskStatusLabel(task.status)}</p>
+            {getTaskTimingNote(task) ? (
+              <p className="web-task-timing-note">{getTaskTimingNote(task)}</p>
+            ) : null}
           </div>
           <Link
             className="web-primary-link"
@@ -144,9 +148,21 @@ export default function WebTaskDetailScreen() {
                   }
                 />
                 <DetailRow
-                  label="Reminder"
-                  value={formatReminderOffset(task.reminderOffsetMinutes)}
+                  label="Reminders"
+                  value={formatReminderOffsets(task.reminderOffsets)}
                 />
+                {task.reminderOffsets.length > 0 ? (
+                  <DetailRow
+                    label="Reminder delivery"
+                    value="Saved reminder choices do not schedule browser notifications."
+                  />
+                ) : null}
+                {task.startedAt ? (
+                  <DetailRow
+                    label={task.status === "started" ? "Started" : "Last started"}
+                    value={new Date(task.startedAt).toLocaleString()}
+                  />
+                ) : null}
                 {task.completedAt ? (
                   <DetailRow
                     label="Completed"
@@ -225,6 +241,25 @@ export default function WebTaskDetailScreen() {
             ) : null}
             {isTaskActive(task) ? (
               <>
+                {task.status === "started" ? (
+                  <button
+                    className="web-gentle-action-button"
+                    disabled={isUpdating}
+                    onClick={() => runAction(() => detail.repository.pauseTask(task.id))}
+                    type="button"
+                  >
+                    Pause for now
+                  </button>
+                ) : task.status === "not_started" ? (
+                  <button
+                    className="web-gentle-action-button"
+                    disabled={isUpdating}
+                    onClick={() => runAction(() => detail.repository.startTask(task.id))}
+                    type="button"
+                  >
+                    Start task
+                  </button>
+                ) : null}
                 <button
                   className="web-secondary-button"
                   disabled={isUpdating}

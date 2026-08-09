@@ -5,7 +5,7 @@ export type TaskValidationField =
   | "scheduledTime"
   | "estimatedDurationMinutes"
   | "deadlineDate"
-  | "reminderOffsetMinutes"
+  | "reminderOffsets"
   | "breakdownTitles";
 
 export class TaskValidationError extends Error {

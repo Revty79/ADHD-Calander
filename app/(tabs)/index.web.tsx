@@ -3,7 +3,7 @@ import { useCallback, useMemo } from "react";
 
 import { TaskList } from "../../src/features/tasks/components/TaskList";
 import { useTodayPlan } from "../../src/features/today/hooks/useTodayPlan";
-import { formatReminderOffset } from "../../src/notifications/reminderRules";
+import { formatReminderOffsets } from "../../src/notifications/reminderRules";
 import { isTaskActive, isTaskCompleted } from "../../src/types/task";
 import { formatLocalDateForDisplay, getLocalDateString } from "../../src/utils/dates";
 
@@ -16,7 +16,9 @@ export default function WebTodayScreen() {
     errorMessage,
     refresh,
     completeTask,
-    undoCompletion
+    undoCompletion,
+    startTask,
+    pauseTask
   } = useTodayPlan(today);
 
   useFocusEffect(
@@ -51,15 +53,12 @@ export default function WebTodayScreen() {
         </Link>
       </header>
 
-      <Link
-        className="web-today-recovery-link"
-        href={{ pathname: "/recovery", params: { sourceDate: today } }}
-      >
+      <Link className="web-today-recovery-link" href="/recovery/start">
         <span>
-          <strong>Today got away from me</strong>
+          <strong>Plans changed?</strong>
           <small>Review unfinished tasks without moving fixed appointments.</small>
         </span>
-        <b>Open Recovery Mode</b>
+        <b>Review options</b>
       </Link>
 
       {isLoading ? (
@@ -100,9 +99,9 @@ export default function WebTodayScreen() {
                       <div>
                         <strong>{event.title}</strong>
                         <span>Fixed</span>
-                        {event.reminderOffsetMinutes !== null ? (
+                        {event.reminderOffsets.length > 0 ? (
                           <span>
-                            Reminder: {formatReminderOffset(event.reminderOffsetMinutes)}
+                            Reminders: {formatReminderOffsets(event.reminderOffsets)}
                           </span>
                         ) : null}
                       </div>
@@ -115,6 +114,8 @@ export default function WebTodayScreen() {
               actionLabel="Complete"
               emptyMessage="No tasks have a set time today."
               onAction={completeTask}
+              onPause={pauseTask}
+              onStart={startTask}
               tasks={plannedTasks}
               title="Planned tasks"
             />
@@ -122,6 +123,8 @@ export default function WebTodayScreen() {
               actionLabel="Complete"
               emptyMessage="No flexible tasks are scheduled for today."
               onAction={completeTask}
+              onPause={pauseTask}
+              onStart={startTask}
               tasks={flexibleTasks}
               title="Flexible tasks"
             />

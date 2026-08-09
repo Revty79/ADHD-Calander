@@ -1,11 +1,15 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 
 import { TaskValidationError } from "../../../database/repositories/errors";
-import { formatReminderOffset } from "../../../notifications/reminderRules";
 import {
+  formatReminderOffset,
+  formatReminderOffsets
+} from "../../../notifications/reminderRules";
+import {
+  maxRemindersPerItem,
   ReminderOffsetMinutes,
   ReminderPermissionStatus,
-  reminderOffsetOptions
+  reminderSelectionOptions
 } from "../../../types/reminder";
 import {
   CreateTaskInput,
@@ -15,6 +19,11 @@ import {
   TaskPlanningState
 } from "../../../types/task";
 import { useReminderSettings } from "../../settings/hooks/useReminderSettings";
+import {
+  getDeadlineQuickChoices,
+  getPlannedDateQuickChoices,
+  TaskDateQuickChoice
+} from "../taskDateChoices";
 
 type FieldErrors = Partial<Record<TaskValidationError["field"], string>>;
 
@@ -60,8 +69,11 @@ export function TaskEditorForm({
     initialTask?.estimatedDurationMinutes ?? null
   );
   const [deadlineDate, setDeadlineDate] = useState(initialTask?.deadlineDate ?? "");
-  const [reminderOffsetMinutes, setReminderOffsetMinutes] =
-    useState<ReminderOffsetMinutes | null>(initialTask?.reminderOffsetMinutes ?? null);
+  const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[]>(
+    initialTask?.reminderOffsets ?? []
+  );
+  const [referenceDate] = useState(() => new Date());
+  const deadlineInput = useRef<HTMLInputElement>(null);
   const [detailsOpen, setDetailsOpen] = useState(Boolean(initialTask || initialDate));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -73,10 +85,10 @@ export function TaskEditorForm({
     if (nextState === "flexible") {
       setScheduledDate("");
       setScheduledTime("");
-      setReminderOffsetMinutes(null);
     } else if (nextState === "planned") {
       setScheduledTime("");
-      setReminderOffsetMinutes(null);
+    } else if (!scheduledDate) {
+      setScheduledDate(getPlannedDateQuickChoices(referenceDate)[0]?.value ?? "");
     }
   }
 
@@ -95,8 +107,7 @@ export function TaskEditorForm({
         scheduledTime: planningState === "scheduled" ? scheduledTime : null,
         estimatedDurationMinutes,
         deadlineDate,
-        reminderOffsetMinutes:
-          planningState === "scheduled" ? reminderOffsetMinutes : null
+        reminderOffsets
       });
     } catch (error) {
       if (error instanceof TaskValidationError) {
@@ -172,6 +183,12 @@ export function TaskEditorForm({
           {planningState !== "flexible" ? (
             <div className="web-form-group">
               <label htmlFor="task-date">Planned date</label>
+              <DateQuickChoices
+                choices={getPlannedDateQuickChoices(referenceDate)}
+                name="planned date"
+                onChange={(value) => setScheduledDate(value ?? "")}
+                value={scheduledDate}
+              />
               <input
                 aria-describedby={
                   fieldErrors.scheduledDate ? "task-date-error" : undefined
@@ -182,6 +199,13 @@ export function TaskEditorForm({
                 type="date"
                 value={scheduledDate}
               />
+              <button
+                className="web-text-button"
+                onClick={() => choosePlanningState("flexible")}
+                type="button"
+              >
+                Clear date · Make flexible
+              </button>
               <FieldError id="task-date-error" message={fieldErrors.scheduledDate} />
             </div>
           ) : null}
@@ -239,42 +263,89 @@ export function TaskEditorForm({
               aria-invalid={fieldErrors.deadlineDate ? true : undefined}
               id="task-deadline"
               onChange={(event) => setDeadlineDate(event.currentTarget.value)}
+              ref={deadlineInput}
               type="date"
               value={deadlineDate}
             />
+            <DateQuickChoices
+              choices={getDeadlineQuickChoices(referenceDate)}
+              name="deadline"
+              onChange={(value) => setDeadlineDate(value ?? "")}
+              value={deadlineDate}
+            />
+            <button
+              className="web-text-button"
+              onClick={() => {
+                deadlineInput.current?.focus();
+                deadlineInput.current?.showPicker?.();
+              }}
+              type="button"
+            >
+              Choose date
+            </button>
             <small id="task-deadline-help">
               A deadline is the last day to finish, not when you plan to work.
             </small>
             <FieldError id="task-deadline-error" message={fieldErrors.deadlineDate} />
           </div>
 
-          {planningState === "scheduled" ? (
+          {planningState === "scheduled" &&
+          reminderSettings.status?.permissionStatus === "unsupported" ? (
+            <section className="web-form-info" aria-labelledby="task-reminders-title">
+              <strong id="task-reminders-title">Reminders</strong>
+              <p>
+                Browser notification delivery is not supported. Set task reminders in the
+                Android app.
+              </p>
+              {reminderOffsets.length > 0 ? (
+                <p>Saved choices: {formatReminderOffsets(reminderOffsets)}</p>
+              ) : null}
+            </section>
+          ) : planningState === "scheduled" ? (
             <fieldset className="web-choice-fieldset">
-              <legend>Reminder</legend>
+              <legend>Reminders</legend>
               <small>
                 {reminderDisabledMessage ??
-                  "Optional. Choose at most one gentle reminder."}
+                  `Optional. Choose up to ${maxRemindersPerItem}. ${reminderOffsets.length} selected.`}
               </small>
               <div className="web-choice-options">
-                {[null, ...reminderOffsetOptions].map((offset) => (
-                  <label key={offset ?? "none"}>
-                    <input
-                      checked={offset === reminderOffsetMinutes}
-                      disabled={Boolean(reminderDisabledMessage)}
-                      name="task-reminder"
-                      onChange={() => setReminderOffsetMinutes(offset)}
-                      type="radio"
-                      value={offset ?? "none"}
-                    />
-                    <span>{formatReminderOffset(offset)}</span>
-                  </label>
-                ))}
+                {reminderSelectionOptions.map((offset) => {
+                  const checked = reminderOffsets.includes(offset);
+                  const atLimit =
+                    reminderOffsets.length >= maxRemindersPerItem && !checked;
+
+                  return (
+                    <label key={offset}>
+                      <input
+                        checked={checked}
+                        disabled={Boolean(reminderDisabledMessage) || atLimit}
+                        name="task-reminders"
+                        onChange={() =>
+                          setReminderOffsets((current) =>
+                            checked
+                              ? current.filter((candidate) => candidate !== offset)
+                              : [...current, offset]
+                          )
+                        }
+                        type="checkbox"
+                        value={offset}
+                      />
+                      <span>{formatReminderOffset(offset)}</span>
+                    </label>
+                  );
+                })}
               </div>
               <FieldError
                 id="task-reminder-error"
-                message={fieldErrors.reminderOffsetMinutes}
+                message={fieldErrors.reminderOffsets}
               />
             </fieldset>
+          ) : null}
+
+          {planningState !== "scheduled" && reminderOffsets.length > 0 ? (
+            <p className="web-form-hint">
+              Saved reminder choices are inactive until this task has a date and time.
+            </p>
           ) : null}
         </div>
       </details>
@@ -291,6 +362,34 @@ export function TaskEditorForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function DateQuickChoices({
+  choices,
+  name,
+  onChange,
+  value
+}: {
+  choices: TaskDateQuickChoice[];
+  name: string;
+  onChange(value: string | null): void;
+  value: string;
+}) {
+  return (
+    <div aria-label={`${name} quick choices`} className="web-date-quick-choices">
+      {choices.map((choice) => (
+        <button
+          aria-pressed={value === (choice.value ?? "")}
+          className="web-choice-button"
+          key={choice.label}
+          onClick={() => onChange(choice.value)}
+          type="button"
+        >
+          {choice.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -353,7 +452,7 @@ function getReminderDisabledMessage(
   }
 
   if (remindersEnabled !== true) {
-    return "Turn on reminders in Settings to choose one here.";
+    return "Turn on reminders in Settings to choose them here.";
   }
 
   return null;

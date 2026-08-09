@@ -8,10 +8,11 @@ import {
   TaskImportance,
   UpdateTaskInput
 } from "../../types/task";
+import { getReminderTriggerDate } from "../../notifications/reminderRules";
 import {
-  getReminderTriggerDate,
-  isReminderOffsetMinutes
-} from "../../notifications/reminderRules";
+  isReminderOffsetList,
+  normalizeReminderOffsets
+} from "../../notifications/reminderOffsets";
 import {
   noOpReminderSynchronizer,
   ReminderSynchronizer
@@ -33,7 +34,7 @@ type NormalizedTaskInput = Pick<
   | "scheduledTime"
   | "estimatedDurationMinutes"
   | "deadlineDate"
-  | "reminderOffsetMinutes"
+  | "reminderOffsets"
 >;
 
 export class TaskRepository {
@@ -49,8 +50,6 @@ export class TaskRepository {
     const now = this.clock();
     const timestamp = now.toISOString();
 
-    validateFutureReminder(normalizedInput, now);
-
     const task: Task = {
       id: this.idGenerator(),
       title: normalizedInput.title,
@@ -62,7 +61,8 @@ export class TaskRepository {
       scheduledTime: normalizedInput.scheduledTime,
       estimatedDurationMinutes: normalizedInput.estimatedDurationMinutes,
       deadlineDate: normalizedInput.deadlineDate,
-      reminderOffsetMinutes: normalizedInput.reminderOffsetMinutes,
+      reminderOffsets: normalizedInput.reminderOffsets,
+      startedAt: null,
       createdAt: timestamp,
       updatedAt: timestamp,
       completedAt: null,
@@ -86,26 +86,9 @@ export class TaskRepository {
 
     try {
       const existingTask = await this.requireStoredTask(id);
-      let reminderOffsetMinutes = normalizedInput.reminderOffsetMinutes;
-
-      if (!isTaskActive(existingTask)) {
-        reminderOffsetMinutes = null;
-      } else if (reminderOffsetMinutes !== null) {
-        const reminderDate = getReminderTriggerDate(
-          normalizedInput.scheduledDate!,
-          normalizedInput.scheduledTime!,
-          reminderOffsetMinutes
-        );
-
-        if (!reminderDate || reminderDate.getTime() <= now.getTime()) {
-          reminderOffsetMinutes = null;
-        }
-      }
-
       const updatedTask: Task = {
         ...existingTask,
         ...normalizedInput,
-        reminderOffsetMinutes,
         updatedAt: now.toISOString()
       };
 
@@ -213,20 +196,6 @@ export class TaskRepository {
         );
       }
 
-      let reminderOffsetMinutes = existingTask.reminderOffsetMinutes;
-
-      if (reminderOffsetMinutes !== null) {
-        const reminderDate = getReminderTriggerDate(
-          normalizedInput.scheduledDate,
-          normalizedInput.scheduledTime,
-          reminderOffsetMinutes
-        );
-
-        if (!reminderDate || reminderDate.getTime() <= now.getTime()) {
-          reminderOffsetMinutes = null;
-        }
-      }
-
       const scheduledTask: Task = {
         ...existingTask,
         scheduledDate: normalizedInput.scheduledDate,
@@ -234,7 +203,6 @@ export class TaskRepository {
         estimatedDurationMinutes:
           normalizedInput.estimatedDurationMinutes ??
           existingTask.estimatedDurationMinutes,
-        reminderOffsetMinutes,
         updatedAt: now.toISOString()
       };
 
@@ -267,7 +235,6 @@ export class TaskRepository {
       const resolvedParent: Task = {
         ...parentTask,
         status: "broken_down",
-        reminderOffsetMinutes: null,
         updatedAt: timestamp
       };
       const childTasks = titles.map<Task>((title) => ({
@@ -281,7 +248,8 @@ export class TaskRepository {
         scheduledTime: null,
         estimatedDurationMinutes: null,
         deadlineDate: null,
-        reminderOffsetMinutes: null,
+        reminderOffsets: [],
+        startedAt: null,
         createdAt: timestamp,
         updatedAt: timestamp,
         completedAt: null,
@@ -331,7 +299,6 @@ export class TaskRepository {
       const removedChildren = childTasks.map<Task>((task) => ({
         ...task,
         status: "removed",
-        reminderOffsetMinutes: null,
         updatedAt: timestamp
       }));
 
@@ -359,7 +326,6 @@ export class TaskRepository {
       const completedTask: Task = {
         ...existingTask,
         status: "completed",
-        reminderOffsetMinutes: null,
         completedAt: timestamp,
         updatedAt: timestamp
       };
@@ -403,6 +369,62 @@ export class TaskRepository {
       return restoredTask;
     } catch (error) {
       throw wrapTaskError("Unable to undo task completion.", error);
+    }
+  }
+
+  async startTask(id: string): Promise<Task> {
+    const timestamp = this.clock().toISOString();
+
+    try {
+      const existingTask = await this.requireStoredTask(id);
+
+      if (existingTask.status !== "not_started") {
+        throw new TaskValidationError(
+          "Only a task that is not started can be started.",
+          "title"
+        );
+      }
+
+      const startedTask: Task = {
+        ...existingTask,
+        status: "started",
+        startedAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      if (!(await this.storage.updateTask(startedTask))) {
+        throw new TaskNotFoundError();
+      }
+
+      return startedTask;
+    } catch (error) {
+      throw wrapTaskError("Unable to start the task.", error);
+    }
+  }
+
+  async pauseTask(id: string): Promise<Task> {
+    const timestamp = this.clock().toISOString();
+
+    try {
+      const existingTask = await this.requireStoredTask(id);
+
+      if (existingTask.status !== "started") {
+        throw new TaskValidationError("Only an in-progress task can be paused.", "title");
+      }
+
+      const pausedTask: Task = {
+        ...existingTask,
+        status: "not_started",
+        updatedAt: timestamp
+      };
+
+      if (!(await this.storage.updateTask(pausedTask))) {
+        throw new TaskNotFoundError();
+      }
+
+      return pausedTask;
+    } catch (error) {
+      throw wrapTaskError("Unable to pause the task.", error);
     }
   }
 
@@ -460,7 +482,6 @@ export class TaskRepository {
       const updatedTask: Task = {
         ...existingTask,
         status,
-        reminderOffsetMinutes: null,
         updatedAt: timestamp
       };
 
@@ -558,19 +579,12 @@ function normalizeTaskInput(
     );
   }
 
-  const reminderOffsetMinutes = input.reminderOffsetMinutes ?? null;
+  const reminderOffsets = input.reminderOffsets ?? [];
 
-  if (reminderOffsetMinutes !== null && !isReminderOffsetMinutes(reminderOffsetMinutes)) {
+  if (!isReminderOffsetList(reminderOffsets)) {
     throw new TaskValidationError(
-      "Choose an available reminder time.",
-      "reminderOffsetMinutes"
-    );
-  }
-
-  if (reminderOffsetMinutes !== null && (!scheduledDate || !scheduledTime)) {
-    throw new TaskValidationError(
-      "Choose a scheduled date and time before adding a reminder.",
-      "reminderOffsetMinutes"
+      "Choose up to five different reminder times.",
+      "reminderOffsets"
     );
   }
 
@@ -582,27 +596,8 @@ function normalizeTaskInput(
     scheduledTime,
     estimatedDurationMinutes,
     deadlineDate,
-    reminderOffsetMinutes
+    reminderOffsets: normalizeReminderOffsets(reminderOffsets)
   };
-}
-
-function validateFutureReminder(input: NormalizedTaskInput, now: Date): void {
-  if (input.reminderOffsetMinutes === null) {
-    return;
-  }
-
-  const reminderDate = getReminderTriggerDate(
-    input.scheduledDate!,
-    input.scheduledTime!,
-    input.reminderOffsetMinutes
-  );
-
-  if (!reminderDate || reminderDate.getTime() <= now.getTime()) {
-    throw new TaskValidationError(
-      "Choose a future date and time for this reminder.",
-      "reminderOffsetMinutes"
-    );
-  }
 }
 
 function normalizeScheduleTaskInput(input: ScheduleTaskInput): {

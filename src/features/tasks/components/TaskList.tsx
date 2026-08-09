@@ -1,13 +1,14 @@
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { formatReminderOffset } from "../../../notifications/reminderRules";
+import { formatReminderOffsets } from "../../../notifications/reminderRules";
 import { isTaskActive, Task } from "../../../types/task";
 import { formatLocalDateForDisplay } from "../../../utils/dates";
 import {
   getTaskImportanceLabel,
   getTaskPlanningLabel,
-  getTaskStatusLabel
+  getTaskStatusLabel,
+  getTaskTimingNote
 } from "../taskPresentation";
 
 type TaskListProps = {
@@ -16,7 +17,9 @@ type TaskListProps = {
   tasks: Task[];
   actionLabel?: string;
   onAction?(id: string): void;
+  onPause?(id: string): void;
   onSchedule?(id: string): void;
+  onStart?(id: string): void;
   showDate?: boolean;
 };
 
@@ -26,7 +29,9 @@ export function TaskList({
   tasks,
   actionLabel,
   onAction,
+  onPause,
   onSchedule,
+  onStart,
   showDate = false
 }: TaskListProps) {
   return (
@@ -72,9 +77,9 @@ export function TaskList({
                       Deadline {formatLocalDateForDisplay(task.deadlineDate)}
                     </Text>
                   ) : null}
-                  {task.reminderOffsetMinutes !== null ? (
+                  {task.reminderOffsets.length > 0 ? (
                     <Text style={styles.metaText}>
-                      Reminder: {formatReminderOffset(task.reminderOffsetMinutes)}
+                      Reminders: {formatReminderOffsets(task.reminderOffsets)}
                     </Text>
                   ) : null}
                   <Text style={styles.metaText}>{getTaskPlanningLabel(task)}</Text>
@@ -86,9 +91,38 @@ export function TaskList({
                   ) : null}
                   <Text style={styles.metaText}>{getTaskStatusLabel(task.status)}</Text>
                 </View>
+                {getTaskTimingNote(task) ? (
+                  <Text style={styles.timingNote}>{getTaskTimingNote(task)}</Text>
+                ) : null}
               </View>
-              {actionLabel && onAction ? (
+              {(actionLabel && onAction) || onStart || onPause ? (
                 <View style={styles.actions}>
+                  {task.status === "not_started" && onStart ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Start task ${task.title}`}
+                      onPress={() => onStart(task.id)}
+                      style={({ pressed }) => [
+                        styles.executionButton,
+                        pressed && styles.pressed
+                      ]}
+                    >
+                      <Text style={styles.executionButtonText}>Start task</Text>
+                    </Pressable>
+                  ) : null}
+                  {task.status === "started" && onPause ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Pause ${task.title} for now`}
+                      onPress={() => onPause(task.id)}
+                      style={({ pressed }) => [
+                        styles.executionButton,
+                        pressed && styles.pressed
+                      ]}
+                    >
+                      <Text style={styles.executionButtonText}>Pause for now</Text>
+                    </Pressable>
+                  ) : null}
                   {onSchedule && isTaskActive(task) && task.scheduledTime === null ? (
                     <Pressable
                       accessibilityRole="button"
@@ -102,17 +136,19 @@ export function TaskList({
                       <Text style={styles.scheduleButtonText}>Help me schedule</Text>
                     </Pressable>
                   ) : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${actionLabel} ${task.title}`}
-                    onPress={() => onAction(task.id)}
-                    style={({ pressed }) => [
-                      styles.actionButton,
-                      pressed && styles.pressed
-                    ]}
-                  >
-                    <Text style={styles.actionButtonText}>{actionLabel}</Text>
-                  </Pressable>
+                  {actionLabel && onAction ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${actionLabel} ${task.title}`}
+                      onPress={() => onAction(task.id)}
+                      style={({ pressed }) => [
+                        styles.actionButton,
+                        pressed && styles.pressed
+                      ]}
+                    >
+                      <Text style={styles.actionButtonText}>{actionLabel}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ) : null}
             </View>
@@ -181,6 +217,11 @@ const styles = StyleSheet.create({
     color: "#68645e",
     fontSize: 13
   },
+  timingNote: {
+    color: "#53625b",
+    fontSize: 13,
+    fontWeight: "700"
+  },
   actionButton: {
     alignItems: "center",
     borderColor: "#2f5d62",
@@ -199,6 +240,21 @@ const styles = StyleSheet.create({
     color: "#2f5d62",
     fontSize: 14,
     fontWeight: "700"
+  },
+  executionButton: {
+    alignItems: "center",
+    backgroundColor: "#e7efeb",
+    borderColor: "#789087",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 12
+  },
+  executionButtonText: {
+    color: "#244b43",
+    fontSize: 14,
+    fontWeight: "800"
   },
   scheduleButton: {
     alignItems: "center",

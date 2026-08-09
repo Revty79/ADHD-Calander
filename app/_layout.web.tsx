@@ -14,6 +14,7 @@ export default function WebRootLayout() {
         <Stack.Screen name="tasks/[id]/breakdown" />
         <Stack.Screen name="tasks/[id]/schedule" />
         <Stack.Screen name="events/new" />
+        <Stack.Screen name="recovery/start" />
       </Stack>
     </DatabaseProvider>
   );

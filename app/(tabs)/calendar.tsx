@@ -30,10 +30,14 @@ import {
   getEventDurationMinutes
 } from "../../src/features/calendar/calendarSchedule";
 import { useCalendarSchedule } from "../../src/features/calendar/hooks/useCalendarSchedule";
-import { formatReminderOffset } from "../../src/notifications/reminderRules";
+import { formatReminderOffsets } from "../../src/notifications/reminderRules";
 import { CalendarEvent } from "../../src/types/calendarEvent";
 import { LocalDateString } from "../../src/types/dateTime";
 import { Task } from "../../src/types/task";
+import {
+  getTaskStatusLabel,
+  getTaskTimingNote
+} from "../../src/features/tasks/taskPresentation";
 import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
 
 type CalendarView = "month" | "week" | "day";
@@ -86,16 +90,31 @@ export default function CalendarScreen() {
             See commitments and scheduled work without treating open time as a demand.
           </Text>
         </View>
-        <Pressable
-          accessibilityLabel={`Add fixed event on ${formatDayHeading(selectedDate)}`}
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({ pathname: "/events/new", params: { date: selectedDate } })
-          }
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.primaryButtonText}>Add Event</Text>
-        </Pressable>
+        <View style={styles.addActions}>
+          <Pressable
+            accessibilityLabel={`Add fixed event on ${formatDayHeading(selectedDate)}`}
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({ pathname: "/events/new", params: { date: selectedDate } })
+            }
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.primaryButtonText}>Add event</Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel={`Add task on ${formatDayHeading(selectedDate)}`}
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({
+                pathname: "/tasks/new",
+                params: { scheduledDate: selectedDate, returnTo: "calendar" }
+              })
+            }
+            style={({ pressed }) => [styles.addTaskButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.addTaskButtonText}>Add task</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View accessibilityRole="tablist" style={styles.viewSwitcher}>
@@ -459,9 +478,9 @@ function EventCard({ event }: { event: CalendarEvent }) {
         {event.endTime ? ` - ${event.endTime}` : ""}
         {duration ? ` · ${duration}` : ""}
       </Text>
-      {event.reminderOffsetMinutes !== null ? (
+      {event.reminderOffsets.length > 0 ? (
         <Text style={styles.scheduleMeta}>
-          Reminder: {formatReminderOffset(event.reminderOffsetMinutes)}
+          Reminders: {formatReminderOffsets(event.reminderOffsets)}
         </Text>
       ) : null}
       {event.notes ? <Text style={styles.scheduleNotes}>{event.notes}</Text> : null}
@@ -487,11 +506,14 @@ function TaskScheduleCard({
       <Text style={styles.scheduleMeta}>
         {task.scheduledTime ? `${task.scheduledTime} · ` : ""}
         {duration ? `${duration} · ` : ""}
-        {task.status === "completed" ? "Completed" : "Not started"}
+        {getTaskStatusLabel(task.status)}
       </Text>
-      {task.reminderOffsetMinutes !== null ? (
+      {getTaskTimingNote(task) ? (
+        <Text style={styles.timingNote}>{getTaskTimingNote(task)}</Text>
+      ) : null}
+      {task.reminderOffsets.length > 0 ? (
         <Text style={styles.scheduleMeta}>
-          Reminder: {formatReminderOffset(task.reminderOffsetMinutes)}
+          Reminders: {formatReminderOffsets(task.reminderOffsets)}
         </Text>
       ) : null}
     </View>
@@ -541,6 +563,26 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "800"
+  },
+  addActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  addTaskButton: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: "#2f5d62",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: 18
+  },
+  addTaskButtonText: {
+    color: "#2f5d62",
     fontSize: 16,
     fontWeight: "800"
   },
@@ -707,7 +749,7 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   taskIndicator: {
-    color: "#735328",
+    color: "#53625b",
     fontSize: 10,
     fontWeight: "800"
   },
@@ -780,9 +822,9 @@ const styles = StyleSheet.create({
     paddingLeft: 6
   },
   weekTaskItem: {
-    borderLeftColor: "#af7c3b",
+    borderLeftColor: "#789087",
     borderLeftWidth: 3,
-    color: "#5b4b35",
+    color: "#4f5c54",
     fontSize: 11,
     lineHeight: 16,
     paddingLeft: 6
@@ -848,7 +890,7 @@ const styles = StyleSheet.create({
     borderLeftColor: "#47665a"
   },
   taskCard: {
-    borderLeftColor: "#af7c3b"
+    borderLeftColor: "#789087"
   },
   fixedLabel: {
     color: "#466056",
@@ -857,7 +899,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7
   },
   taskLabel: {
-    color: "#86602e",
+    color: "#53625b",
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.7
@@ -870,6 +912,12 @@ const styles = StyleSheet.create({
   scheduleMeta: {
     color: "#66615a",
     fontSize: 13,
+    lineHeight: 18
+  },
+  timingNote: {
+    color: "#53625b",
+    fontSize: 13,
+    fontWeight: "700",
     lineHeight: 18
   },
   scheduleNotes: {

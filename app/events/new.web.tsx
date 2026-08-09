@@ -150,6 +150,14 @@ export default function WebNewEventScreen() {
             />
           </FormField>
 
+          <section className="web-form-info" aria-labelledby="event-reminders-title">
+            <strong id="event-reminders-title">Reminders</strong>
+            <p>
+              Browser notification delivery is not supported. Add multiple event reminders
+              in the Android app.
+            </p>
+          </section>
+
           {errorMessage ? (
             <div className="web-error-notice" role="alert">
               <p>{errorMessage}</p>

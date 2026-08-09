@@ -25,6 +25,10 @@ validated 24-hour `HH:MM` strings. They are not converted through UTC or stored
 as JavaScript timestamps, so an item entered for August 6 remains on August 6
 in the user's local calendar.
 
+These strings are storage and domain representations, not user-entry formats.
+Native task and Recovery flows use date/time pickers, while web uses semantic
+browser date/time controls and quick local-date choices.
+
 Creation and update timestamps are ISO instants. They describe record history,
 not calendar placement.
 
@@ -47,52 +51,61 @@ Android and future iOS builds use Expo SQLite with versioned SQL migrations.
 
 ### `tasks`
 
-| Column                       | Type    | Notes                                                                                         |
-| ---------------------------- | ------- | --------------------------------------------------------------------------------------------- |
-| `id`                         | text    | Unique task ID.                                                                               |
-| `title`                      | text    | Required trimmed title.                                                                       |
-| `description`                | text    | Optional trimmed description.                                                                 |
-| `importance`                 | text    | `low`, `normal`, or `important`; legacy rows default to `normal`.                             |
-| `status`                     | text    | Implemented values are `not_started`, `completed`, `delegated`, `removed`, and `broken_down`. |
-| `parent_task_id`             | text    | Optional self-reference for a smaller task created by breakdown.                              |
-| `scheduled_date`             | text    | Optional local `YYYY-MM-DD` date.                                                             |
-| `scheduled_time`             | text    | Optional local `HH:MM` time; requires a scheduled date.                                       |
-| `estimated_duration_minutes` | integer | Optional positive whole-number estimate.                                                      |
-| `deadline_date`              | text    | Optional local `YYYY-MM-DD` last day; distinct from planned date/time.                        |
-| `reminder_offset_minutes`    | integer | Optional one-reminder intent: `0`, `10`, `30`, or `60` minutes before the scheduled time.     |
-| `created_at`                 | text    | ISO timestamp.                                                                                |
-| `updated_at`                 | text    | ISO timestamp.                                                                                |
-| `completed_at`               | text    | Optional ISO timestamp set on completion.                                                     |
-| `deleted_at`                 | text    | Optional ISO timestamp reserved for future soft deletion.                                     |
+| Column                       | Type    | Notes                                                                                                           |
+| ---------------------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
+| `id`                         | text    | Unique task ID.                                                                                                 |
+| `title`                      | text    | Required trimmed title.                                                                                         |
+| `description`                | text    | Optional trimmed description.                                                                                   |
+| `importance`                 | text    | `low`, `normal`, or `important`; legacy rows default to `normal`.                                               |
+| `status`                     | text    | Implemented values are `not_started`, `started`, `completed`, `delegated`, `removed`, and `broken_down`.        |
+| `parent_task_id`             | text    | Optional self-reference for a smaller task created by breakdown.                                                |
+| `scheduled_date`             | text    | Optional local `YYYY-MM-DD` date.                                                                               |
+| `scheduled_time`             | text    | Optional local `HH:MM` time; requires a scheduled date.                                                         |
+| `estimated_duration_minutes` | integer | Optional positive whole-number estimate.                                                                        |
+| `deadline_date`              | text    | Optional local `YYYY-MM-DD` last day; distinct from planned date/time.                                          |
+| `reminder_offset_minutes`    | integer | Legacy single-reminder column retained for upgrade compatibility; new writes use `reminder_offsets`.            |
+| `reminder_offsets`           | text    | JSON array of up to five unique reminder offsets; supported values are `0`, `10`, `15`, `30`, `60`, and `1440`. |
+| `started_at`                 | text    | Optional ISO timestamp for the most recent Start task action.                                                   |
+| `created_at`                 | text    | ISO timestamp.                                                                                                  |
+| `updated_at`                 | text    | ISO timestamp.                                                                                                  |
+| `completed_at`               | text    | Optional ISO timestamp set on completion.                                                                       |
+| `deleted_at`                 | text    | Optional ISO timestamp reserved for future soft deletion.                                                       |
 
 Planning state is derived rather than stored redundantly: no date is Flexible,
 a date without a time is Planned, and a date with a time is Scheduled. A
 deadline remains independent from all three states.
+
+Execution state is separate: `not_started`, `started`, and `completed` describe
+whether work has begun, while the date/time fields describe planning. Pausing
+changes `started` back to `not_started` but preserves `started_at` as factual
+history. Completion always uses `completed_at`; Daily Recap never treats
+`started_at` as completion.
 
 Delegated, removed, and broken-down tasks remain stored as task history but are
 excluded from active Today and Calendar work. A manual or Recovery breakdown
 marks the original `broken_down` and creates unscheduled child tasks whose
 `parent_task_id` references it. The status constraint also
 reserves future values so later migrations do not
-need to rewrite rows only to recognize planned states: `started`,
-`partially_completed`, `intentionally_skipped`, `rescheduled`,
+need to rewrite rows only to recognize planned states: `partially_completed`,
+`intentionally_skipped`, `rescheduled`,
 `recovery_queue`, and `no_longer_necessary`.
 
 ### `calendar_events`
 
-| Column                    | Type    | Notes                                                                        |
-| ------------------------- | ------- | ---------------------------------------------------------------------------- |
-| `id`                      | text    | Unique event ID.                                                             |
-| `title`                   | text    | Required trimmed title.                                                      |
-| `kind`                    | text    | Currently constrained to `fixed`.                                            |
-| `date`                    | text    | Required local `YYYY-MM-DD` date.                                            |
-| `start_time`              | text    | Required local `HH:MM` start.                                                |
-| `end_time`                | text    | Optional local end time, not earlier than start.                             |
-| `duration_minutes`        | integer | Optional positive duration used instead of `end_time`.                       |
-| `notes`                   | text    | Optional trimmed notes.                                                      |
-| `reminder_offset_minutes` | integer | Optional one-reminder intent: `0`, `10`, `30`, or `60` minutes before start. |
-| `created_at`              | text    | ISO timestamp.                                                               |
-| `updated_at`              | text    | ISO timestamp.                                                               |
+| Column                    | Type    | Notes                                                             |
+| ------------------------- | ------- | ----------------------------------------------------------------- |
+| `id`                      | text    | Unique event ID.                                                  |
+| `title`                   | text    | Required trimmed title.                                           |
+| `kind`                    | text    | Currently constrained to `fixed`.                                 |
+| `date`                    | text    | Required local `YYYY-MM-DD` date.                                 |
+| `start_time`              | text    | Required local `HH:MM` start.                                     |
+| `end_time`                | text    | Optional local end time, not earlier than start.                  |
+| `duration_minutes`        | integer | Optional positive duration used instead of `end_time`.            |
+| `notes`                   | text    | Optional trimmed notes.                                           |
+| `reminder_offset_minutes` | integer | Legacy single-reminder column retained for upgrade compatibility. |
+| `reminder_offsets`        | text    | JSON array of up to five unique reminder offsets.                 |
+| `created_at`              | text    | ISO timestamp.                                                    |
+| `updated_at`              | text    | ISO timestamp.                                                    |
 
 An event may have an end time or a duration, but not both. Both may be omitted
 when the duration is unknown. Calendar workload summaries count only known
@@ -122,7 +135,8 @@ A partial unique index permits only one `active` session.
 | `original_scheduled_date`             | text    | Snapshot local date.                                                       |
 | `original_scheduled_time`             | text    | Optional snapshot local time.                                              |
 | `original_estimated_duration_minutes` | integer | Optional snapshot estimate.                                                |
-| `original_reminder_offset_minutes`    | integer | Optional reminder snapshot used when a decision is reopened.               |
+| `original_reminder_offset_minutes`    | integer | Legacy single-reminder snapshot retained for upgrade compatibility.        |
+| `original_reminder_offsets`           | text    | JSON-array reminder snapshot used when a decision is reopened.             |
 | `status`                              | text    | `pending` or `resolved`.                                                   |
 | `decision`                            | text    | `keep`, `reschedule`, `break_down`, `delegate`, `remove`, `skip`, or null. |
 | `note`                                | text    | Optional local delegation note.                                            |
@@ -191,6 +205,16 @@ status, reminders, and identity remain unchanged.
 Existing rows receive `normal` importance and no parent while preserving every
 other field and task identity.
 
+### Version 7: `execution_multiple_reminders`
+
+`src/database/migrations/007_execution_multiple_reminders.ts` adds nullable
+`tasks.started_at` plus JSON reminder arrays on tasks, calendar events, and
+Recovery item snapshots. Existing single offsets are copied into one-element
+arrays, null offsets become empty arrays, and every other value is preserved.
+Any legacy `started` row receives its existing `updated_at` as the best
+available factual start timestamp. Legacy reminder columns remain in place so
+upgrading an installed APK never requires destructive table replacement.
+
 ### Daily Recap Foundation
 
 No migration is required. Recap derives its view from the existing nullable
@@ -199,7 +223,7 @@ does not persist duplicate daily summary rows.
 
 ## Web Persistence
 
-The web build uses IndexedDB database version 6. It has:
+The web build uses IndexedDB database version 7. It has:
 
 - `tasks`, keyed by task ID with `scheduledDate`, `updatedAt`, and `parentTaskId`
   indexes.
@@ -212,9 +236,11 @@ Version 2 preserves the existing version 1 task store and adds the event store.
 Version 3 preserves both stores and adds recovery storage. Version 4 preserves
 all existing stores and adds `appSettings`. Version 5 keeps those stores and
 introduces the scheduling task shape without rewriting records. Version 6 adds
-the parent-task index without rewriting records. Older task,
-event, and Recovery item records without reminder metadata deserialize with
-`null` reminder intent.
+the parent-task index without rewriting records. Version 7 upgrades legacy
+single reminder fields to arrays and adds nullable `startedAt`. Older task,
+event, and Recovery item records also retain fallback readers, so a record that
+has not yet been rewritten still produces an empty or one-element reminder
+array safely.
 Older task records without `estimatedDurationMinutes` deserialize with a `null`
 estimate, and records without `deadlineDate` receive a `null` deadline. Older
 task records without `importance` receive `normal`, records without
@@ -231,7 +257,7 @@ native data are intentionally separate.
 
 Recurring events, event editing/deletion, time zones,
 all-day events, external calendar identifiers, advanced notification policy,
-quiet hours, default reminders, day plans,
+quiet hours, default reminders, custom reminder offsets, day plans,
 recovery analytics, multi-level projects, partial-progress measurement,
 earliest-start constraints,
 preferred work periods, energy requirements, import/export, accounts, and cloud

@@ -1553,6 +1553,131 @@ summary:focus-visible {
   outline-offset: 3px;
 }
 
+.web-recovery-shortcut {
+  display: grid;
+  gap: 3px;
+  min-height: 48px;
+  padding: 11px 12px;
+  margin-top: 20px;
+  color: #244b43;
+  text-decoration: none;
+  background: #f7faf7;
+  border: 1px solid #9fb6ad;
+  border-radius: 8px;
+}
+
+.web-recovery-shortcut small {
+  color: #59665e;
+  line-height: 1.4;
+}
+
+.web-recovery-shortcut:hover {
+  background: #ffffff;
+  border-color: #68877c;
+}
+
+.web-recovery-shortcut-compact {
+  min-height: 42px;
+  padding: 9px 12px;
+  margin: 0 12px 10px;
+  text-align: center;
+}
+
+.web-task-timing-note {
+  margin: 8px 0 0;
+  color: #53625b;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.web-gentle-action-button {
+  min-height: 44px;
+  padding: 9px 14px;
+  color: #244b43;
+  font-weight: 800;
+  cursor: pointer;
+  background: #e7efeb;
+  border: 1px solid #789087;
+  border-radius: 8px;
+}
+
+.web-gentle-action-button:hover:not(:disabled) {
+  background: #dce9e3;
+}
+
+.web-date-quick-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.web-choice-button,
+.web-text-button {
+  min-height: 44px;
+  padding: 8px 12px;
+  color: #3f5149;
+  font-weight: 700;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid #aaa39a;
+  border-radius: 8px;
+}
+
+.web-choice-button[aria-pressed="true"] {
+  color: #244b4f;
+  background: #edf4f2;
+  border-color: #2f5d62;
+}
+
+.web-text-button {
+  justify-self: start;
+  padding-inline: 4px;
+  color: #24565c;
+  text-decoration: underline;
+  background: transparent;
+  border-color: transparent;
+}
+
+.web-form-info {
+  padding: 15px;
+  color: #4f5c54;
+  background: #eef2ed;
+  border: 1px solid #c9d7ce;
+  border-radius: 8px;
+}
+
+.web-form-info p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.web-recovery-entry-panel {
+  display: grid;
+  gap: 18px;
+  width: min(100%, 620px);
+  padding: clamp(22px, 5vw, 36px);
+  color: #4a4742;
+  background: #ffffff;
+  border: 1px solid #d4dcd6;
+  border-radius: 12px;
+}
+
+.web-recovery-entry-panel h1,
+.web-recovery-entry-panel p {
+  margin: 0;
+}
+
+.web-recovery-entry-panel > p:not(.web-eyebrow) {
+  line-height: 1.6;
+}
+
+.web-recovery-entry-notice {
+  padding: 14px;
+  color: #405149;
+  background: #eef2ed;
+  border-radius: 8px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

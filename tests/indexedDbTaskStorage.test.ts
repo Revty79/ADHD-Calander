@@ -91,6 +91,31 @@ describe("IndexedDB task storage", () => {
     assert.deepEqual(tasks, [createdTask]);
   });
 
+  it("persists started state and multiple reminders after browser restart", async () => {
+    const indexedDB = new IDBFactory();
+    const firstRepository = await createRepository(
+      "execution-reminders-persistence-test",
+      indexedDB
+    );
+    const task = await firstRepository.createTask({
+      title: "Prepare browser notes",
+      scheduledDate: "2026-08-08",
+      scheduledTime: "10:00",
+      reminderOffsets: [60, 15, 0]
+    });
+    await firstRepository.startTask(task.id);
+
+    const reopenedRepository = await createRepository(
+      "execution-reminders-persistence-test",
+      indexedDB
+    );
+    const reopenedTask = await reopenedRepository.getTaskById(task.id);
+
+    assert.equal(reopenedTask.status, "started");
+    assert.equal(reopenedTask.startedAt, "2026-08-06T15:00:00.000Z");
+    assert.deepEqual(reopenedTask.reminderOffsets, [60, 15, 0]);
+  });
+
   it("persists unscheduled tasks", async () => {
     const repository = await createRepository("unscheduled-test");
     const createdTask = await repository.createTask({ title: "Read mail" });
@@ -193,7 +218,8 @@ describe("IndexedDB task storage", () => {
       scheduledTime: null,
       estimatedDurationMinutes: null,
       deadlineDate: null,
-      reminderOffsetMinutes: null,
+      reminderOffsets: [],
+      startedAt: null,
       createdAt: "2026-08-06T15:00:00.000Z",
       updatedAt: "2026-08-06T15:00:00.000Z",
       completedAt: null,
@@ -201,12 +227,12 @@ describe("IndexedDB task storage", () => {
     };
 
     assert.deepEqual(deserializeTaskFromWeb(serializeTaskForWeb(task)), task);
-    assert.equal(
+    assert.deepEqual(
       deserializeTaskFromWeb({
         ...task,
         reminderOffsetMinutes: undefined
-      }).reminderOffsetMinutes,
-      null
+      }).reminderOffsets,
+      []
     );
     assert.throws(
       () => deserializeTaskFromWeb({ ...task, scheduledDate: "August 6" }),
@@ -263,6 +289,34 @@ describe("IndexedDB task storage", () => {
     assert.equal(tasks[0]?.estimatedDurationMinutes, null);
     assert.equal(tasks[0]?.importance, "normal");
     assert.equal(tasks[0]?.parentTaskId, null);
+  });
+
+  it("upgrades version six single reminders to persisted reminder arrays", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "version-six-reminder-upgrade-test";
+    await createVersionSixReminderDatabase(indexedDB, databaseName);
+
+    const storages = await openIndexedDbStorages({
+      databaseName,
+      indexedDB,
+      keyRange: IDBKeyRange
+    });
+    const task = await storages.taskStorage.getTaskById("version-six-task");
+    const events = await storages.calendarEventStorage.getAllEvents();
+
+    assert.deepEqual(task?.reminderOffsets, [30]);
+    assert.equal(task?.startedAt, null);
+    assert.deepEqual(events[0]?.reminderOffsets, [60]);
+
+    const reopened = await openIndexedDbStorages({
+      databaseName,
+      indexedDB,
+      keyRange: IDBKeyRange
+    });
+    assert.deepEqual(
+      (await reopened.taskStorage.getTaskById("version-six-task"))?.reminderOffsets,
+      [30]
+    );
   });
 
   it("persists edits, breakdown relationships, removal, and restoration", async () => {
@@ -358,7 +412,7 @@ describe("IndexedDB calendar event storage", () => {
       endTime: null,
       durationMinutes: 30,
       notes: null,
-      reminderOffsetMinutes: null,
+      reminderOffsets: [],
       createdAt: "2026-08-06T15:00:00.000Z",
       updatedAt: "2026-08-06T15:00:00.000Z"
     };
@@ -520,7 +574,7 @@ describe("IndexedDB recovery storage", () => {
       originalScheduledDate: "2026-08-06",
       originalScheduledTime: null,
       originalEstimatedDurationMinutes: null,
-      originalReminderOffsetMinutes: null,
+      originalReminderOffsets: [],
       status: "pending",
       decision: "skip",
       note: null,
@@ -637,6 +691,60 @@ function createVersionOneDatabase(
         updatedAt: "2026-08-06T15:00:00.000Z",
         completedAt: null,
         deletedAt: null
+      });
+      transaction.onerror = () => reject(transaction.error);
+      transaction.oncomplete = () => {
+        database.close();
+        resolve();
+      };
+    };
+  });
+}
+
+function createVersionSixReminderDatabase(
+  indexedDB: IDBFactory,
+  databaseName: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(databaseName, 6);
+
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore("tasks", { keyPath: "id" });
+      request.result.createObjectStore("calendarEvents", { keyPath: "id" });
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction(["tasks", "calendarEvents"], "readwrite");
+      transaction.objectStore("tasks").add({
+        id: "version-six-task",
+        title: "Existing browser task",
+        description: null,
+        importance: "normal",
+        status: "not_started",
+        parentTaskId: null,
+        scheduledDate: "2026-08-08",
+        scheduledTime: "10:00",
+        estimatedDurationMinutes: 30,
+        deadlineDate: null,
+        reminderOffsetMinutes: 30,
+        createdAt: "2026-08-06T15:00:00.000Z",
+        updatedAt: "2026-08-06T15:00:00.000Z",
+        completedAt: null,
+        deletedAt: null
+      });
+      transaction.objectStore("calendarEvents").add({
+        id: "version-six-event",
+        title: "Existing browser event",
+        kind: "fixed",
+        date: "2026-08-08",
+        startTime: "11:00",
+        endTime: null,
+        durationMinutes: 30,
+        notes: null,
+        reminderOffsetMinutes: 60,
+        createdAt: "2026-08-06T15:00:00.000Z",
+        updatedAt: "2026-08-06T15:00:00.000Z"
       });
       transaction.onerror = () => reject(transaction.error);
       transaction.oncomplete = () => {

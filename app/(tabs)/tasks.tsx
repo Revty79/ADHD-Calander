@@ -10,8 +10,16 @@ import { isTaskActive, isTaskCompleted, isTaskResolved } from "../../src/types/t
 
 export default function TasksScreen() {
   const router = useRouter();
-  const { tasks, isLoading, errorMessage, refresh, completeTask, undoCompletion } =
-    useAllTasks();
+  const {
+    tasks,
+    isLoading,
+    errorMessage,
+    refresh,
+    completeTask,
+    undoCompletion,
+    startTask,
+    pauseTask
+  } = useAllTasks();
 
   useFocusEffect(
     useCallback(() => {
@@ -39,7 +47,7 @@ export default function TasksScreen() {
             accessibilityLabel="Create a task"
             style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
           >
-            <Text style={styles.addButtonText}>Add</Text>
+            <Text style={styles.addButtonText}>Add task</Text>
           </Pressable>
         </Link>
       </View>
@@ -61,9 +69,11 @@ export default function TasksScreen() {
             tasks={openTasks}
             actionLabel="Complete"
             onAction={completeTask}
+            onPause={pauseTask}
             onSchedule={(id) =>
               router.push({ pathname: "/tasks/[id]/schedule", params: { id } })
             }
+            onStart={startTask}
             showDate
           />
           <TaskList
@@ -106,7 +116,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: "center",
     minHeight: 48,
-    minWidth: 72,
+    minWidth: 112,
     paddingHorizontal: 18
   },
   addButtonText: {

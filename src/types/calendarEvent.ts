@@ -14,7 +14,7 @@ export type CalendarEvent = {
   endTime: LocalTimeString | null;
   durationMinutes: number | null;
   notes: string | null;
-  reminderOffsetMinutes: ReminderOffsetMinutes | null;
+  reminderOffsets: ReminderOffsetMinutes[];
   createdAt: string;
   updatedAt: string;
 };
@@ -26,5 +26,5 @@ export type CreateCalendarEventInput = {
   endTime?: string | null;
   durationMinutes?: number | null;
   notes?: string | null;
-  reminderOffsetMinutes?: number | null;
+  reminderOffsets?: number[];
 };

@@ -4,6 +4,7 @@ import { recoveryFoundationMigration } from "./003_recovery_foundation";
 import { settingsRemindersFoundationMigration } from "./004_settings_reminders_foundation";
 import { schedulingAssistanceFoundationMigration } from "./005_scheduling_assistance_foundation";
 import { taskFunctionalCoreMigration } from "./006_task_functional_core";
+import { executionMultipleRemindersMigration } from "./007_execution_multiple_reminders";
 import { Migration } from "./types";
 
 export const migrations: Migration[] = [
@@ -12,5 +13,6 @@ export const migrations: Migration[] = [
   recoveryFoundationMigration,
   settingsRemindersFoundationMigration,
   schedulingAssistanceFoundationMigration,
-  taskFunctionalCoreMigration
+  taskFunctionalCoreMigration,
+  executionMultipleRemindersMigration
 ];

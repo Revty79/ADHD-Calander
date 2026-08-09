@@ -10,6 +10,10 @@ import {
 } from "react-native";
 
 import { ErrorNotice } from "../../src/components/ErrorNotice";
+import {
+  NativeDatePickerButton,
+  NativeTimePickerButton
+} from "../../src/components/NativeDateTimePickerButton";
 import { Screen } from "../../src/components/Screen";
 import { useRecoverySession } from "../../src/features/recovery/hooks/useRecoverySession";
 import { getRecoveryDecisionLabel } from "../../src/features/recovery/recoveryPresentation";
@@ -288,14 +292,10 @@ function StartPanel({
       <Text style={styles.bodyText}>
         Only unfinished tasks scheduled for this day will be included.
       </Text>
-      <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
-      <TextInput
-        accessibilityLabel="Recovery date"
-        autoCapitalize="none"
-        autoCorrect={false}
-        onChangeText={onChangeDate}
-        placeholder="YYYY-MM-DD"
-        style={styles.input}
+      <Text style={styles.label}>Date</Text>
+      <NativeDatePickerButton
+        accessibilityLabel="Choose the Recovery review date"
+        onChange={onChangeDate}
         value={sourceDate}
       />
       <Pressable
@@ -414,26 +414,28 @@ function ActionForm({
           <Text style={styles.bodyText}>
             The task keeps its history and moves only after you save.
           </Text>
-          <Text style={styles.label}>New date (YYYY-MM-DD)</Text>
-          <TextInput
-            accessibilityLabel="New scheduled date"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={onChangeRescheduledDate}
-            placeholder="YYYY-MM-DD"
-            style={styles.input}
+          <Text style={styles.label}>New date</Text>
+          <NativeDatePickerButton
+            accessibilityLabel="Choose the new planned date"
+            onChange={onChangeRescheduledDate}
             value={rescheduledDate}
           />
-          <Text style={styles.label}>Time (optional, HH:MM)</Text>
-          <TextInput
-            accessibilityLabel="New scheduled time"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={onChangeRescheduledTime}
-            placeholder="HH:MM"
-            style={styles.input}
+          <Text style={styles.label}>Time (optional)</Text>
+          <NativeTimePickerButton
+            accessibilityLabel="Choose the new scheduled time"
+            onChange={onChangeRescheduledTime}
             value={rescheduledTime}
           />
+          {rescheduledTime ? (
+            <Pressable
+              accessibilityLabel="Clear the new scheduled time"
+              accessibilityRole="button"
+              onPress={() => onChangeRescheduledTime("")}
+              style={styles.changeButton}
+            >
+              <Text style={styles.changeButtonText}>Clear time · Keep date only</Text>
+            </Pressable>
+          ) : null}
         </>
       ) : null}
 

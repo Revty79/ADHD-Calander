@@ -11,6 +11,26 @@ export function getLocalDateString(date = new Date()): LocalDateString {
   return `${year}-${month}-${day}` as LocalDateString;
 }
 
+export function getLocalTimeString(date = new Date()): LocalTimeString {
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+
+  return `${hour}:${minute}` as LocalTimeString;
+}
+
+export function addDaysToLocalDate(
+  days: number,
+  referenceDate = new Date()
+): LocalDateString {
+  return getLocalDateString(
+    new Date(
+      referenceDate.getFullYear(),
+      referenceDate.getMonth(),
+      referenceDate.getDate() + days
+    )
+  );
+}
+
 export function normalizeLocalDateInput(value: string): LocalDateString | null {
   const trimmedValue = value.trim();
   const match = localDatePattern.exec(trimmedValue);

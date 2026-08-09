@@ -7,10 +7,10 @@ import { AppSettings } from "../types/settings";
 import { Task } from "../types/task";
 import { NotificationAdapter } from "./notificationAdapter";
 import {
-  buildEventReminderRequest,
-  buildTaskReminderRequest,
-  getEventReminderIdentifier,
-  getTaskReminderIdentifier
+  buildEventReminderRequests,
+  buildTaskReminderRequests,
+  getAllEventReminderIdentifiers,
+  getAllTaskReminderIdentifiers
 } from "./reminderRules";
 import { ReminderSynchronizer } from "./reminderSynchronizer";
 
@@ -92,11 +92,15 @@ export class ReminderService implements ReminderSynchronizer {
       ]);
 
       for (const task of tasks) {
-        await this.scheduleIfFuture(buildTaskReminderRequest(task));
+        for (const request of buildTaskReminderRequests(task)) {
+          await this.scheduleIfFuture(request);
+        }
       }
 
       for (const event of events) {
-        await this.scheduleIfFuture(buildEventReminderRequest(event));
+        for (const request of buildEventReminderRequests(event)) {
+          await this.scheduleIfFuture(request);
+        }
       }
     } catch (error) {
       console.error("Reminder reconciliation failed", error);
@@ -105,26 +109,28 @@ export class ReminderService implements ReminderSynchronizer {
 
   async syncTaskReminder(task: Task): Promise<void> {
     await this.safelySynchronize(
-      getTaskReminderIdentifier(task.id),
-      buildTaskReminderRequest(task)
+      getAllTaskReminderIdentifiers(task.id),
+      buildTaskReminderRequests(task)
     );
   }
 
   async syncEventReminder(event: CalendarEvent): Promise<void> {
     await this.safelySynchronize(
-      getEventReminderIdentifier(event.id),
-      buildEventReminderRequest(event)
+      getAllEventReminderIdentifiers(event.id),
+      buildEventReminderRequests(event)
     );
   }
 
   private async safelySynchronize(
-    identifier: string,
-    request: ReminderNotificationRequest | null
+    identifiers: string[],
+    requests: ReminderNotificationRequest[]
   ): Promise<void> {
     try {
-      await this.notificationAdapter.cancelReminder(identifier);
+      for (const identifier of identifiers) {
+        await this.notificationAdapter.cancelReminder(identifier);
+      }
 
-      if (!request) {
+      if (requests.length === 0) {
         return;
       }
 
@@ -134,7 +140,9 @@ export class ReminderService implements ReminderSynchronizer {
         return;
       }
 
-      await this.scheduleIfFuture(request);
+      for (const request of requests) {
+        await this.scheduleIfFuture(request);
+      }
     } catch (error) {
       console.error("Reminder synchronization failed", error);
     }

@@ -20,18 +20,33 @@ export default function WebTabLayout() {
           <span className="web-brand-name">ADHD Calendar</span>
         </div>
         <Navigation pathname={pathname} />
+        <RecoveryShortcut />
         <p className="web-sidebar-note">Your calendar stays on this browser.</p>
       </aside>
 
       <div className="web-mobile-shell-header">
         <div className="web-mobile-brand">ADHD Calendar</div>
         <Navigation pathname={pathname} />
+        <RecoveryShortcut compact />
       </div>
 
       <main className="web-main-content">
         <Slot />
       </main>
     </div>
+  );
+}
+
+function RecoveryShortcut({ compact = false }: { compact?: boolean }) {
+  return (
+    <Link
+      aria-label="Plans changed? Review what to keep, move, or let go"
+      className={`web-recovery-shortcut${compact ? " web-recovery-shortcut-compact" : ""}`}
+      href="/recovery/start"
+    >
+      <strong>Plans changed?</strong>
+      {!compact ? <small>Review what to keep, move, or let go.</small> : null}
+    </Link>
   );
 }
 

@@ -6,7 +6,7 @@ import { ErrorNotice } from "../../src/components/ErrorNotice";
 import { Screen } from "../../src/components/Screen";
 import { TaskList } from "../../src/features/tasks/components/TaskList";
 import { useTodayPlan } from "../../src/features/today/hooks/useTodayPlan";
-import { formatReminderOffset } from "../../src/notifications/reminderRules";
+import { formatReminderOffsets } from "../../src/notifications/reminderRules";
 import { CalendarEvent } from "../../src/types/calendarEvent";
 import { isTaskActive, isTaskCompleted } from "../../src/types/task";
 import { formatLocalDateForDisplay, getLocalDateString } from "../../src/utils/dates";
@@ -20,7 +20,9 @@ export default function TodayScreen() {
     errorMessage,
     refresh,
     completeTask,
-    undoCompletion
+    undoCompletion,
+    startTask,
+    pauseTask
   } = useTodayPlan(today);
 
   useFocusEffect(
@@ -58,19 +60,19 @@ export default function TodayScreen() {
         </Link>
       </View>
 
-      <Link href={{ pathname: "/recovery", params: { sourceDate: today } }} asChild>
+      <Link href="/recovery/start" asChild>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Open Recovery Mode for today"
           style={({ pressed }) => [styles.recoveryCallout, pressed && styles.pressed]}
         >
           <View style={styles.recoveryCopy}>
-            <Text style={styles.recoveryTitle}>Today got away from me</Text>
+            <Text style={styles.recoveryTitle}>Plans changed?</Text>
             <Text style={styles.recoveryText}>
               Review unfinished tasks without moving fixed appointments.
             </Text>
           </View>
-          <Text style={styles.recoveryArrow}>Open</Text>
+          <Text style={styles.recoveryArrow}>Review</Text>
         </Pressable>
       </Link>
 
@@ -102,6 +104,8 @@ export default function TodayScreen() {
             tasks={plannedTasks}
             actionLabel="Complete"
             onAction={completeTask}
+            onPause={pauseTask}
+            onStart={startTask}
           />
           <TaskList
             title="Flexible tasks"
@@ -109,6 +113,8 @@ export default function TodayScreen() {
             tasks={flexibleTasks}
             actionLabel="Complete"
             onAction={completeTask}
+            onPause={pauseTask}
+            onStart={startTask}
           />
           <TaskList
             title="Completed"
@@ -142,9 +148,9 @@ function FixedEventList({ events }: { events: CalendarEvent[] }) {
               <View style={styles.eventCopy}>
                 <Text style={styles.eventTitle}>{event.title}</Text>
                 <Text style={styles.fixedLabel}>Fixed</Text>
-                {event.reminderOffsetMinutes !== null ? (
+                {event.reminderOffsets.length > 0 ? (
                   <Text style={styles.fixedLabel}>
-                    Reminder: {formatReminderOffset(event.reminderOffsetMinutes)}
+                    Reminders: {formatReminderOffsets(event.reminderOffsets)}
                   </Text>
                 ) : null}
               </View>

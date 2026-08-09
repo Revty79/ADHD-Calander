@@ -94,6 +94,33 @@ describe("DailyRecapRepository", () => {
     );
   });
 
+  it("treats startedAt as in progress and only completedAt as accomplishment", async () => {
+    const context = await createContext();
+    const task = await context.taskRepository.createTask({
+      title: "Work through notes",
+      scheduledDate: "2026-08-06"
+    });
+    context.setTime(new Date(2026, 7, 6, 9, 30));
+    await context.taskRepository.startTask(task.id);
+
+    const inProgressRecap =
+      await context.dailyRecapRepository.getDailyRecap("2026-08-06");
+    assert.deepEqual(inProgressRecap.accomplishedTasks, []);
+    assert.deepEqual(
+      inProgressRecap.stillOpenTasks.map(({ task: openTask }) => openTask.title),
+      ["Work through notes"]
+    );
+
+    context.setTime(new Date(2026, 7, 7, 8, 0));
+    await context.taskRepository.completeTask(task.id);
+    const completionRecap =
+      await context.dailyRecapRepository.getDailyRecap("2026-08-07");
+    assert.deepEqual(
+      completionRecap.accomplishedTasks.map((completedTask) => completedTask.title),
+      ["Work through notes"]
+    );
+  });
+
   it("keeps fixed events factual and Recovery decisions separate from completion", async () => {
     const context = await createContext();
     const selectedDate = "2026-08-06";
