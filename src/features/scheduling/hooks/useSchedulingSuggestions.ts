@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useSchedulingService } from "../../../database/DatabaseProvider";
+import { ReminderOffsetMinutes } from "../../../types/reminder";
 import { Task } from "../../../types/task";
+import { SpecificTimeScheduleInput } from "../schedulingService";
 import { SchedulingSearchResult, SchedulingSuggestion } from "../types";
 
 export const practicalDurationOptions = [10, 15, 30, 45, 60, 90, 120] as const;
@@ -75,7 +77,10 @@ export function useSchedulingSuggestions(taskId: string) {
   }, [durationOverride, horizonDays, service, taskId]);
 
   const acceptSuggestion = useCallback(
-    async (suggestion: SchedulingSuggestion): Promise<Task | null> => {
+    async (
+      suggestion: SchedulingSuggestion,
+      reminderOffsets?: ReminderOffsetMinutes[]
+    ): Promise<Task | null> => {
       setIsAccepting(true);
       setErrorMessage(null);
 
@@ -84,7 +89,8 @@ export function useSchedulingSuggestions(taskId: string) {
           ...(durationOverride === undefined
             ? {}
             : { durationMinutes: durationOverride }),
-          horizonDays
+          horizonDays,
+          ...(reminderOffsets === undefined ? {} : { reminderOffsets })
         });
       } catch (error) {
         const message =
@@ -99,6 +105,27 @@ export function useSchedulingSuggestions(taskId: string) {
       }
     },
     [durationOverride, horizonDays, loadSuggestions, service, taskId]
+  );
+
+  const scheduleSpecificTime = useCallback(
+    async (input: SpecificTimeScheduleInput): Promise<Task | null> => {
+      setIsAccepting(true);
+      setErrorMessage(null);
+
+      try {
+        return await service.scheduleSpecificTime(taskId, input);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "This task could not be scheduled. Please try again."
+        );
+        return null;
+      } finally {
+        setIsAccepting(false);
+      }
+    },
+    [service, taskId]
   );
 
   return {
@@ -121,6 +148,7 @@ export function useSchedulingSuggestions(taskId: string) {
       setResult(null);
       setHorizonDays(14);
     },
-    acceptSuggestion
+    acceptSuggestion,
+    scheduleSpecificTime
   };
 }

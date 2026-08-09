@@ -6,6 +6,9 @@ import { CalendarEventValidationError } from "../../src/database/repositories/ca
 import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
 
 type FieldErrors = Partial<Record<CalendarEventValidationError["field"], string>>;
+type TimingMethod = "endTime" | "duration";
+
+const durationOptions = [15, 30, 45, 60, 90, 120] as const;
 
 export default function WebNewEventScreen() {
   const router = useRouter();
@@ -19,7 +22,8 @@ export default function WebNewEventScreen() {
   const [date, setDate] = useState<string>(initialDate);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState("");
+  const [timingMethod, setTimingMethod] = useState<TimingMethod>("duration");
+  const [durationMinutes, setDurationMinutes] = useState<number>(60);
   const [notes, setNotes] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -36,8 +40,8 @@ export default function WebNewEventScreen() {
         title,
         date,
         startTime,
-        endTime,
-        durationMinutes: durationMinutes.trim() ? Number(durationMinutes) : null,
+        endTime: timingMethod === "endTime" ? endTime : null,
+        durationMinutes: timingMethod === "duration" ? durationMinutes : null,
         notes
       });
 
@@ -107,13 +111,32 @@ export default function WebNewEventScreen() {
             </FormField>
           </div>
 
-          <div className="web-form-row">
-            <FormField
-              error={fieldErrors.endTime}
-              id="event-end-time"
-              label="End time"
-              optional
-            >
+          <fieldset className="web-choice-fieldset">
+            <legend>Event length</legend>
+            <div className="web-choice-options">
+              <label>
+                <input
+                  checked={timingMethod === "endTime"}
+                  name="event-timing-method"
+                  onChange={() => setTimingMethod("endTime")}
+                  type="radio"
+                />
+                <span>End time</span>
+              </label>
+              <label>
+                <input
+                  checked={timingMethod === "duration"}
+                  name="event-timing-method"
+                  onChange={() => setTimingMethod("duration")}
+                  type="radio"
+                />
+                <span>Duration</span>
+              </label>
+            </div>
+          </fieldset>
+
+          {timingMethod === "endTime" ? (
+            <FormField error={fieldErrors.endTime} id="event-end-time" label="End time">
               <input
                 id="event-end-time"
                 onChange={(event) => setEndTime(event.currentTarget.value)}
@@ -121,24 +144,30 @@ export default function WebNewEventScreen() {
                 value={endTime}
               />
             </FormField>
-            <FormField
-              error={fieldErrors.durationMinutes}
-              id="event-duration"
-              label="Duration in minutes"
-              optional
-            >
-              <input
-                id="event-duration"
-                min="1"
-                onChange={(event) => setDurationMinutes(event.currentTarget.value)}
-                placeholder="For example, 45"
-                step="1"
-                type="number"
-                value={durationMinutes}
-              />
-            </FormField>
-          </div>
-          <p className="web-form-hint">Use an end time or a duration, not both.</p>
+          ) : (
+            <fieldset className="web-choice-fieldset">
+              <legend>Duration</legend>
+              <div className="web-choice-options">
+                {durationOptions.map((duration) => (
+                  <label key={duration}>
+                    <input
+                      checked={durationMinutes === duration}
+                      name="event-duration"
+                      onChange={() => setDurationMinutes(duration)}
+                      type="radio"
+                      value={duration}
+                    />
+                    <span>{duration} min</span>
+                  </label>
+                ))}
+              </div>
+              {fieldErrors.durationMinutes ? (
+                <p className="web-validation-message" role="alert">
+                  {fieldErrors.durationMinutes}
+                </p>
+              ) : null}
+            </fieldset>
+          )}
 
           <FormField id="event-notes" label="Notes" optional>
             <textarea

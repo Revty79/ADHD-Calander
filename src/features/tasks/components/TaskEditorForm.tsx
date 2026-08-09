@@ -17,6 +17,7 @@ import { ReminderOffsetMinutes, ReminderPermissionStatus } from "../../../types/
 import {
   CreateTaskInput,
   getTaskPlanningState,
+  PlannedTimePreference,
   Task,
   TaskImportance,
   TaskPlanningState
@@ -28,6 +29,7 @@ import {
   getPlannedDateQuickChoices,
   TaskDateQuickChoice
 } from "../taskDateChoices";
+import { plannedTimePreferenceOptions } from "../plannedTimePreferences";
 
 type FieldErrors = Partial<Record<TaskValidationError["field"], string>>;
 
@@ -69,6 +71,8 @@ export function TaskEditorForm({
     initialTask?.scheduledDate ?? initialDate
   );
   const [scheduledTime, setScheduledTime] = useState(initialTask?.scheduledTime ?? "");
+  const [plannedTimePreference, setPlannedTimePreference] =
+    useState<PlannedTimePreference>(initialTask?.plannedTimePreference ?? "anytime");
   const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState<number | null>(
     initialTask?.estimatedDurationMinutes ?? null
   );
@@ -95,6 +99,11 @@ export function TaskEditorForm({
     }
   }
 
+  function chooseExactTime(value: string) {
+    setScheduledTime(value);
+    setPlanningState("scheduled");
+  }
+
   async function saveTask() {
     setFieldErrors({});
     setErrorMessage(null);
@@ -107,6 +116,8 @@ export function TaskEditorForm({
         importance,
         scheduledDate: planningState === "flexible" ? null : scheduledDate,
         scheduledTime: planningState === "scheduled" ? scheduledTime : null,
+        plannedTimePreference:
+          planningState === "flexible" ? null : plannedTimePreference,
         estimatedDurationMinutes,
         deadlineDate,
         reminderOffsets
@@ -171,7 +182,7 @@ export function TaskEditorForm({
           />
 
           <ChoiceGroup<TaskPlanningState>
-            help="Flexible has no date. Planned has a date. Scheduled has a date and time."
+            help="Flexible has no date. Planned has a date and a soft preference; you can also add an exact time. Scheduled has an exact date and time."
             label="Planning state"
             onChange={choosePlanningState}
             options={planningOptions}
@@ -209,6 +220,28 @@ export function TaskEditorForm({
                 value={scheduledTime}
               />
             </Field>
+          ) : null}
+
+          {planningState === "planned" ? (
+            <View style={styles.plannedOptions}>
+              <ChoiceGroup<PlannedTimePreference>
+                help="This guides scheduling suggestions but never blocks other available times."
+                label="Preferred time"
+                onChange={setPlannedTimePreference}
+                options={plannedTimePreferenceOptions}
+                value={plannedTimePreference}
+              />
+              <Field label="Exact start time · Optional">
+                <Text style={styles.helpText}>
+                  Choosing a time makes this a Scheduled task and enables reminders.
+                </Text>
+                <NativeTimePickerButton
+                  accessibilityLabel="Choose an optional exact start time"
+                  onChange={chooseExactTime}
+                  value={scheduledTime}
+                />
+              </Field>
+            </View>
           ) : null}
 
           <View style={styles.field}>
@@ -435,6 +468,7 @@ function getReminderDisabledMessage(
 const styles = StyleSheet.create({
   form: { gap: 18 },
   details: { gap: 20 },
+  plannedOptions: { gap: 20 },
   field: { gap: 8 },
   label: { color: "#2f2d2a", fontSize: 16, fontWeight: "700" },
   helpText: { color: "#68645e", fontSize: 13, lineHeight: 19 },

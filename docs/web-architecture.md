@@ -63,7 +63,7 @@ return to Today, Tasks, or its selected Calendar date.
 
 Native builds continue to initialize Expo SQLite, apply versioned SQL
 migrations, and use SQL storage adapters. The web build opens IndexedDB database
-`adhd-calendar-web` at version 7 with `tasks`, `calendarEvents`,
+`adhd-calendar-web` at version 8 with `tasks`, `calendarEvents`,
 `recoverySessions`, `recoveryItems`, and `appSettings` stores.
 
 `TaskRepository`, `CalendarEventRepository`, and `RecoveryRepository` depend on
@@ -73,8 +73,9 @@ IndexedDB recovery decisions update task records and recovery items in one
 transaction.
 
 IndexedDB version 7 stores task and event reminder-offset arrays, Recovery
-reminder snapshots, and task execution timestamps. Its upgrade path converts
-version 6 single-reminder records and preserves in-progress tasks. Legacy fields
+reminder snapshots, and task execution timestamps. Version 8 adds semantic
+planned time preferences, assigning Anytime to dated legacy tasks and null to
+Flexible tasks. Both upgrade paths preserve existing records, and legacy fields
 remain readable as a compatibility fallback.
 
 `SettingsRepository` uses the `appSettings` store through a shared storage

@@ -6,6 +6,7 @@ import { formatLocalDateForDisplay } from "../../../utils/dates";
 import {
   getTaskImportanceLabel,
   getTaskPlanningLabel,
+  getTaskPlannedTimePreferenceLabel,
   getTaskStatusLabel,
   getTaskTimingNote
 } from "../taskPresentation";
@@ -70,6 +71,9 @@ export function TaskList({
                   ) : null}
                   {task.scheduledTime ? (
                     <time dateTime={task.scheduledTime}>{task.scheduledTime}</time>
+                  ) : null}
+                  {getTaskPlannedTimePreferenceLabel(task) ? (
+                    <span>{getTaskPlannedTimePreferenceLabel(task)}</span>
                   ) : null}
                   {task.estimatedDurationMinutes ? (
                     <span>{task.estimatedDurationMinutes} min estimate</span>

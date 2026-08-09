@@ -3,6 +3,7 @@ import { FormEvent, useCallback, useMemo, useState } from "react";
 
 import { useRecoverySession } from "../../src/features/recovery/hooks/useRecoverySession";
 import { getRecoveryDecisionLabel } from "../../src/features/recovery/recoveryPresentation";
+import { getPlannedTimePreferenceLabel } from "../../src/features/tasks/plannedTimePreferences";
 import {
   getNextRecoveryItem,
   getResolvedRecoveryItemCount,
@@ -138,8 +139,10 @@ export default function WebRecoveryScreen() {
                 <div className="web-task-meta">
                   <span>
                     {currentItem.originalScheduledTime
-                      ? `Planned for ${currentItem.originalScheduledTime}`
-                      : "Flexible timing"}
+                      ? `Scheduled for ${currentItem.originalScheduledTime}`
+                      : `Planned · ${getPlannedTimePreferenceLabel(
+                          currentItem.originalPlannedTimePreference
+                        )} preference`}
                   </span>
                   {currentItem.originalEstimatedDurationMinutes ? (
                     <span>

@@ -32,8 +32,8 @@ export default function TodayScreen() {
   );
 
   const activeTasks = tasks.filter(isTaskActive);
-  const plannedTasks = activeTasks.filter((task) => task.scheduledTime !== null);
-  const flexibleTasks = activeTasks.filter((task) => task.scheduledTime === null);
+  const scheduledTasks = activeTasks.filter((task) => task.scheduledTime !== null);
+  const plannedTasks = activeTasks.filter((task) => task.scheduledTime === null);
   const completedTasks = tasks.filter(isTaskCompleted);
 
   return (
@@ -99,18 +99,18 @@ export default function TodayScreen() {
         <>
           <FixedEventList events={fixedEvents} />
           <TaskList
-            title="Planned tasks"
+            title="Scheduled tasks"
             emptyMessage="No tasks have a set time today."
-            tasks={plannedTasks}
+            tasks={scheduledTasks}
             actionLabel="Complete"
             onAction={completeTask}
             onPause={pauseTask}
             onStart={startTask}
           />
           <TaskList
-            title="Flexible tasks"
-            emptyMessage="No flexible tasks are scheduled for today."
-            tasks={flexibleTasks}
+            title="Planned tasks"
+            emptyMessage="No tasks are planned for today without a set time."
+            tasks={plannedTasks}
             actionLabel="Complete"
             onAction={completeTask}
             onPause={pauseTask}

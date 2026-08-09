@@ -81,7 +81,7 @@ describe("IndexedDB task storage", () => {
       title: "  Prepare lunch  ",
       description: "  Put it by the door  ",
       scheduledDate: "2026-08-06",
-      scheduledTime: "12:30",
+      plannedTimePreference: "afternoon",
       estimatedDurationMinutes: 20
     });
 
@@ -89,6 +89,7 @@ describe("IndexedDB task storage", () => {
     const tasks = await reopenedRepository.getAllTasks();
 
     assert.deepEqual(tasks, [createdTask]);
+    assert.equal(tasks[0]?.plannedTimePreference, "afternoon");
   });
 
   it("persists started state and multiple reminders after browser restart", async () => {
@@ -216,6 +217,7 @@ describe("IndexedDB task storage", () => {
       parentTaskId: null,
       scheduledDate: "2026-08-06",
       scheduledTime: null,
+      plannedTimePreference: "anytime",
       estimatedDurationMinutes: null,
       deadlineDate: null,
       reminderOffsets: [],
@@ -258,6 +260,7 @@ describe("IndexedDB task storage", () => {
     assert.equal(deserializeTaskFromWeb(legacyTask).deadlineDate, null);
     assert.equal(deserializeTaskFromWeb(legacyTask).importance, "normal");
     assert.equal(deserializeTaskFromWeb(legacyTask).parentTaskId, null);
+    assert.equal(deserializeTaskFromWeb(legacyTask).plannedTimePreference, "anytime");
   });
 
   it("reads legacy task records without completion timestamp data", () => {
@@ -289,6 +292,7 @@ describe("IndexedDB task storage", () => {
     assert.equal(tasks[0]?.estimatedDurationMinutes, null);
     assert.equal(tasks[0]?.importance, "normal");
     assert.equal(tasks[0]?.parentTaskId, null);
+    assert.equal(tasks[0]?.plannedTimePreference, "anytime");
   });
 
   it("upgrades version six single reminders to persisted reminder arrays", async () => {
@@ -306,6 +310,7 @@ describe("IndexedDB task storage", () => {
 
     assert.deepEqual(task?.reminderOffsets, [30]);
     assert.equal(task?.startedAt, null);
+    assert.equal(task?.plannedTimePreference, "anytime");
     assert.deepEqual(events[0]?.reminderOffsets, [60]);
 
     const reopened = await openIndexedDbStorages({
@@ -316,6 +321,36 @@ describe("IndexedDB task storage", () => {
     assert.deepEqual(
       (await reopened.taskStorage.getTaskById("version-six-task"))?.reminderOffsets,
       [30]
+    );
+  });
+
+  it("upgrades version seven planned preferences and persists them after reopen", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "version-seven-preference-upgrade-test";
+    await createVersionSevenPreferenceDatabase(indexedDB, databaseName);
+
+    const upgraded = await openIndexedDbStorages({
+      databaseName,
+      indexedDB,
+      keyRange: IDBKeyRange
+    });
+    const datedTask = await upgraded.taskStorage.getTaskById("version-seven-dated");
+    const flexibleTask = await upgraded.taskStorage.getTaskById("version-seven-flexible");
+    const activeSession = await upgraded.recoveryStorage.getActiveSession();
+
+    assert.equal(datedTask?.plannedTimePreference, "anytime");
+    assert.equal(flexibleTask?.plannedTimePreference, null);
+    assert.equal(activeSession?.items[0]?.originalPlannedTimePreference, "anytime");
+
+    const reopened = await openIndexedDbStorages({
+      databaseName,
+      indexedDB,
+      keyRange: IDBKeyRange
+    });
+    assert.equal(
+      (await reopened.taskStorage.getTaskById("version-seven-dated"))
+        ?.plannedTimePreference,
+      "anytime"
     );
   });
 
@@ -573,6 +608,7 @@ describe("IndexedDB recovery storage", () => {
       originalStatus: "not_started",
       originalScheduledDate: "2026-08-06",
       originalScheduledTime: null,
+      originalPlannedTimePreference: "anytime",
       originalEstimatedDurationMinutes: null,
       originalReminderOffsets: [],
       status: "pending",
@@ -745,6 +781,98 @@ function createVersionSixReminderDatabase(
         reminderOffsetMinutes: 60,
         createdAt: "2026-08-06T15:00:00.000Z",
         updatedAt: "2026-08-06T15:00:00.000Z"
+      });
+      transaction.onerror = () => reject(transaction.error);
+      transaction.oncomplete = () => {
+        database.close();
+        resolve();
+      };
+    };
+  });
+}
+
+function createVersionSevenPreferenceDatabase(
+  indexedDB: IDBFactory,
+  databaseName: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(databaseName, 7);
+
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore("tasks", { keyPath: "id" });
+      request.result.createObjectStore("calendarEvents", { keyPath: "id" });
+      const sessionStore = request.result.createObjectStore("recoverySessions", {
+        keyPath: "id"
+      });
+      sessionStore.createIndex("status", "status", { unique: false });
+      sessionStore.createIndex("completedAt", "completedAt", { unique: false });
+      const itemStore = request.result.createObjectStore("recoveryItems", {
+        keyPath: "id"
+      });
+      itemStore.createIndex("sessionId", "sessionId", { unique: false });
+      itemStore.createIndex("status", "status", { unique: false });
+      request.result.createObjectStore("appSettings", { keyPath: "key" });
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction(
+        ["tasks", "recoverySessions", "recoveryItems"],
+        "readwrite"
+      );
+      const tasks = transaction.objectStore("tasks");
+      const taskBase = {
+        title: "Existing browser task",
+        description: null,
+        importance: "normal",
+        status: "not_started",
+        parentTaskId: null,
+        scheduledTime: null,
+        estimatedDurationMinutes: 30,
+        deadlineDate: null,
+        reminderOffsets: [],
+        startedAt: null,
+        createdAt: "2026-08-06T15:00:00.000Z",
+        updatedAt: "2026-08-06T15:00:00.000Z",
+        completedAt: null,
+        deletedAt: null
+      };
+      tasks.add({
+        ...taskBase,
+        id: "version-seven-dated",
+        scheduledDate: "2026-08-08"
+      });
+      tasks.add({
+        ...taskBase,
+        id: "version-seven-flexible",
+        scheduledDate: null
+      });
+      transaction.objectStore("recoverySessions").add({
+        id: "version-seven-session",
+        sourceDate: "2026-08-08",
+        status: "active",
+        startedAt: "2026-08-09T15:00:00.000Z",
+        completedAt: null
+      });
+      transaction.objectStore("recoveryItems").add({
+        id: "version-seven-item",
+        sessionId: "version-seven-session",
+        taskId: "version-seven-dated",
+        originalTitle: "Existing browser task",
+        originalStatus: "not_started",
+        originalScheduledDate: "2026-08-08",
+        originalScheduledTime: null,
+        originalEstimatedDurationMinutes: 30,
+        originalReminderOffsets: [],
+        status: "pending",
+        decision: null,
+        note: null,
+        rescheduledDate: null,
+        rescheduledTime: null,
+        createdTaskIds: [],
+        reviewedAt: null,
+        createdAt: "2026-08-09T15:00:00.000Z",
+        updatedAt: "2026-08-09T15:00:00.000Z"
       });
       transaction.onerror = () => reject(transaction.error);
       transaction.oncomplete = () => {

@@ -28,8 +28,8 @@ export default function WebTodayScreen() {
   );
 
   const activeTasks = tasks.filter(isTaskActive);
-  const plannedTasks = activeTasks.filter((task) => task.scheduledTime !== null);
-  const flexibleTasks = activeTasks.filter((task) => task.scheduledTime === null);
+  const scheduledTasks = activeTasks.filter((task) => task.scheduledTime !== null);
+  const plannedTasks = activeTasks.filter((task) => task.scheduledTime === null);
   const completedTasks = tasks.filter(isTaskCompleted);
 
   return (
@@ -39,7 +39,7 @@ export default function WebTodayScreen() {
           <p className="web-eyebrow">Today</p>
           <h1>{formatLocalDateForDisplay(today)}</h1>
           <p className="web-page-intro">
-            Fixed appointments, planned tasks, and flexible work in one calm view.
+            Fixed appointments, scheduled tasks, and planned work in one calm view.
           </p>
         </div>
         <Link
@@ -116,17 +116,17 @@ export default function WebTodayScreen() {
               onAction={completeTask}
               onPause={pauseTask}
               onStart={startTask}
-              tasks={plannedTasks}
-              title="Planned tasks"
+              tasks={scheduledTasks}
+              title="Scheduled tasks"
             />
             <TaskList
               actionLabel="Complete"
-              emptyMessage="No flexible tasks are scheduled for today."
+              emptyMessage="No tasks are planned for today without a set time."
               onAction={completeTask}
               onPause={pauseTask}
               onStart={startTask}
-              tasks={flexibleTasks}
-              title="Flexible tasks"
+              tasks={plannedTasks}
+              title="Planned tasks"
             />
             <TaskList
               actionLabel="Undo"
@@ -146,12 +146,12 @@ export default function WebTodayScreen() {
                 <dd>{fixedEvents.length}</dd>
               </div>
               <div>
-                <dt>Planned tasks</dt>
-                <dd>{plannedTasks.length}</dd>
+                <dt>Scheduled tasks</dt>
+                <dd>{scheduledTasks.length}</dd>
               </div>
               <div>
-                <dt>Flexible tasks</dt>
-                <dd>{flexibleTasks.length}</dd>
+                <dt>Planned tasks</dt>
+                <dd>{plannedTasks.length}</dd>
               </div>
               <div>
                 <dt>Completed</dt>

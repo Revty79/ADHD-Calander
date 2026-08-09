@@ -63,13 +63,21 @@ Recovery decisions without scoring the day. Recovery supports explicit
 task-by-task decisions without automatic next-day scheduling. Settings provides
 a local reminder master control, accessibility and privacy guidance, and app
 information. Task planning uses human date/time controls with quick local-date
-choices instead of requiring formatted strings. Tasks can be started, paused,
-and completed while keeping planning state separate from execution state.
+choices instead of requiring formatted strings. Planned tasks store a date and
+an optional semantic Anytime, Morning, Afternoon, or Evening preference without
+inventing an exact time. Scheduled tasks store an exact start time. Tasks can be
+started, paused, and completed while keeping planning state separate from
+execution state. Fixed-event creation uses platform date/time controls plus an
+explicit end-time or duration choice rather than formatted text entry.
 Native scheduled tasks and fixed events may each have up to five optional local
 reminders; web reports that notification scheduling is unavailable there.
-Flexible tasks can request deterministic scheduling suggestions inside local
+Active tasks without an exact time can request deterministic scheduling suggestions inside local
 planning boundaries. The user reviews no more than three factual options and
 must choose and confirm one before the existing task schedule changes.
+Task editing and scheduling assistance also offer an optional exact-time path;
+choosing it truthfully changes the task from Planned to Scheduled. The Android
+scheduler lets the user select up to five reminders before confirming either an
+exact time or a generated suggestion.
 Calendar gives Add event and Add task comparable primary discoverability. A
 consistent Plans changed? action opens a confirmation step, then starts or
 resumes the one active Recovery session without automatic task changes.
@@ -102,4 +110,7 @@ when permission is unavailable.
 Scheduling assistance passes when a flexible task with a duration can receive
 bounded, non-overlapping local-time suggestions around fixed events and timed
 tasks; accepting one preserves task identity and persistence, while declining
-leaves the task unchanged.
+leaves the task unchanged. A Planned time-of-day preference ranks matching
+suggestions ahead of fallback times within the same daily-load band, but never
+overrides fixed commitments, buffers, planning hours, deadlines, duration, or
+the daily task limit.

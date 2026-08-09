@@ -16,7 +16,7 @@ import { SqlCalendarEventStorage } from "../src/database/sqlCalendarEventStorage
 import { createTasksMigration } from "../src/database/migrations/001_create_tasks";
 import { migrations } from "../src/database/migrations";
 import { ReminderSynchronizer } from "../src/notifications/reminderSynchronizer";
-import { Task } from "../src/types/task";
+import { getTaskPlanningState, PlannedTimePreference, Task } from "../src/types/task";
 import { getLocalDateString } from "../src/utils/dates";
 import {
   getDeadlineQuickChoices,
@@ -74,7 +74,8 @@ describe("task database", () => {
       { version: 4, name: "settings_reminders_foundation" },
       { version: 5, name: "scheduling_assistance_foundation" },
       { version: 6, name: "task_functional_core" },
-      { version: 7, name: "execution_multiple_reminders" }
+      { version: 7, name: "execution_multiple_reminders" },
+      { version: 8, name: "planned_time_preferences" }
     ]);
 
     const taskColumns = await database.getAllAsync<{ name: string }>(
@@ -84,6 +85,15 @@ describe("task database", () => {
     assert.ok(taskColumns.some((column) => column.name === "parent_task_id"));
     assert.ok(taskColumns.some((column) => column.name === "started_at"));
     assert.ok(taskColumns.some((column) => column.name === "reminder_offsets"));
+    assert.ok(taskColumns.some((column) => column.name === "planned_time_preference"));
+    const recoveryItemColumns = await database.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(recovery_items);"
+    );
+    assert.ok(
+      recoveryItemColumns.some(
+        (column) => column.name === "original_planned_time_preference"
+      )
+    );
   });
 
   it("preserves existing tasks when upgrading to calendar storage", async () => {
@@ -134,6 +144,7 @@ describe("task database", () => {
     assert.equal(tasks[0]?.startedAt, null);
     assert.equal(tasks[0]?.importance, "normal");
     assert.equal(tasks[0]?.parentTaskId, null);
+    assert.equal(tasks[0]?.plannedTimePreference, "anytime");
   });
 
   it("migrates legacy single reminders without changing installed data", async () => {
@@ -233,12 +244,43 @@ describe("task database", () => {
     assert.equal(task.status, "not_started");
     assert.equal(task.scheduledDate, "2026-08-04");
     assert.equal(task.scheduledTime, "09:15");
+    assert.equal(task.plannedTimePreference, "anytime");
     assert.equal(task.estimatedDurationMinutes, 25);
     assert.equal(task.deadlineDate, "2026-08-08");
     assert.deepEqual(task.reminderOffsets, []);
     assert.equal(task.startedAt, null);
     assert.equal(task.completedAt, null);
     assert.equal(task.deletedAt, null);
+  });
+
+  it("persists every planned time preference without creating an exact time", async () => {
+    const { database, repository } = await createRepository();
+    const preferences: PlannedTimePreference[] = [
+      "anytime",
+      "morning",
+      "afternoon",
+      "evening"
+    ];
+
+    for (const preference of preferences) {
+      const task = await repository.createTask({
+        title: `${preference} task`,
+        scheduledDate: "2026-08-06",
+        plannedTimePreference: preference
+      });
+
+      assert.equal(task.plannedTimePreference, preference);
+      assert.equal(task.scheduledTime, null);
+      assert.equal(getTaskPlanningState(task), "planned");
+    }
+
+    const restoredDatabase = await createSqlJsDatabase(database.exportData());
+    await initializeDatabase(restoredDatabase);
+    const restoredPreferences = (
+      await new TaskRepository(new SqlTaskStorage(restoredDatabase)).getAllTasks()
+    ).map((task) => task.plannedTimePreference);
+
+    assert.deepEqual(restoredPreferences, preferences);
   });
 
   it("edits one task identity across planning states and persists the changes", async () => {
@@ -250,6 +292,7 @@ describe("task database", () => {
       description: "Start with the three main sections",
       importance: "important",
       scheduledDate: "2026-08-06",
+      plannedTimePreference: "afternoon",
       estimatedDurationMinutes: 45,
       deadlineDate: "2026-08-08"
     });
@@ -257,6 +300,8 @@ describe("task database", () => {
     assert.equal(planned.id, original.id);
     assert.equal(planned.scheduledDate, "2026-08-06");
     assert.equal(planned.scheduledTime, null);
+    assert.equal(planned.plannedTimePreference, "afternoon");
+    assert.equal(getTaskPlanningState(planned), "planned");
     assert.equal(planned.importance, "important");
     assert.equal((await repository.getAllTasks()).length, 1);
 
@@ -267,16 +312,30 @@ describe("task database", () => {
       reminderOffsets: [10]
     });
     assert.equal(scheduled.scheduledTime, "10:00");
+    assert.equal(scheduled.plannedTimePreference, "afternoon");
+    assert.equal(getTaskPlanningState(scheduled), "scheduled");
     assert.deepEqual(scheduled.reminderOffsets, [10]);
 
-    const flexible = await repository.updateTask(original.id, {
+    const replanned = await repository.updateTask(original.id, {
       ...scheduled,
+      scheduledTime: null,
+      plannedTimePreference: "morning"
+    });
+    assert.equal(replanned.id, original.id);
+    assert.equal(replanned.scheduledTime, null);
+    assert.equal(replanned.plannedTimePreference, "morning");
+    assert.equal(getTaskPlanningState(replanned), "planned");
+
+    const flexible = await repository.updateTask(original.id, {
+      ...replanned,
       scheduledDate: null,
       scheduledTime: null,
-      reminderOffsets: scheduled.reminderOffsets
+      reminderOffsets: replanned.reminderOffsets
     });
     assert.equal(flexible.scheduledDate, null);
     assert.equal(flexible.scheduledTime, null);
+    assert.equal(flexible.plannedTimePreference, null);
+    assert.equal(getTaskPlanningState(flexible), "flexible");
     assert.deepEqual(flexible.reminderOffsets, [10]);
 
     const restoredDatabase = await createSqlJsDatabase(database.exportData());
@@ -287,6 +346,7 @@ describe("task database", () => {
     assert.equal(restoredTask.title, "Draft project outline");
     assert.equal(restoredTask.importance, "important");
     assert.equal(restoredTask.scheduledDate, null);
+    assert.equal(restoredTask.plannedTimePreference, null);
   });
 
   it("preserves reminder choices when an edited schedule moves into the past", async () => {

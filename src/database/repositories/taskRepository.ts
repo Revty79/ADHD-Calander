@@ -1,6 +1,7 @@
 import {
   BreakDownTaskInput,
   CreateTaskInput,
+  isPlannedTimePreference,
   isTaskActive,
   ScheduleTaskInput,
   taskImportances,
@@ -32,6 +33,7 @@ type NormalizedTaskInput = Pick<
   | "importance"
   | "scheduledDate"
   | "scheduledTime"
+  | "plannedTimePreference"
   | "estimatedDurationMinutes"
   | "deadlineDate"
   | "reminderOffsets"
@@ -59,6 +61,7 @@ export class TaskRepository {
       parentTaskId: null,
       scheduledDate: normalizedInput.scheduledDate,
       scheduledTime: normalizedInput.scheduledTime,
+      plannedTimePreference: normalizedInput.plannedTimePreference,
       estimatedDurationMinutes: normalizedInput.estimatedDurationMinutes,
       deadlineDate: normalizedInput.deadlineDate,
       reminderOffsets: normalizedInput.reminderOffsets,
@@ -200,9 +203,11 @@ export class TaskRepository {
         ...existingTask,
         scheduledDate: normalizedInput.scheduledDate,
         scheduledTime: normalizedInput.scheduledTime,
+        plannedTimePreference: existingTask.plannedTimePreference ?? "anytime",
         estimatedDurationMinutes:
           normalizedInput.estimatedDurationMinutes ??
           existingTask.estimatedDurationMinutes,
+        reminderOffsets: normalizedInput.reminderOffsets ?? existingTask.reminderOffsets,
         updatedAt: now.toISOString()
       };
 
@@ -246,6 +251,7 @@ export class TaskRepository {
         parentTaskId: parentTask.id,
         scheduledDate: null,
         scheduledTime: null,
+        plannedTimePreference: null,
         estimatedDurationMinutes: null,
         deadlineDate: null,
         reminderOffsets: [],
@@ -552,6 +558,22 @@ function normalizeTaskInput(
     );
   }
 
+  const rawPlannedTimePreference = input.plannedTimePreference?.trim() ?? "";
+  let plannedTimePreference: Task["plannedTimePreference"] = null;
+
+  if (scheduledDate !== null) {
+    const candidate = rawPlannedTimePreference || "anytime";
+
+    if (!isPlannedTimePreference(candidate)) {
+      throw new TaskValidationError(
+        "Choose Anytime, Morning, Afternoon, or Evening.",
+        "plannedTimePreference"
+      );
+    }
+
+    plannedTimePreference = candidate;
+  }
+
   const estimatedDurationMinutes = input.estimatedDurationMinutes ?? null;
 
   if (
@@ -594,6 +616,7 @@ function normalizeTaskInput(
     importance,
     scheduledDate,
     scheduledTime,
+    plannedTimePreference,
     estimatedDurationMinutes,
     deadlineDate,
     reminderOffsets: normalizeReminderOffsets(reminderOffsets)
@@ -604,6 +627,7 @@ function normalizeScheduleTaskInput(input: ScheduleTaskInput): {
   scheduledDate: Task["scheduledDate"] & string;
   scheduledTime: Task["scheduledTime"] & string;
   estimatedDurationMinutes: number | undefined;
+  reminderOffsets: Task["reminderOffsets"] | undefined;
 } {
   const scheduledDate = normalizeLocalDateInput(input.scheduledDate);
 
@@ -634,10 +658,24 @@ function normalizeScheduleTaskInput(input: ScheduleTaskInput): {
     );
   }
 
+  if (
+    input.reminderOffsets !== undefined &&
+    !isReminderOffsetList(input.reminderOffsets)
+  ) {
+    throw new TaskValidationError(
+      "Choose up to five different reminder times.",
+      "reminderOffsets"
+    );
+  }
+
   return {
     scheduledDate,
     scheduledTime,
-    estimatedDurationMinutes: input.estimatedDurationMinutes
+    estimatedDurationMinutes: input.estimatedDurationMinutes,
+    reminderOffsets:
+      input.reminderOffsets === undefined
+        ? undefined
+        : normalizeReminderOffsets(input.reminderOffsets)
   };
 }
 

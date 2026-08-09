@@ -132,31 +132,25 @@ function normalizeCreateEventInput(
   const date = normalizeLocalDateInput(input.date);
 
   if (!date) {
-    throw new CalendarEventValidationError(
-      "Use an event date in YYYY-MM-DD format.",
-      "date"
-    );
+    throw new CalendarEventValidationError("Choose an event date.", "date");
   }
 
   const startTime = normalizeOptionalTime(input.startTime);
 
   if (!startTime) {
-    throw new CalendarEventValidationError(
-      "Use a start time in HH:MM format.",
-      "startTime"
-    );
+    throw new CalendarEventValidationError("Choose a start time.", "startTime");
   }
 
   const rawEndTime = input.endTime?.trim() ?? "";
   const endTime = normalizeOptionalTime(rawEndTime);
 
   if (rawEndTime && !endTime) {
-    throw new CalendarEventValidationError("Use an end time in HH:MM format.", "endTime");
+    throw new CalendarEventValidationError("Choose an end time.", "endTime");
   }
 
-  if (endTime && endTime < startTime) {
+  if (endTime && endTime <= startTime) {
     throw new CalendarEventValidationError(
-      "The end time must not be earlier than the start time.",
+      "Choose an end time later than the start time.",
       "endTime"
     );
   }

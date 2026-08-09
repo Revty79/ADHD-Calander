@@ -56,7 +56,7 @@ export function buildTaskReminderRequests(task: Task): ReminderNotificationReque
           {
             identifier: getTaskReminderIdentifier(task.id, offset),
             title: task.title,
-            body: `Planned for ${formatLocalTime(task.scheduledDate!, task.scheduledTime!)}.`,
+            body: `Scheduled for ${formatLocalTime(task.scheduledDate!, task.scheduledTime!)}.`,
             triggerDate,
             itemType: "task" as const,
             itemId: task.id

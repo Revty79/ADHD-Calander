@@ -122,10 +122,13 @@ describe("rule-based scheduling engine", () => {
   it("uses the deadline as a hard local-date boundary", () => {
     const suggestions = generate({
       task: createTask({
+        scheduledDate: "2026-08-10",
+        plannedTimePreference: "evening",
         estimatedDurationMinutes: 30,
         deadlineDate: "2026-08-11"
       }),
-      horizonDays: 4
+      horizonDays: 4,
+      maximumSuggestions: 2
     });
 
     assert.deepEqual(
@@ -146,6 +149,76 @@ describe("rule-based scheduling engine", () => {
     assert.equal(suggestions[0]?.date, "2026-08-10");
     assert.equal(suggestions[0]?.startTime, "08:15");
     assert.equal(suggestions[0]?.endTime, "08:45");
+  });
+
+  it("ranks preferred time-of-day slots before valid non-preferred slots", () => {
+    const suggestions = generate({
+      task: createTask({
+        scheduledDate: "2026-08-10",
+        plannedTimePreference: "afternoon",
+        estimatedDurationMinutes: 45
+      }),
+      horizonDays: 1,
+      maximumSuggestions: 3
+    });
+
+    assert.equal(suggestions[0]?.startTime, "12:00");
+    assert.match(suggestions[0]?.explanation ?? "", /afternoon preference/);
+    assert.equal(suggestions[1]?.startTime, "08:00");
+  });
+
+  it("returns valid alternatives when the preferred period is unavailable", () => {
+    const suggestions = generate({
+      task: createTask({
+        scheduledDate: "2026-08-10",
+        plannedTimePreference: "afternoon",
+        estimatedDurationMinutes: 30
+      }),
+      events: [
+        createEvent({
+          startTime: "11:45",
+          endTime: "17:15",
+          durationMinutes: 330
+        })
+      ],
+      horizonDays: 1
+    });
+
+    assert.ok(suggestions.length > 0);
+    assert.ok(
+      suggestions.every(
+        (suggestion) => suggestion.endTime <= "11:30" || suggestion.startTime >= "17:30"
+      )
+    );
+    assert.ok(
+      suggestions.every(
+        (suggestion) => suggestion.startTime < "12:00" || suggestion.startTime >= "17:00"
+      )
+    );
+    assert.match(suggestions[0]?.explanation ?? "", /fallback/);
+  });
+
+  it("never lets a soft preference override planning boundaries", () => {
+    const suggestions = generate({
+      task: createTask({
+        scheduledDate: "2026-08-10",
+        plannedTimePreference: "evening",
+        estimatedDurationMinutes: 60
+      }),
+      preferences: {
+        ...defaultPreferences,
+        planningDayStart: "09:00",
+        planningDayEnd: "16:00"
+      },
+      horizonDays: 1
+    });
+
+    assert.ok(suggestions.length > 0);
+    assert.ok(
+      suggestions.every(
+        (suggestion) => suggestion.startTime >= "09:00" && suggestion.endTime <= "16:00"
+      )
+    );
   });
 
   it("ranks a reasonable lower-load day before a busier day", () => {
@@ -274,7 +347,7 @@ describe("rule-based scheduling engine", () => {
 });
 
 describe("scheduling acceptance workflow", () => {
-  it("updates one existing task, persists its deadline, and resynchronizes reminder intent", async () => {
+  it("updates one existing task and persists multiple reminder choices", async () => {
     const database = await createSqlJsDatabase();
     await initializeDatabase(database);
     const taskStorage = new SqlTaskStorage(database);
@@ -317,16 +390,21 @@ describe("scheduling acceptance workflow", () => {
     const search = await service.getSuggestions(task.id);
     const suggestion = search.suggestions[0]!;
 
-    const scheduled = await service.acceptSuggestion(task.id, suggestion);
+    assert.ok(search.suggestions.every((candidate) => candidate.date >= "2026-08-12"));
+
+    const scheduled = await service.acceptSuggestion(task.id, suggestion, {
+      reminderOffsets: [1440, 60, 15]
+    });
 
     assert.equal(scheduled.id, task.id);
     assert.equal(scheduled.scheduledDate, suggestion.date);
     assert.equal(scheduled.scheduledTime, suggestion.startTime);
     assert.equal(scheduled.deadlineDate, "2026-08-13");
-    assert.deepEqual(scheduled.reminderOffsets, [10]);
+    assert.deepEqual(scheduled.reminderOffsets, [1440, 60, 15]);
     assert.equal((await taskStorage.getAllTasks()).length, 1);
     assert.equal(synchronizer.tasks.at(-1)?.id, task.id);
     assert.equal(synchronizer.tasks.at(-1)?.scheduledTime, suggestion.startTime);
+    assert.deepEqual(synchronizer.tasks.at(-1)?.reminderOffsets, [1440, 60, 15]);
 
     const reopenedDatabase = await createSqlJsDatabase(database.exportData());
     await initializeDatabase(reopenedDatabase);
@@ -335,6 +413,52 @@ describe("scheduling acceptance workflow", () => {
     assert.equal(restored?.scheduledDate, suggestion.date);
     assert.equal(restored?.scheduledTime, suggestion.startTime);
     assert.equal(restored?.deadlineDate, "2026-08-13");
+    assert.deepEqual(restored?.reminderOffsets, [1440, 60, 15]);
+  });
+
+  it("persists a user-selected exact time and multiple reminders", async () => {
+    const database = await createSqlJsDatabase();
+    await initializeDatabase(database);
+    const taskStorage = new SqlTaskStorage(database);
+    const synchronizer = new RecordingReminderSynchronizer();
+    const taskRepository = new TaskRepository(
+      taskStorage,
+      () => "manual-task",
+      () => now,
+      synchronizer
+    );
+    const task = await taskRepository.createTask({
+      title: "Call the clinic",
+      scheduledDate: "2026-08-11",
+      plannedTimePreference: "morning"
+    });
+    const service = new SchedulingService(
+      taskRepository,
+      new CalendarEventRepository(new SqlCalendarEventStorage(database)),
+      new SettingsRepository(new SqlSettingsStorage(database)),
+      () => now
+    );
+
+    const scheduled = await service.scheduleSpecificTime(task.id, {
+      scheduledDate: "2026-08-11",
+      scheduledTime: "09:30",
+      estimatedDurationMinutes: 30,
+      reminderOffsets: [1440, 60, 15, 0]
+    });
+
+    assert.equal(scheduled.id, task.id);
+    assert.equal(scheduled.scheduledDate, "2026-08-11");
+    assert.equal(scheduled.scheduledTime, "09:30");
+    assert.equal(scheduled.plannedTimePreference, "morning");
+    assert.deepEqual(scheduled.reminderOffsets, [1440, 60, 15, 0]);
+    assert.deepEqual(synchronizer.tasks.at(-1)?.reminderOffsets, [1440, 60, 15, 0]);
+
+    const reopenedDatabase = await createSqlJsDatabase(database.exportData());
+    await initializeDatabase(reopenedDatabase);
+    const restored = await new SqlTaskStorage(reopenedDatabase).getTaskById(task.id);
+
+    assert.equal(restored?.scheduledTime, "09:30");
+    assert.deepEqual(restored?.reminderOffsets, [1440, 60, 15, 0]);
   });
 
   it("revalidates a suggestion before acceptance", async () => {
@@ -426,6 +550,7 @@ function createTask(overrides: Partial<Task> = {}): Task {
     parentTaskId: null,
     scheduledDate: null,
     scheduledTime: null,
+    plannedTimePreference: null,
     estimatedDurationMinutes: 30,
     deadlineDate: null,
     reminderOffsets: [],
