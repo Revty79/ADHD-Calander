@@ -14,7 +14,6 @@ import {
 import {
   CreateTaskInput,
   getTaskPlanningState,
-  PlannedTimePreference,
   Task,
   TaskImportance,
   TaskPlanningState
@@ -25,7 +24,6 @@ import {
   getPlannedDateQuickChoices,
   TaskDateQuickChoice
 } from "../taskDateChoices";
-import { plannedTimePreferenceOptions } from "../plannedTimePreferences";
 
 type FieldErrors = Partial<Record<TaskValidationError["field"], string>>;
 
@@ -67,8 +65,6 @@ export function TaskEditorForm({
     initialTask?.scheduledDate ?? initialDate
   );
   const [scheduledTime, setScheduledTime] = useState(initialTask?.scheduledTime ?? "");
-  const [plannedTimePreference, setPlannedTimePreference] =
-    useState<PlannedTimePreference>(initialTask?.plannedTimePreference ?? "anytime");
   const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState<number | null>(
     initialTask?.estimatedDurationMinutes ?? null
   );
@@ -96,14 +92,6 @@ export function TaskEditorForm({
     }
   }
 
-  function chooseExactTime(value: string) {
-    setScheduledTime(value);
-
-    if (value) {
-      setPlanningState("scheduled");
-    }
-  }
-
   async function saveTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFieldErrors({});
@@ -117,8 +105,6 @@ export function TaskEditorForm({
         importance,
         scheduledDate: planningState === "flexible" ? null : scheduledDate,
         scheduledTime: planningState === "scheduled" ? scheduledTime : null,
-        plannedTimePreference:
-          planningState === "flexible" ? null : plannedTimePreference,
         estimatedDurationMinutes,
         deadlineDate,
         reminderOffsets
@@ -186,7 +172,7 @@ export function TaskEditorForm({
           />
 
           <ChoiceFieldset<TaskPlanningState>
-            help="Flexible has no date. Planned has a date and a soft preference; you can also add an exact time. Scheduled has an exact date and time."
+            help="Flexible has no date. Planned has a date. Scheduled has a date and time."
             legend="Planning state"
             name="task-planning-state"
             onChange={choosePlanningState}
@@ -239,34 +225,6 @@ export function TaskEditorForm({
               />
               <FieldError id="task-time-error" message={fieldErrors.scheduledTime} />
             </div>
-          ) : null}
-
-          {planningState === "planned" ? (
-            <>
-              <ChoiceFieldset<PlannedTimePreference>
-                help="This guides scheduling suggestions but never blocks other available times."
-                legend="Preferred time"
-                name="task-planned-time-preference"
-                onChange={setPlannedTimePreference}
-                options={plannedTimePreferenceOptions}
-                value={plannedTimePreference}
-              />
-              <div className="web-form-group">
-                <label htmlFor="task-optional-time">
-                  Exact start time <span>Optional</span>
-                </label>
-                <small id="task-optional-time-help">
-                  Choosing a time makes this a Scheduled task and enables reminders.
-                </small>
-                <input
-                  aria-describedby="task-optional-time-help"
-                  id="task-optional-time"
-                  onChange={(event) => chooseExactTime(event.currentTarget.value)}
-                  type="time"
-                  value={scheduledTime}
-                />
-              </div>
-            </>
           ) : null}
 
           <fieldset className="web-choice-fieldset">

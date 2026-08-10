@@ -3,23 +3,21 @@
 ## Purpose
 
 Calendar is the structural center for the Plan -> Do -> Recover direction. This
-foundation answers what is fixed, what work has an exact schedule, and what work
-has been deliberately planned without an exact time. Scheduling assistance may
-suggest a place for one active untimed task, but never decides or moves work on
-its own.
+foundation answers what is fixed, what work has been deliberately planned, and
+what dated work remains flexible. Scheduling assistance may now suggest a place
+for one flexible task, but never decides or moves work on its own.
 
 ## Domain Separation
 
 `CalendarEvent` represents a fixed commitment. Its current `kind` is always
 `fixed`. `Task` represents work and can be:
 
-- Flexible: no date, exact time, or time-of-day preference.
-- Planned: a date without an exact start time, optionally carrying a semantic
-  Anytime, Morning, Afternoon, or Evening preference.
-- Scheduled: a date with an exact start time.
+- Unscheduled: no date or time.
+- Flexible on a date: a date without a start time.
+- Planned: a date with a start time.
 
-Planning placement and execution state are separate. A task can be Flexible,
-Planned, or Scheduled while its execution state is Not started, In progress, or
+Planning placement and execution state are separate. A task can be unscheduled,
+flexible, or planned while its execution state is Not started, In progress, or
 Completed. Starting and pausing never invent or change a schedule.
 
 Calendar aggregation reads both repositories and keeps these categories
@@ -35,7 +33,7 @@ calendar” facts and never as completed or attended accomplishments.
   completed-task counts. Selecting a date opens its detail.
 - Week shows seven factual day summaries and stored items. Wide layouts use
   columns; narrow layouts use a vertical list.
-- Day groups items as Fixed, Scheduled, and Planned and keeps completed tasks
+- Day groups items as Fixed, Planned, and Flexible and keeps completed tasks
   visible with a calm status label.
 - Calendar exposes Add event and Add task as equally visible primary actions.
 - Active tasks whose planned time or deadline has passed remain ordinary open
@@ -53,8 +51,7 @@ depend on color alone.
 
 - Event duration when explicitly stored.
 - Difference between explicit event start and end times.
-- Scheduled-task estimated duration when explicitly stored. Planned tasks do not
-  claim scheduled minutes before an exact time is chosen.
+- Task estimated duration when explicitly stored.
 
 Unknown durations contribute zero. The UI does not label a day empty,
 available, overloaded, or productive based on whitespace.
@@ -67,7 +64,7 @@ database and creates equivalent adapters. Recovery task mutations and recovery
 decision writes share a storage transaction.
 
 The calendar hook loads events for the visible local-date range and filters
-dated tasks into that range. Flexible tasks remain available in Tasks
+scheduled tasks into that range. Unscheduled tasks remain available in Tasks
 but do not appear on a calendar date.
 
 ## Local Dates
@@ -86,9 +83,9 @@ date.
 
 A task or fixed event may store up to five distinct reminder offsets from the
 supported choices. Reminder intent does not change Calendar grouping: fixed
-events remain fixed, exact-time tasks remain Scheduled, and dated untimed tasks
-remain Planned. Native item cards describe stored reminders with text, so their
-state is not communicated by color.
+events remain fixed, timed tasks remain planned, and untimed tasks remain
+flexible. Native item cards describe stored reminders with text, so their state
+is not communicated by color.
 
 `ReminderService` builds one local trigger per valid offset from the item's
 validated local date and time. Each request identifier includes the item type,
@@ -105,18 +102,12 @@ controls. Task editing updates the existing record through `TaskRepository`.
 Event reminders can be selected during event creation; general event editing,
 including later reminder changes, remains deferred.
 
-Native fixed-event creation uses date, start-time, and end-time pickers or one
-of the explicit duration choices 15, 30, 45, 60, 90, and 120 minutes. Web uses
-semantic date/time inputs and the same duration choices. End time and duration
-remain mutually exclusive. Browser reminders remain visibly unsupported rather
-than presenting controls that cannot deliver notifications.
-
 ## Scheduling Assistance Integration
 
 Fixed events and active timed tasks are read as blockers by the pure scheduling
 engine. Fixed events receive the configured transition buffer; timed tasks use
 their exact known estimate and no extra fixed-event buffer. Untimed dated tasks
-remain visible as Planned work but do not claim an exact interval. An accepted
+remain visible as flexible work but do not claim an exact interval. An accepted
 suggestion updates the task's local date and time, so Calendar and Today read the
 new placement through their existing repositories without a duplicate event.
 

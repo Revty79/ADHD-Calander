@@ -6,7 +6,6 @@ import { useTaskDetail } from "../../../src/features/tasks/hooks/useTaskDetail";
 import {
   getTaskImportanceLabel,
   getTaskPlanningLabel,
-  getTaskPlannedTimePreferenceLabel,
   getTaskStatusLabel,
   getTaskTimingNote
 } from "../../../src/features/tasks/taskPresentation";
@@ -132,14 +131,6 @@ export default function WebTaskDetailScreen() {
                   label="Scheduled time"
                   value={task.scheduledTime ?? "No time"}
                 />
-                {getTaskPlanningState(task) === "planned" ? (
-                  <DetailRow
-                    label="Preferred time"
-                    value={
-                      getTaskPlannedTimePreferenceLabel(task) ?? "Anytime preference"
-                    }
-                  />
-                ) : null}
                 <DetailRow
                   label="Deadline"
                   value={

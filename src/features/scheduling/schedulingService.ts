@@ -1,7 +1,7 @@
 import { CalendarEventRepository } from "../../database/repositories/calendarEventRepository";
 import { SettingsRepository } from "../../database/repositories/settingsRepository";
 import { TaskRepository } from "../../database/repositories/taskRepository";
-import { ScheduleTaskInput, Task } from "../../types/task";
+import { Task } from "../../types/task";
 import { getLocalDateString } from "../../utils/dates";
 import { addLocalDays } from "../calendar/calendarDates";
 import { generateSchedulingSuggestions } from "./scheduler";
@@ -13,15 +13,6 @@ export type SchedulingSearchOptions = {
   durationMinutes?: number;
   horizonDays?: number;
 };
-
-export type SchedulingAcceptanceOptions = SchedulingSearchOptions & {
-  reminderOffsets?: number[];
-};
-
-export type SpecificTimeScheduleInput = Pick<
-  ScheduleTaskInput,
-  "scheduledDate" | "scheduledTime" | "estimatedDurationMinutes" | "reminderOffsets"
->;
 
 export class SchedulingSuggestionUnavailableError extends Error {
   constructor() {
@@ -43,15 +34,11 @@ export class SchedulingService {
     options: SchedulingSearchOptions = {}
   ): Promise<SchedulingSearchResult> {
     const now = this.clock();
-    const today = getLocalDateString(now);
+    const startDate = getLocalDateString(now);
     const horizonDays = normalizeHorizon(options.horizonDays);
-    const task = await this.taskRepository.getTaskById(taskId);
-    const startDate =
-      task.scheduledDate !== null && task.scheduledDate > today
-        ? task.scheduledDate
-        : today;
     const searchedThrough = addLocalDays(startDate, horizonDays - 1);
-    const [tasks, events, settings] = await Promise.all([
+    const [task, tasks, events, settings] = await Promise.all([
+      this.taskRepository.getTaskById(taskId),
       this.taskRepository.getAllTasks(),
       this.calendarEventRepository.getEventsForRange(startDate, searchedThrough),
       this.settingsRepository.getSettings()
@@ -96,10 +83,9 @@ export class SchedulingService {
   async acceptSuggestion(
     taskId: string,
     suggestion: SchedulingSuggestion,
-    options: SchedulingAcceptanceOptions = {}
+    options: SchedulingSearchOptions = {}
   ): Promise<Task> {
-    const { reminderOffsets, ...searchOptions } = options;
-    const refreshed = await this.getSuggestions(taskId, searchOptions);
+    const refreshed = await this.getSuggestions(taskId, options);
     const available = refreshed.suggestions.find(
       (candidate) =>
         candidate.date === suggestion.date &&
@@ -115,16 +101,8 @@ export class SchedulingService {
     return this.taskRepository.scheduleTask(taskId, {
       scheduledDate: available.date,
       scheduledTime: available.startTime,
-      estimatedDurationMinutes: refreshed.durationMinutes,
-      ...(reminderOffsets === undefined ? {} : { reminderOffsets })
+      estimatedDurationMinutes: refreshed.durationMinutes
     });
-  }
-
-  async scheduleSpecificTime(
-    taskId: string,
-    input: SpecificTimeScheduleInput
-  ): Promise<Task> {
-    return this.taskRepository.scheduleTask(taskId, input);
   }
 }
 

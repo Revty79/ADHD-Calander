@@ -6,12 +6,7 @@ import {
   useSchedulingSuggestions
 } from "../../../src/features/scheduling/hooks/useSchedulingSuggestions";
 import { SchedulingSuggestion } from "../../../src/features/scheduling/types";
-import { getTaskPlanningLabel } from "../../../src/features/tasks/taskPresentation";
-import {
-  formatLocalDateForDisplay,
-  getLocalDateString,
-  normalizeLocalDateInput
-} from "../../../src/utils/dates";
+import { formatLocalDateForDisplay } from "../../../src/utils/dates";
 
 export default function WebScheduleTaskScreen() {
   const router = useRouter();
@@ -20,20 +15,11 @@ export default function WebScheduleTaskScreen() {
   const scheduling = useSchedulingSuggestions(taskId);
   const [selectedSuggestion, setSelectedSuggestion] =
     useState<SchedulingSuggestion | null>(null);
-  const [today] = useState(() => getLocalDateString(new Date()));
-  const [specificDateOverride, setSpecificDate] = useState<string | null>(null);
-  const [specificTimeOverride, setSpecificTime] = useState<string | null>(null);
-  const [isReviewingSpecificTime, setIsReviewingSpecificTime] = useState(false);
   const selectedDuration =
     scheduling.durationOverride ?? scheduling.result?.durationMinutes ?? null;
-  const specificDate =
-    specificDateOverride ?? scheduling.result?.task.scheduledDate ?? today;
-  const specificTime =
-    specificTimeOverride ?? scheduling.result?.task.scheduledTime ?? "";
 
   function chooseDuration(durationMinutes: number) {
     setSelectedSuggestion(null);
-    setIsReviewingSpecificTime(false);
     scheduling.chooseDuration(durationMinutes);
   }
 
@@ -44,28 +30,10 @@ export default function WebScheduleTaskScreen() {
 
     const task = await scheduling.acceptSuggestion(selectedSuggestion);
 
-    returnToTask(task?.id);
-  }
-
-  async function confirmSpecificTime() {
-    if (!specificDate || !specificTime) {
-      return;
-    }
-
-    const task = await scheduling.scheduleSpecificTime({
-      scheduledDate: specificDate,
-      scheduledTime: specificTime,
-      ...(selectedDuration === null ? {} : { estimatedDurationMinutes: selectedDuration })
-    });
-
-    returnToTask(task?.id);
-  }
-
-  function returnToTask(id: string | undefined) {
-    if (id) {
+    if (task?.scheduledDate) {
       router.replace({
         pathname: "/tasks/[id]",
-        params: { id }
+        params: { id: task.id }
       });
     }
   }
@@ -111,9 +79,7 @@ export default function WebScheduleTaskScreen() {
           <>
             <section className="web-scheduling-task" aria-labelledby="task-title">
               <div>
-                <p className="web-eyebrow">
-                  {getTaskPlanningLabel(scheduling.result.task)} task
-                </p>
+                <p className="web-eyebrow">Flexible task</p>
                 <h2 id="task-title">{scheduling.result.task.title}</h2>
                 {scheduling.result.task.description ? (
                   <p>{scheduling.result.task.description}</p>
@@ -166,95 +132,6 @@ export default function WebScheduleTaskScreen() {
                 ))}
               </div>
             </section>
-
-            <section
-              className="web-scheduling-specific"
-              aria-labelledby="specific-time-title"
-            >
-              <div>
-                <h2 id="specific-time-title">Choose a specific time</h2>
-                <p>
-                  Already know when you want to do it? Enter the exact date and time
-                  instead of using a suggestion. Nothing changes until you confirm.
-                </p>
-              </div>
-              <div className="web-scheduling-specific-fields">
-                <label htmlFor="specific-task-date">
-                  Date
-                  <input
-                    id="specific-task-date"
-                    onChange={(event) => {
-                      setSpecificDate(event.currentTarget.value);
-                      setIsReviewingSpecificTime(false);
-                    }}
-                    type="date"
-                    value={specificDate}
-                  />
-                </label>
-                <label htmlFor="specific-task-time">
-                  Start time
-                  <input
-                    id="specific-task-time"
-                    onChange={(event) => {
-                      setSpecificTime(event.currentTarget.value);
-                      setIsReviewingSpecificTime(false);
-                    }}
-                    type="time"
-                    value={specificTime}
-                  />
-                </label>
-              </div>
-              {scheduling.result.task.reminderOffsets.length > 0 ? (
-                <p>
-                  The task&apos;s{" "}
-                  {formatReminderCount(scheduling.result.task.reminderOffsets.length)}{" "}
-                  will move with the confirmed time. Android schedules only future trigger
-                  times.
-                </p>
-              ) : null}
-              <button
-                className="web-secondary-button"
-                disabled={!specificDate || !specificTime}
-                onClick={() => {
-                  setSelectedSuggestion(null);
-                  setIsReviewingSpecificTime(true);
-                }}
-                type="button"
-              >
-                Review this exact time
-              </button>
-            </section>
-
-            {isReviewingSpecificTime && specificDate && specificTime ? (
-              <section className="web-scheduling-confirm" aria-live="polite">
-                <h2>Confirm this exact time?</h2>
-                <p>
-                  {formatSpecificDate(specificDate)}, {formatTime(specificTime)}
-                </p>
-                <p>
-                  This updates the existing task. It does not create another task or
-                  event.
-                </p>
-                <div className="web-form-actions">
-                  <button
-                    className="web-primary-button"
-                    disabled={scheduling.isAccepting}
-                    onClick={confirmSpecificTime}
-                    type="button"
-                  >
-                    {scheduling.isAccepting ? "Scheduling..." : "Confirm exact time"}
-                  </button>
-                  <button
-                    className="web-secondary-button"
-                    disabled={scheduling.isAccepting}
-                    onClick={() => setIsReviewingSpecificTime(false)}
-                    type="button"
-                  >
-                    Keep editing
-                  </button>
-                </div>
-              </section>
-            ) : null}
 
             {scheduling.result.status === "needs_duration" ? (
               <section className="web-scheduling-message" aria-live="polite">
@@ -316,10 +193,7 @@ export default function WebScheduleTaskScreen() {
                             : "web-suggestion-card"
                         }
                         key={`${suggestion.date}-${suggestion.startTime}`}
-                        onClick={() => {
-                          setIsReviewingSpecificTime(false);
-                          setSelectedSuggestion(suggestion);
-                        }}
+                        onClick={() => setSelectedSuggestion(suggestion)}
                         type="button"
                       >
                         <span className="web-suggestion-date">
@@ -407,14 +281,4 @@ function formatTime(value: string): string {
   const displayHour = hour % 12 || 12;
 
   return `${displayHour}:${String(minute).padStart(2, "0")} ${suffix}`;
-}
-
-function formatReminderCount(count: number): string {
-  return count === 1 ? "1 saved reminder" : `${count} saved reminders`;
-}
-
-function formatSpecificDate(value: string): string {
-  const normalized = normalizeLocalDateInput(value);
-
-  return normalized ? formatLocalDateForDisplay(normalized) : value;
 }

@@ -6,7 +6,7 @@ import {
   RecoverySessionStatus
 } from "../types/recovery";
 import { LocalDateString, LocalTimeString } from "../types/dateTime";
-import { PlannedTimePreference, TaskStatus } from "../types/task";
+import { TaskStatus } from "../types/task";
 import { RecoveryDecisionMutation, RecoveryStorage } from "./recoveryStorage";
 import { SqlExecutor } from "./sql";
 import { SqlTaskStorage } from "./sqlTaskStorage";
@@ -28,7 +28,6 @@ type RecoveryItemRow = {
   originalStatus: TaskStatus;
   originalScheduledDate: LocalDateString;
   originalScheduledTime: LocalTimeString | null;
-  originalPlannedTimePreference: PlannedTimePreference;
   originalEstimatedDurationMinutes: number | null;
   originalReminderOffsets: string;
   status: RecoveryItemStatus;
@@ -61,7 +60,6 @@ const itemSelect = `
     original_status AS originalStatus,
     original_scheduled_date AS originalScheduledDate,
     original_scheduled_time AS originalScheduledTime,
-    original_planned_time_preference AS originalPlannedTimePreference,
     original_estimated_duration_minutes AS originalEstimatedDurationMinutes,
     original_reminder_offsets AS originalReminderOffsets,
     status,
@@ -209,7 +207,6 @@ export class SqlRecoveryStorage implements RecoveryStorage {
           original_status,
           original_scheduled_date,
           original_scheduled_time,
-          original_planned_time_preference,
           original_estimated_duration_minutes,
           original_reminder_offsets,
           status,
@@ -221,7 +218,7 @@ export class SqlRecoveryStorage implements RecoveryStorage {
           reviewed_at,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       item.id,
       item.sessionId,
@@ -230,7 +227,6 @@ export class SqlRecoveryStorage implements RecoveryStorage {
       item.originalStatus,
       item.originalScheduledDate,
       item.originalScheduledTime,
-      item.originalPlannedTimePreference,
       item.originalEstimatedDurationMinutes,
       JSON.stringify(item.originalReminderOffsets),
       item.status,
@@ -290,7 +286,6 @@ function mapRecoveryItemRow(row: RecoveryItemRow): RecoveryItem {
     originalStatus: row.originalStatus,
     originalScheduledDate: row.originalScheduledDate,
     originalScheduledTime: row.originalScheduledTime,
-    originalPlannedTimePreference: row.originalPlannedTimePreference,
     originalEstimatedDurationMinutes: row.originalEstimatedDurationMinutes,
     originalReminderOffsets: parseStoredReminderOffsets(row.originalReminderOffsets),
     status: row.status,

@@ -29,14 +29,6 @@ export type TaskStatus = (typeof taskStatuses)[number];
 export const taskImportances = ["low", "normal", "important"] as const;
 export type TaskImportance = (typeof taskImportances)[number];
 
-export const plannedTimePreferences = [
-  "anytime",
-  "morning",
-  "afternoon",
-  "evening"
-] as const;
-export type PlannedTimePreference = (typeof plannedTimePreferences)[number];
-
 export type TaskPlanningState = "flexible" | "planned" | "scheduled";
 
 export type Task = {
@@ -48,7 +40,6 @@ export type Task = {
   parentTaskId: string | null;
   scheduledDate: LocalDateString | null;
   scheduledTime: LocalTimeString | null;
-  plannedTimePreference: PlannedTimePreference | null;
   estimatedDurationMinutes: number | null;
   deadlineDate: LocalDateString | null;
   reminderOffsets: ReminderOffsetMinutes[];
@@ -65,7 +56,6 @@ export type CreateTaskInput = {
   importance?: TaskImportance;
   scheduledDate?: string | null;
   scheduledTime?: string | null;
-  plannedTimePreference?: string | null;
   estimatedDurationMinutes?: number | null;
   deadlineDate?: string | null;
   reminderOffsets?: number[];
@@ -81,7 +71,6 @@ export type ScheduleTaskInput = {
   scheduledDate: string;
   scheduledTime: string;
   estimatedDurationMinutes?: number;
-  reminderOffsets?: number[];
 };
 
 export const resolvedTaskStatuses: readonly TaskStatus[] = [
@@ -110,10 +99,6 @@ export function getTaskPlanningState(task: Task): TaskPlanningState {
   }
 
   return task.scheduledTime === null ? "planned" : "scheduled";
-}
-
-export function isPlannedTimePreference(value: string): value is PlannedTimePreference {
-  return plannedTimePreferences.some((preference) => preference === value);
 }
 
 export type { LocalDateString, LocalTimeString } from "./dateTime";

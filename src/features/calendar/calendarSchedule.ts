@@ -5,8 +5,8 @@ import { isTaskResolved, Task } from "../../types/task";
 export type CalendarDaySchedule = {
   date: LocalDateString;
   fixedEvents: CalendarEvent[];
-  scheduledTasks: Task[];
   plannedTasks: Task[];
+  flexibleTasks: Task[];
   completedTaskCount: number;
   scheduledMinutes: number;
 };
@@ -38,23 +38,26 @@ export function buildCalendarSchedule(
     const day = getOrCreateDay(schedule, task.scheduledDate);
 
     if (task.scheduledTime) {
-      day.scheduledTasks.push(task);
-      day.scheduledMinutes += task.estimatedDurationMinutes ?? 0;
-    } else {
       day.plannedTasks.push(task);
+    } else {
+      day.flexibleTasks.push(task);
     }
 
     if (task.status === "completed") {
       day.completedTaskCount += 1;
     }
+
+    day.scheduledMinutes += task.estimatedDurationMinutes ?? 0;
   }
 
   for (const day of schedule.values()) {
     day.fixedEvents.sort((first, second) =>
       first.startTime.localeCompare(second.startTime)
     );
-    day.scheduledTasks.sort(compareTaskTimes);
     day.plannedTasks.sort(compareTaskTimes);
+    day.flexibleTasks.sort((first, second) =>
+      first.createdAt.localeCompare(second.createdAt)
+    );
   }
 
   return schedule;
@@ -64,8 +67,8 @@ export function createEmptyDay(date: LocalDateString): CalendarDaySchedule {
   return {
     date,
     fixedEvents: [],
-    scheduledTasks: [],
     plannedTasks: [],
+    flexibleTasks: [],
     completedTaskCount: 0,
     scheduledMinutes: 0
   };

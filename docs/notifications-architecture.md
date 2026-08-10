@@ -69,8 +69,7 @@ urgency.
 ## Task Synchronization
 
 - Create/edit/reschedule: persist the reminder array, cancel every old identity,
-  then schedule all valid future triggers. Android scheduling assistance exposes
-  the same up-to-five selection before confirming a generated or exact time.
+  then schedule all valid future triggers.
 - Start/Pause: keep the task active and do not alter reminder intent.
 - Complete/remove/resolve: preserve reminder choices but cancel pending native
   notifications because the task is no longer active.

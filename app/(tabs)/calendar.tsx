@@ -36,7 +36,6 @@ import { LocalDateString } from "../../src/types/dateTime";
 import { Task } from "../../src/types/task";
 import {
   getTaskStatusLabel,
-  getTaskPlannedTimePreferenceLabel,
   getTaskTimingNote
 } from "../../src/features/tasks/taskPresentation";
 import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
@@ -254,7 +253,7 @@ function MonthView({
       <View style={styles.monthGrid}>
         {monthDays.map((gridDay) => {
           const schedule = days.get(gridDay.date) ?? createEmptyDay(gridDay.date);
-          const taskCount = schedule.scheduledTasks.length + schedule.plannedTasks.length;
+          const taskCount = schedule.plannedTasks.length + schedule.flexibleTasks.length;
           const isSelected = gridDay.date === selectedDate;
           const isToday = gridDay.date === today;
           const summary = [
@@ -324,7 +323,7 @@ function WeekView({
     <View style={[styles.weekGrid, !isWide && styles.weekList]}>
       {getWeekDates(selectedDate).map((date) => {
         const day = days.get(date) ?? createEmptyDay(date);
-        const taskCount = day.scheduledTasks.length + day.plannedTasks.length;
+        const taskCount = day.plannedTasks.length + day.flexibleTasks.length;
 
         return (
           <Pressable
@@ -353,17 +352,17 @@ function WeekView({
                   {event.startTime} Fixed: {event.title}
                 </Text>
               ))}
-              {day.scheduledTasks.map((task) => (
+              {day.plannedTasks.map((task) => (
                 <Text key={task.id} numberOfLines={2} style={styles.weekTaskItem}>
-                  {task.scheduledTime} Scheduled: {task.title}
+                  {task.scheduledTime} Task: {task.title}
                   {task.estimatedDurationMinutes
                     ? ` · ${formatDuration(task.estimatedDurationMinutes)}`
                     : ""}
                 </Text>
               ))}
-              {day.plannedTasks.map((task) => (
+              {day.flexibleTasks.map((task) => (
                 <Text key={task.id} numberOfLines={2} style={styles.weekTaskItem}>
-                  Planned: {task.title}
+                  Flexible: {task.title}
                   {task.estimatedDurationMinutes
                     ? ` · ${formatDuration(task.estimatedDurationMinutes)}`
                     : ""}
@@ -388,7 +387,7 @@ function DayDetails({
   compact?: boolean;
 }) {
   const router = useRouter();
-  const taskCount = day.scheduledTasks.length + day.plannedTasks.length;
+  const taskCount = day.plannedTasks.length + day.flexibleTasks.length;
 
   return (
     <View style={styles.dayDetails}>
@@ -410,19 +409,19 @@ function DayDetails({
 
       <ScheduleSection
         emptyMessage="No tasks have a start time on this day."
-        title="Scheduled"
-      >
-        {day.scheduledTasks.map((task) => (
-          <TaskScheduleCard key={task.id} task={task} variant="scheduled" />
-        ))}
-      </ScheduleSection>
-
-      <ScheduleSection
-        emptyMessage="No tasks are planned for this day without a set time."
         title="Planned"
       >
         {day.plannedTasks.map((task) => (
           <TaskScheduleCard key={task.id} task={task} variant="planned" />
+        ))}
+      </ScheduleSection>
+
+      <ScheduleSection
+        emptyMessage="No flexible tasks are associated with this date."
+        title="Flexible"
+      >
+        {day.flexibleTasks.map((task) => (
+          <TaskScheduleCard key={task.id} task={task} variant="flexible" />
         ))}
       </ScheduleSection>
 
@@ -494,14 +493,14 @@ function TaskScheduleCard({
   variant
 }: {
   task: Task;
-  variant: "scheduled" | "planned";
+  variant: "planned" | "flexible";
 }) {
   const duration = formatDuration(task.estimatedDurationMinutes);
 
   return (
     <View style={[styles.scheduleCard, styles.taskCard]}>
       <Text style={styles.taskLabel}>
-        {variant === "scheduled" ? "SCHEDULED TASK" : "PLANNED TASK"}
+        {variant === "planned" ? "PLANNED TASK" : "FLEXIBLE TASK"}
       </Text>
       <Text style={styles.scheduleCardTitle}>{task.title}</Text>
       <Text style={styles.scheduleMeta}>
@@ -509,9 +508,6 @@ function TaskScheduleCard({
         {duration ? `${duration} · ` : ""}
         {getTaskStatusLabel(task.status)}
       </Text>
-      {getTaskPlannedTimePreferenceLabel(task) ? (
-        <Text style={styles.scheduleMeta}>{getTaskPlannedTimePreferenceLabel(task)}</Text>
-      ) : null}
       {getTaskTimingNote(task) ? (
         <Text style={styles.timingNote}>{getTaskTimingNote(task)}</Text>
       ) : null}

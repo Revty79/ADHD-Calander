@@ -11,15 +11,15 @@ import { Task } from "../src/types/task";
 const timestamp = "2026-08-06T15:00:00.000Z";
 
 describe("calendar schedule", () => {
-  it("keeps fixed events separate from scheduled and planned tasks", () => {
+  it("keeps fixed events separate from planned and flexible tasks", () => {
     const event = createEvent({ endTime: "10:30" });
     const plannedTask = createTask({
       id: "planned",
       scheduledTime: "11:00",
       estimatedDurationMinutes: 45
     });
-    const untimedPlannedTask = createTask({
-      id: "untimed-planned",
+    const flexibleTask = createTask({
+      id: "flexible",
       scheduledTime: null,
       estimatedDurationMinutes: 20,
       status: "completed"
@@ -29,14 +29,14 @@ describe("calendar schedule", () => {
       "2026-08-06",
       "2026-08-06",
       [event],
-      [plannedTask, untimedPlannedTask]
+      [plannedTask, flexibleTask]
     ).get("2026-08-06");
 
     assert.deepEqual(day?.fixedEvents, [event]);
-    assert.deepEqual(day?.scheduledTasks, [plannedTask]);
-    assert.deepEqual(day?.plannedTasks, [untimedPlannedTask]);
+    assert.deepEqual(day?.plannedTasks, [plannedTask]);
+    assert.deepEqual(day?.flexibleTasks, [flexibleTask]);
     assert.equal(day?.completedTaskCount, 1);
-    assert.equal(day?.scheduledMinutes, 135);
+    assert.equal(day?.scheduledMinutes, 155);
   });
 
   it("derives event minutes from local wall-clock times", () => {
@@ -90,7 +90,6 @@ function createTask(overrides: Partial<Task> = {}): Task {
     parentTaskId: null,
     scheduledDate: "2026-08-06",
     scheduledTime: null,
-    plannedTimePreference: "anytime",
     estimatedDurationMinutes: null,
     deadlineDate: null,
     reminderOffsets: [],

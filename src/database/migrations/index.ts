@@ -5,7 +5,6 @@ import { settingsRemindersFoundationMigration } from "./004_settings_reminders_f
 import { schedulingAssistanceFoundationMigration } from "./005_scheduling_assistance_foundation";
 import { taskFunctionalCoreMigration } from "./006_task_functional_core";
 import { executionMultipleRemindersMigration } from "./007_execution_multiple_reminders";
-import { plannedTimePreferencesMigration } from "./008_planned_time_preferences";
 import { Migration } from "./types";
 
 export const migrations: Migration[] = [
@@ -15,6 +14,5 @@ export const migrations: Migration[] = [
   settingsRemindersFoundationMigration,
   schedulingAssistanceFoundationMigration,
   taskFunctionalCoreMigration,
-  executionMultipleRemindersMigration,
-  plannedTimePreferencesMigration
+  executionMultipleRemindersMigration
 ];

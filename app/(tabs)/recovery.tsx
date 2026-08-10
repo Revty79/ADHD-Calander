@@ -17,7 +17,6 @@ import {
 import { Screen } from "../../src/components/Screen";
 import { useRecoverySession } from "../../src/features/recovery/hooks/useRecoverySession";
 import { getRecoveryDecisionLabel } from "../../src/features/recovery/recoveryPresentation";
-import { getPlannedTimePreferenceLabel } from "../../src/features/tasks/plannedTimePreferences";
 import {
   getNextRecoveryItem,
   getResolvedRecoveryItemCount,
@@ -115,16 +114,10 @@ export default function RecoveryScreen() {
               <View style={styles.metaRow}>
                 {currentItem.originalScheduledTime ? (
                   <Text style={styles.metaText}>
-                    Scheduled for {currentItem.originalScheduledTime}
+                    Planned for {currentItem.originalScheduledTime}
                   </Text>
                 ) : (
-                  <Text style={styles.metaText}>
-                    Planned ·{" "}
-                    {getPlannedTimePreferenceLabel(
-                      currentItem.originalPlannedTimePreference
-                    )}{" "}
-                    preference
-                  </Text>
+                  <Text style={styles.metaText}>Flexible timing</Text>
                 )}
                 {currentItem.originalEstimatedDurationMinutes ? (
                   <Text style={styles.metaText}>

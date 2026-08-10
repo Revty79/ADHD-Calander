@@ -3,60 +3,26 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ErrorNotice } from "../../../src/components/ErrorNotice";
-import {
-  NativeDatePickerButton,
-  NativeTimePickerButton
-} from "../../../src/components/NativeDateTimePickerButton";
 import { Screen } from "../../../src/components/Screen";
-import { ReminderOffsetSelector } from "../../../src/features/reminders/components/ReminderOffsetSelector";
 import {
   practicalDurationOptions,
   useSchedulingSuggestions
 } from "../../../src/features/scheduling/hooks/useSchedulingSuggestions";
 import { SchedulingSuggestion } from "../../../src/features/scheduling/types";
-import { useReminderSettings } from "../../../src/features/settings/hooks/useReminderSettings";
-import {
-  ReminderOffsetMinutes,
-  ReminderPermissionStatus
-} from "../../../src/types/reminder";
-import {
-  formatLocalDateForDisplay,
-  getLocalDateString,
-  normalizeLocalDateInput
-} from "../../../src/utils/dates";
+import { formatLocalDateForDisplay } from "../../../src/utils/dates";
 
 export default function ScheduleTaskScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const taskId = typeof params.id === "string" ? params.id : "";
   const scheduling = useSchedulingSuggestions(taskId);
-  const reminderSettings = useReminderSettings();
   const [selectedSuggestion, setSelectedSuggestion] =
     useState<SchedulingSuggestion | null>(null);
-  const [today] = useState(() => getLocalDateString(new Date()));
-  const [specificDateOverride, setSpecificDate] = useState<string | null>(null);
-  const [specificTimeOverride, setSpecificTime] = useState<string | null>(null);
-  const [isReviewingSpecificTime, setIsReviewingSpecificTime] = useState(false);
-  const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[] | null>(
-    null
-  );
   const selectedDuration =
     scheduling.durationOverride ?? scheduling.result?.durationMinutes ?? null;
-  const specificDate =
-    specificDateOverride ?? scheduling.result?.task.scheduledDate ?? today;
-  const specificTime =
-    specificTimeOverride ?? scheduling.result?.task.scheduledTime ?? "";
-  const selectedReminderOffsets =
-    reminderOffsets ?? scheduling.result?.task.reminderOffsets ?? [];
-  const reminderDisabledMessage = getReminderDisabledMessage(
-    reminderSettings.isLoading,
-    reminderSettings.status?.permissionStatus,
-    reminderSettings.status?.settings.remindersEnabled
-  );
 
   function chooseDuration(durationMinutes: number) {
     setSelectedSuggestion(null);
-    setIsReviewingSpecificTime(false);
     scheduling.chooseDuration(durationMinutes);
   }
 
@@ -65,36 +31,12 @@ export default function ScheduleTaskScreen() {
       return;
     }
 
-    const task = await scheduling.acceptSuggestion(
-      selectedSuggestion,
-      selectedReminderOffsets
-    );
+    const task = await scheduling.acceptSuggestion(selectedSuggestion);
 
-    returnToTask(task?.id);
-  }
-
-  async function confirmSpecificTime() {
-    if (!specificDate || !specificTime) {
-      return;
-    }
-
-    const task = await scheduling.scheduleSpecificTime({
-      scheduledDate: specificDate,
-      scheduledTime: specificTime,
-      ...(selectedDuration === null
-        ? {}
-        : { estimatedDurationMinutes: selectedDuration }),
-      reminderOffsets: selectedReminderOffsets
-    });
-
-    returnToTask(task?.id);
-  }
-
-  function returnToTask(id: string | undefined) {
-    if (id) {
+    if (task?.scheduledDate) {
       router.replace({
         pathname: "/tasks/[id]",
-        params: { id }
+        params: { id: task.id }
       });
     }
   }
@@ -178,106 +120,6 @@ export default function ScheduleTaskScreen() {
             </View>
           </View>
 
-          <View style={[styles.section, styles.specificTimePanel]}>
-            <Text style={styles.sectionTitle}>Choose a specific time</Text>
-            <Text style={styles.sectionHelp}>
-              Already know when you want to do it? Choose the exact date and time instead
-              of using a suggestion. Nothing changes until you confirm.
-            </Text>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Date</Text>
-              <NativeDatePickerButton
-                accessibilityLabel="Choose the exact task date"
-                onChange={(value) => {
-                  setSpecificDate(value);
-                  setIsReviewingSpecificTime(false);
-                }}
-                value={specificDate}
-              />
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Start time</Text>
-              <NativeTimePickerButton
-                accessibilityLabel="Choose the exact task start time"
-                onChange={(value) => {
-                  setSpecificTime(value);
-                  setIsReviewingSpecificTime(false);
-                }}
-                value={specificTime}
-              />
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              disabled={!specificDate || !specificTime}
-              onPress={() => {
-                setSelectedSuggestion(null);
-                setIsReviewingSpecificTime(true);
-              }}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.pressed,
-                (!specificDate || !specificTime) && styles.disabled
-              ]}
-            >
-              <Text style={styles.secondaryButtonText}>Review this exact time</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.section}>
-            <ReminderOffsetSelector
-              disabled={Boolean(reminderDisabledMessage)}
-              {...(reminderDisabledMessage
-                ? { disabledMessage: reminderDisabledMessage }
-                : {})}
-              onChange={(value) => {
-                setReminderOffsets(value);
-                setIsReviewingSpecificTime(false);
-                setSelectedSuggestion(null);
-              }}
-              value={selectedReminderOffsets}
-            />
-          </View>
-
-          {isReviewingSpecificTime && specificDate && specificTime ? (
-            <View accessibilityRole="summary" style={styles.confirmPanel}>
-              <Text style={styles.confirmTitle}>Confirm this exact time?</Text>
-              <Text style={styles.confirmText}>
-                {formatSpecificDate(specificDate)}, {formatTime(specificTime)}
-              </Text>
-              <Text style={styles.confirmText}>
-                {formatReminderCount(selectedReminderOffsets.length)} will be saved and
-                scheduled when their trigger times are still in the future.
-              </Text>
-              <View style={styles.confirmActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={scheduling.isAccepting}
-                  onPress={confirmSpecificTime}
-                  style={({ pressed }) => [
-                    styles.primaryButton,
-                    pressed && styles.pressed,
-                    scheduling.isAccepting && styles.disabled
-                  ]}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    {scheduling.isAccepting ? "Scheduling..." : "Confirm exact time"}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={scheduling.isAccepting}
-                  onPress={() => setIsReviewingSpecificTime(false)}
-                  style={({ pressed }) => [
-                    styles.secondaryButton,
-                    pressed && styles.pressed
-                  ]}
-                >
-                  <Text style={styles.secondaryButtonText}>Keep editing</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
-
           {scheduling.result.status === "needs_duration" ? (
             <View accessibilityRole="summary" style={styles.messagePanel}>
               <Text style={styles.messageTitle}>Add an estimated duration</Text>
@@ -339,10 +181,7 @@ export default function ScheduleTaskScreen() {
                       )}. ${suggestion.explanation}`}
                       accessibilityState={{ selected: isSelected }}
                       key={`${suggestion.date}-${suggestion.startTime}`}
-                      onPress={() => {
-                        setIsReviewingSpecificTime(false);
-                        setSelectedSuggestion(suggestion);
-                      }}
+                      onPress={() => setSelectedSuggestion(suggestion)}
                       style={({ pressed }) => [
                         styles.suggestionCard,
                         isSelected && styles.suggestionCardSelected,
@@ -379,10 +218,6 @@ export default function ScheduleTaskScreen() {
               </Text>
               <Text style={styles.confirmText}>
                 This updates the existing task. It does not create another task or event.
-              </Text>
-              <Text style={styles.confirmText}>
-                {formatReminderCount(selectedReminderOffsets.length)} will be saved and
-                scheduled when their trigger times are still in the future.
               </Text>
               <View style={styles.confirmActions}>
                 <Pressable
@@ -454,36 +289,6 @@ function formatTime(value: string): string {
   return `${displayHour}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 
-function formatReminderCount(count: number): string {
-  return count === 1 ? "1 reminder" : `${count} reminders`;
-}
-
-function formatSpecificDate(value: string): string {
-  const normalized = normalizeLocalDateInput(value);
-
-  return normalized ? formatLocalDateForDisplay(normalized) : value;
-}
-
-function getReminderDisabledMessage(
-  isLoading: boolean,
-  permissionStatus: ReminderPermissionStatus | undefined,
-  remindersEnabled: boolean | undefined
-): string | null {
-  if (isLoading) {
-    return "Checking reminder settings...";
-  }
-
-  if (permissionStatus === "denied" || permissionStatus === "unsupported") {
-    return "Reminders are unavailable on this device or browser.";
-  }
-
-  if (remindersEnabled !== true) {
-    return "Turn on reminders in Settings to choose them here.";
-  }
-
-  return null;
-}
-
 const styles = StyleSheet.create({
   header: { gap: 6, marginBottom: 20 },
   kicker: {
@@ -509,17 +314,8 @@ const styles = StyleSheet.create({
   taskDescription: { color: "#40544c", fontSize: 15, lineHeight: 21 },
   meta: { color: "#4f5c54", fontSize: 13, lineHeight: 19 },
   section: { gap: 10, marginBottom: 24 },
-  specificTimePanel: {
-    backgroundColor: "#f4f1e9",
-    borderColor: "#cfc8bd",
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 16
-  },
   sectionTitle: { color: "#2f2d2a", fontSize: 19, fontWeight: "800" },
   sectionHelp: { color: "#68645e", fontSize: 14, lineHeight: 20 },
-  field: { gap: 8 },
-  fieldLabel: { color: "#2f2d2a", fontSize: 15, fontWeight: "700" },
   durationOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   durationButton: {
     alignItems: "center",

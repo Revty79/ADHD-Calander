@@ -1,7 +1,6 @@
 import {
   LocalDateString,
   LocalTimeString,
-  PlannedTimePreference,
   Task,
   TaskImportance,
   TaskStatus
@@ -19,7 +18,6 @@ type TaskRow = {
   parentTaskId: string | null;
   scheduledDate: LocalDateString | null;
   scheduledTime: LocalTimeString | null;
-  plannedTimePreference: PlannedTimePreference | null;
   estimatedDurationMinutes: number | null;
   deadlineDate: LocalDateString | null;
   reminderOffsets: string;
@@ -40,7 +38,6 @@ const taskSelect = `
     parent_task_id AS parentTaskId,
     scheduled_date AS scheduledDate,
     scheduled_time AS scheduledTime,
-    planned_time_preference AS plannedTimePreference,
     estimated_duration_minutes AS estimatedDurationMinutes,
     deadline_date AS deadlineDate,
     reminder_offsets AS reminderOffsets,
@@ -67,7 +64,6 @@ export class SqlTaskStorage implements TaskStorage {
           parent_task_id,
           scheduled_date,
           scheduled_time,
-          planned_time_preference,
           estimated_duration_minutes,
           deadline_date,
           reminder_offsets,
@@ -76,7 +72,7 @@ export class SqlTaskStorage implements TaskStorage {
           updated_at,
           completed_at,
           deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       task.id,
       task.title,
@@ -86,7 +82,6 @@ export class SqlTaskStorage implements TaskStorage {
       task.parentTaskId,
       task.scheduledDate,
       task.scheduledTime,
-      task.plannedTimePreference,
       task.estimatedDurationMinutes,
       task.deadlineDate,
       JSON.stringify(task.reminderOffsets),
@@ -160,7 +155,6 @@ export class SqlTaskStorage implements TaskStorage {
           parent_task_id = ?,
           scheduled_date = ?,
           scheduled_time = ?,
-          planned_time_preference = ?,
           estimated_duration_minutes = ?,
           deadline_date = ?,
           reminder_offsets = ?,
@@ -179,7 +173,6 @@ export class SqlTaskStorage implements TaskStorage {
       task.parentTaskId,
       task.scheduledDate,
       task.scheduledTime,
-      task.plannedTimePreference,
       task.estimatedDurationMinutes,
       task.deadlineDate,
       JSON.stringify(task.reminderOffsets),
@@ -229,7 +222,6 @@ function mapTaskRow(row: TaskRow): Task {
     parentTaskId: row.parentTaskId,
     scheduledDate: row.scheduledDate,
     scheduledTime: row.scheduledTime,
-    plannedTimePreference: row.plannedTimePreference,
     estimatedDurationMinutes: row.estimatedDurationMinutes,
     deadlineDate: row.deadlineDate,
     reminderOffsets: parseStoredReminderOffsets(row.reminderOffsets),

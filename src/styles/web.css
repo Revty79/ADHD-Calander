@@ -1429,53 +1429,6 @@ summary:focus-visible {
   gap: 10px;
 }
 
-.web-scheduling-specific {
-  display: grid;
-  gap: 14px;
-  padding: 20px;
-  border: 1px solid #cfc8bd;
-  border-radius: 12px;
-  background: #f4f1e9;
-}
-
-.web-scheduling-specific h2,
-.web-scheduling-specific p {
-  margin: 0;
-}
-
-.web-scheduling-specific h2 {
-  color: #2f2d2a;
-  font-size: 1.25rem;
-}
-
-.web-scheduling-specific p {
-  color: #57534d;
-  line-height: 1.55;
-}
-
-.web-scheduling-specific-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.web-scheduling-specific-fields label {
-  display: grid;
-  gap: 7px;
-  color: #2f2d2a;
-  font-weight: 700;
-}
-
-.web-scheduling-specific-fields input {
-  min-height: 46px;
-  padding: 8px 10px;
-  border: 1px solid #aaa49a;
-  border-radius: 8px;
-  background: #fff;
-  color: #2f2d2a;
-  font: inherit;
-}
-
 .web-scheduling-section > h2,
 .web-scheduling-section > p,
 .web-scheduling-message h2,
@@ -1866,10 +1819,6 @@ summary:focus-visible {
   .web-scheduling-message-actions {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .web-scheduling-specific-fields {
-    grid-template-columns: 1fr;
   }
 
   .web-task-actions,

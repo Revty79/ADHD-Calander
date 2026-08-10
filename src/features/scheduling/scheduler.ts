@@ -1,10 +1,9 @@
 import { CalendarEvent } from "../../types/calendarEvent";
 import { LocalDateString, LocalTimeString } from "../../types/dateTime";
-import { isTaskActive, PlannedTimePreference, Task } from "../../types/task";
+import { isTaskActive, Task } from "../../types/task";
 import { getLocalDateString } from "../../utils/dates";
 import { addLocalDays } from "../calendar/calendarDates";
 import { getEventDurationMinutes } from "../calendar/calendarSchedule";
-import { plannedTimePreferenceRanges } from "../tasks/plannedTimePreferences";
 import { DailyLoad, SchedulingEngineInput, SchedulingSuggestion } from "./types";
 
 type MinuteInterval = {
@@ -14,7 +13,6 @@ type MinuteInterval = {
 
 type RankedSuggestion = SchedulingSuggestion & {
   loadBand: number;
-  preferencePenalty: number;
 };
 
 const candidateIncrementMinutes = 15;
@@ -85,46 +83,34 @@ export function generateSchedulingSuggestions(
     const freeGaps = getFreeGaps(effectiveStart, planningEnd, busyIntervals);
 
     for (const gap of freeGaps) {
-      const starts = getCandidateStarts(
-        gap,
-        durationMinutes,
-        input.task.plannedTimePreference ?? "anytime"
-      );
+      const start = roundUpToIncrement(gap.start, candidateIncrementMinutes);
+      const end = start + durationMinutes;
 
-      for (const start of starts) {
-        const end = start + durationMinutes;
-        const matchesPreference = isWithinPreference(
-          start,
-          end,
-          input.task.plannedTimePreference ?? "anytime"
-        );
-
-        candidates.push({
-          date,
-          startTime: minutesToTime(start),
-          endTime: minutesToTime(end),
-          durationMinutes,
-          explanation: buildExplanation(
-            durationMinutes,
-            input.preferences.transitionBufferMinutes,
-            dailyLoad,
-            input.task.deadlineDate,
-            input.task.plannedTimePreference ?? "anytime",
-            matchesPreference
-          ),
-          dailyLoad,
-          loadBand: Math.floor(dailyLoad.totalScheduledMinutes / 120),
-          preferencePenalty: matchesPreference ? 0 : 1
-        });
+      if (end > gap.end) {
+        continue;
       }
+
+      candidates.push({
+        date,
+        startTime: minutesToTime(start),
+        endTime: minutesToTime(end),
+        durationMinutes,
+        explanation: buildExplanation(
+          durationMinutes,
+          input.preferences.transitionBufferMinutes,
+          dailyLoad,
+          input.task.deadlineDate
+        ),
+        dailyLoad,
+        loadBand: Math.floor(dailyLoad.totalScheduledMinutes / 120)
+      });
     }
   }
 
   candidates.sort(compareSuggestions);
 
   return selectDiverseSuggestions(candidates, input.maximumSuggestions ?? 3).map(
-    ({ loadBand: _loadBand, preferencePenalty: _preferencePenalty, ...suggestion }) =>
-      suggestion
+    ({ loadBand: _loadBand, ...suggestion }) => suggestion
   );
 }
 
@@ -248,7 +234,6 @@ function getFreeGaps(
 function compareSuggestions(first: RankedSuggestion, second: RankedSuggestion): number {
   return (
     first.loadBand - second.loadBand ||
-    first.preferencePenalty - second.preferencePenalty ||
     first.date.localeCompare(second.date) ||
     first.dailyLoad.totalScheduledMinutes - second.dailyLoad.totalScheduledMinutes ||
     first.startTime.localeCompare(second.startTime)
@@ -290,9 +275,7 @@ function buildExplanation(
   durationMinutes: number,
   transitionBufferMinutes: number,
   dailyLoad: DailyLoad,
-  deadlineDate: LocalDateString | null,
-  plannedTimePreference: PlannedTimePreference,
-  matchesPreference: boolean
+  deadlineDate: LocalDateString | null
 ): string {
   const parts = [
     `The full ${durationMinutes}-minute estimate fits within your planning hours.`
@@ -310,14 +293,6 @@ function buildExplanation(
     parts.push(`This time is on or before the ${deadlineDate} deadline.`);
   }
 
-  if (plannedTimePreference !== "anytime") {
-    parts.push(
-      matchesPreference
-        ? `It fits your ${plannedTimePreference} preference.`
-        : `It is outside your ${plannedTimePreference} preference, but remains available as a fallback.`
-    );
-  }
-
   parts.push(
     dailyLoad.totalScheduledMinutes > 0
       ? `${formatMinutes(dailyLoad.totalScheduledMinutes)} is already scheduled that day.`
@@ -325,48 +300,6 @@ function buildExplanation(
   );
 
   return parts.join(" ");
-}
-
-function getCandidateStarts(
-  gap: MinuteInterval,
-  durationMinutes: number,
-  preference: PlannedTimePreference
-): number[] {
-  const starts = new Set<number>();
-  const earliestStart = roundUpToIncrement(gap.start, candidateIncrementMinutes);
-
-  if (earliestStart + durationMinutes <= gap.end) {
-    starts.add(earliestStart);
-  }
-
-  if (preference !== "anytime") {
-    const range = plannedTimePreferenceRanges[preference];
-    const preferredStart = roundUpToIncrement(
-      Math.max(gap.start, timeToMinutes(range.start)),
-      candidateIncrementMinutes
-    );
-    const preferredEnd = Math.min(gap.end, timeToMinutes(range.end));
-
-    if (preferredStart + durationMinutes <= preferredEnd) {
-      starts.add(preferredStart);
-    }
-  }
-
-  return [...starts];
-}
-
-function isWithinPreference(
-  start: number,
-  end: number,
-  preference: PlannedTimePreference
-): boolean {
-  if (preference === "anytime") {
-    return true;
-  }
-
-  const range = plannedTimePreferenceRanges[preference];
-
-  return start >= timeToMinutes(range.start) && end <= timeToMinutes(range.end);
 }
 
 function formatMinutes(minutes: number): string {

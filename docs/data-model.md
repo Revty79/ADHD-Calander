@@ -61,7 +61,6 @@ Android and future iOS builds use Expo SQLite with versioned SQL migrations.
 | `parent_task_id`             | text    | Optional self-reference for a smaller task created by breakdown.                                                |
 | `scheduled_date`             | text    | Optional local `YYYY-MM-DD` date.                                                                               |
 | `scheduled_time`             | text    | Optional local `HH:MM` time; requires a scheduled date.                                                         |
-| `planned_time_preference`    | text    | Null for Flexible; otherwise `anytime`, `morning`, `afternoon`, or `evening`.                                   |
 | `estimated_duration_minutes` | integer | Optional positive whole-number estimate.                                                                        |
 | `deadline_date`              | text    | Optional local `YYYY-MM-DD` last day; distinct from planned date/time.                                          |
 | `reminder_offset_minutes`    | integer | Legacy single-reminder column retained for upgrade compatibility; new writes use `reminder_offsets`.            |
@@ -74,11 +73,7 @@ Android and future iOS builds use Expo SQLite with versioned SQL migrations.
 
 Planning state is derived rather than stored redundantly: no date is Flexible,
 a date without a time is Planned, and a date with a time is Scheduled. A
-Flexible task has a null time preference. Every dated task stores a semantic
-preference, defaulting to `anytime`; only Planned presentation and scheduling
-use it as soft intent. Scheduled tasks retain it so Scheduled-to-Planned editing
-can restore the user's intent without storing a fake clock time. A deadline
-remains independent from all three states.
+deadline remains independent from all three states.
 
 Execution state is separate: `not_started`, `started`, and `completed` describe
 whether work has begun, while the date/time fields describe planning. Pausing
@@ -139,7 +134,6 @@ A partial unique index permits only one `active` session.
 | `original_status`                     | text    | Snapshot used when an active decision is reopened.                         |
 | `original_scheduled_date`             | text    | Snapshot local date.                                                       |
 | `original_scheduled_time`             | text    | Optional snapshot local time.                                              |
-| `original_planned_time_preference`    | text    | Semantic preference snapshot restored when a decision is reopened.         |
 | `original_estimated_duration_minutes` | integer | Optional snapshot estimate.                                                |
 | `original_reminder_offset_minutes`    | integer | Legacy single-reminder snapshot retained for upgrade compatibility.        |
 | `original_reminder_offsets`           | text    | JSON-array reminder snapshot used when a decision is reopened.             |
@@ -221,14 +215,6 @@ Any legacy `started` row receives its existing `updated_at` as the best
 available factual start timestamp. Legacy reminder columns remain in place so
 upgrading an installed APK never requires destructive table replacement.
 
-### Version 8: `planned_time_preferences`
-
-`src/database/migrations/008_planned_time_preferences.ts` adds the constrained
-nullable `tasks.planned_time_preference` field and a constrained Recovery
-snapshot field. Existing dated tasks receive `anytime`; existing Flexible tasks
-receive null; existing Recovery snapshots receive `anytime`. Task, schedule,
-reminder, execution, and identity data remain unchanged.
-
 ### Daily Recap Foundation
 
 No migration is required. Recap derives its view from the existing nullable
@@ -237,7 +223,7 @@ does not persist duplicate daily summary rows.
 
 ## Web Persistence
 
-The web build uses IndexedDB database version 8. It has:
+The web build uses IndexedDB database version 7. It has:
 
 - `tasks`, keyed by task ID with `scheduledDate`, `updatedAt`, and `parentTaskId`
   indexes.
@@ -254,9 +240,7 @@ the parent-task index without rewriting records. Version 7 upgrades legacy
 single reminder fields to arrays and adds nullable `startedAt`. Older task,
 event, and Recovery item records also retain fallback readers, so a record that
 has not yet been rewritten still produces an empty or one-element reminder
-array safely. Version 8 assigns `anytime` to dated legacy tasks, null to Flexible
-legacy tasks, and `anytime` to legacy Recovery preference snapshots. Fallback
-readers apply the same defaults before a migrated record is rewritten.
+array safely.
 Older task records without `estimatedDurationMinutes` deserialize with a `null`
 estimate, and records without `deadlineDate` receive a `null` deadline. Older
 task records without `importance` receive `normal`, records without

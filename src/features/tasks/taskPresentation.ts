@@ -5,7 +5,6 @@ import {
   TaskImportance
 } from "../../types/task";
 import { getLocalDateString, getLocalTimeString } from "../../utils/dates";
-import { getPlannedTimePreferenceLabel } from "./plannedTimePreferences";
 
 export function getTaskStatusLabel(status: Task["status"]): string {
   switch (status) {
@@ -68,14 +67,4 @@ export function getTaskPlanningLabel(task: Task): string {
     default:
       return "Flexible";
   }
-}
-
-export function getTaskPlannedTimePreferenceLabel(task: Task): string | null {
-  if (getTaskPlanningState(task) !== "planned") {
-    return null;
-  }
-
-  return `${getPlannedTimePreferenceLabel(
-    task.plannedTimePreference ?? "anytime"
-  )} preference`;
 }

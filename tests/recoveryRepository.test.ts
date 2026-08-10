@@ -131,7 +131,6 @@ describe("RecoveryRepository", () => {
     assert.equal(storedTask?.status, "partially_completed");
     assert.equal(storedTask?.scheduledDate, null);
     assert.equal(storedTask?.scheduledTime, null);
-    assert.equal(storedTask?.plannedTimePreference, null);
   });
 
   it("reschedules the same task identity and updates calendar placement", async () => {
@@ -154,7 +153,7 @@ describe("RecoveryRepository", () => {
     assert.equal(storedTask?.id, task.id);
     assert.equal(storedTask?.scheduledDate, "2026-08-09");
     assert.equal(storedTask?.scheduledTime, "14:30");
-    assert.equal(schedule.get("2026-08-09")?.scheduledTasks[0]?.id, task.id);
+    assert.equal(schedule.get("2026-08-09")?.plannedTasks[0]?.id, task.id);
   });
 
   it("breaks a task into unscheduled children and resolves the original", async () => {
@@ -240,33 +239,6 @@ describe("RecoveryRepository", () => {
     assert.equal(reopenedSession.items[0]?.decision, null);
     assert.equal(restoredTask?.scheduledDate, sourceDate);
     assert.equal(restoredTask?.scheduledTime, "08:30");
-    assert.equal(restoredTask?.plannedTimePreference, "anytime");
-  });
-
-  it("preserves a planned soft preference through reschedule and reopen", async () => {
-    const { taskStorage, taskRepository, recoveryRepository } = await createContext();
-    const task = await taskRepository.createTask({
-      title: "Prefer a quiet morning",
-      scheduledDate: sourceDate,
-      plannedTimePreference: "morning"
-    });
-    const session = await recoveryRepository.startSession(sourceDate);
-    const item = session.items.find((candidate) => candidate.taskId === task.id)!;
-
-    assert.equal(item.originalPlannedTimePreference, "morning");
-    await recoveryRepository.rescheduleTask(item.id, {
-      scheduledDate: "2026-08-10"
-    });
-    assert.equal(
-      (await taskStorage.getTaskById(task.id))?.plannedTimePreference,
-      "morning"
-    );
-
-    await recoveryRepository.reopenItem(item.id);
-    const restored = await taskStorage.getTaskById(task.id);
-    assert.equal(restored?.scheduledDate, sourceDate);
-    assert.equal(restored?.scheduledTime, null);
-    assert.equal(restored?.plannedTimePreference, "morning");
   });
 
   it("persists active progress and completed sessions across reinitialization", async () => {

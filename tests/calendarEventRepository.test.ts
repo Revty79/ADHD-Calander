@@ -89,36 +89,6 @@ describe("calendar event repository", () => {
     ]);
   });
 
-  it("persists picker-selected local timing and multiple reminders unchanged", async () => {
-    const { database, repository } = await createRepository();
-    const event = await repository.createEvent({
-      title: "Planning review",
-      date: "2026-08-11",
-      startTime: "14:15",
-      endTime: "15:00",
-      reminderOffsets: [60, 15]
-    });
-
-    assert.equal(event.date, "2026-08-11");
-    assert.equal(event.startTime, "14:15");
-    assert.equal(event.endTime, "15:00");
-    assert.equal(event.durationMinutes, null);
-    assert.deepEqual(event.reminderOffsets, [60, 15]);
-
-    const restoredDatabase = await createSqlJsDatabase(database.exportData());
-    await initializeDatabase(restoredDatabase);
-    const restored = (
-      await new CalendarEventRepository(
-        new SqlCalendarEventStorage(restoredDatabase)
-      ).getEventsForDate("2026-08-11")
-    )[0];
-
-    assert.equal(restored?.date, "2026-08-11");
-    assert.equal(restored?.startTime, "14:15");
-    assert.equal(restored?.endTime, "15:00");
-    assert.deepEqual(restored?.reminderOffsets, [60, 15]);
-  });
-
   it("rejects blank titles and invalid times", async () => {
     const { repository } = await createRepository();
 
@@ -132,21 +102,6 @@ describe("calendar event repository", () => {
       (error) => {
         assert.ok(error instanceof CalendarEventValidationError);
         assert.equal(error.field, "title");
-        return true;
-      }
-    );
-
-    await assert.rejects(
-      () =>
-        repository.createEvent({
-          title: "Appointment",
-          date: "2026-08-06",
-          startTime: "10:00",
-          endTime: "10:00"
-        }),
-      (error) => {
-        assert.ok(error instanceof CalendarEventValidationError);
-        assert.equal(error.field, "endTime");
         return true;
       }
     );

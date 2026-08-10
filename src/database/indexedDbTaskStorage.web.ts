@@ -20,11 +20,9 @@ import {
 } from "../notifications/reminderOffsets";
 import {
   taskImportances,
-  isPlannedTimePreference,
   taskStatuses,
   Task,
   TaskImportance,
-  PlannedTimePreference,
   TaskStatus
 } from "../types/task";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../utils/dates";
@@ -34,7 +32,7 @@ import { SettingsStorage, StoredSetting } from "./settingsStorage";
 import { TaskStorage } from "./taskStorage";
 
 const WEB_DATABASE_NAME = "adhd-calendar-web";
-const WEB_DATABASE_VERSION = 8;
+const WEB_DATABASE_VERSION = 7;
 const TASK_STORE_NAME = "tasks";
 const EVENT_STORE_NAME = "calendarEvents";
 const RECOVERY_SESSION_STORE_NAME = "recoverySessions";
@@ -58,7 +56,6 @@ type StoredTask = {
   parentTaskId?: string | null;
   scheduledDate: string | null;
   scheduledTime: string | null;
-  plannedTimePreference?: PlannedTimePreference | null;
   estimatedDurationMinutes?: number | null;
   deadlineDate?: Task["deadlineDate"];
   createdAt: string;
@@ -101,7 +98,6 @@ type StoredRecoveryItem = {
   originalStatus: TaskStatus;
   originalScheduledDate: string;
   originalScheduledTime: string | null;
-  originalPlannedTimePreference?: PlannedTimePreference;
   originalEstimatedDurationMinutes: number | null;
   originalReminderOffsets?: RecoveryItem["originalReminderOffsets"];
   originalReminderOffsetMinutes?: number | null;
@@ -215,8 +211,6 @@ export function deserializeTaskFromWeb(value: unknown): Task {
   const parentTaskId = value.parentTaskId ?? null;
   const scheduledDate = value.scheduledDate;
   const scheduledTime = value.scheduledTime;
-  const plannedTimePreference =
-    value.plannedTimePreference ?? (scheduledDate === null ? null : "anytime");
   const estimatedDurationMinutes = value.estimatedDurationMinutes ?? null;
   const deadlineDate = value.deadlineDate ?? null;
   const completedAt = value.completedAt ?? null;
@@ -237,7 +231,6 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     !isNullableString(parentTaskId) ||
     !isValidStoredDate(scheduledDate) ||
     !isValidStoredTime(scheduledTime) ||
-    !isValidStoredPlannedTimePreference(plannedTimePreference) ||
     !isValidStoredDuration(estimatedDurationMinutes) ||
     !isValidStoredDate(deadlineDate) ||
     !isReminderOffsetList(reminderOffsets) ||
@@ -254,15 +247,6 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     throw new WebStorageDataError("Stored task time requires a scheduled date.");
   }
 
-  if (
-    (scheduledDate === null && plannedTimePreference !== null) ||
-    (scheduledDate !== null && plannedTimePreference === null)
-  ) {
-    throw new WebStorageDataError(
-      "Stored task time preference does not match its planned date."
-    );
-  }
-
   return {
     id: value.id,
     title: value.title,
@@ -272,7 +256,6 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     parentTaskId,
     scheduledDate,
     scheduledTime,
-    plannedTimePreference,
     estimatedDurationMinutes,
     deadlineDate,
     createdAt: value.createdAt,
@@ -411,7 +394,6 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
   const originalScheduledDate = value.originalScheduledDate;
   const originalStatus = value.originalStatus;
   const originalScheduledTime = value.originalScheduledTime;
-  const originalPlannedTimePreference = value.originalPlannedTimePreference ?? "anytime";
   const originalEstimatedDurationMinutes = value.originalEstimatedDurationMinutes;
   const legacyReminderOffset = value.originalReminderOffsetMinutes ?? null;
   const originalReminderOffsets =
@@ -432,7 +414,6 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
     typeof originalScheduledDate !== "string" ||
     normalizeLocalDateInput(originalScheduledDate) !== originalScheduledDate ||
     !isValidStoredTime(originalScheduledTime) ||
-    !isValidStoredPlannedTimePreference(originalPlannedTimePreference) ||
     !isValidStoredDuration(originalEstimatedDurationMinutes) ||
     !isReminderOffsetList(originalReminderOffsets) ||
     typeof status !== "string" ||
@@ -470,7 +451,6 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
     originalStatus,
     originalScheduledDate,
     originalScheduledTime,
-    originalPlannedTimePreference,
     originalEstimatedDurationMinutes,
     originalReminderOffsets: normalizeReminderOffsets(originalReminderOffsets),
     status,
@@ -962,10 +942,6 @@ function openDatabase(
           "originalReminderOffsetMinutes"
         );
       }
-
-      if (event.oldVersion < 8) {
-        migratePlannedTimePreferences(taskStore, itemStore);
-      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed."));
@@ -1060,12 +1036,6 @@ function isValidStoredTime(value: unknown): value is Task["scheduledTime"] {
   );
 }
 
-function isValidStoredPlannedTimePreference(
-  value: unknown
-): value is Task["plannedTimePreference"] {
-  return value === null || (typeof value === "string" && isPlannedTimePreference(value));
-}
-
 function isValidStoredDuration(value: unknown): value is number | null {
   return (
     value === null || (typeof value === "number" && Number.isInteger(value) && value > 0)
@@ -1113,42 +1083,6 @@ function migrateReminderRecords(
       }
 
       cursor.update(record);
-    }
-
-    cursor.continue();
-  };
-}
-
-function migratePlannedTimePreferences(
-  taskStore: IDBObjectStore,
-  recoveryItemStore: IDBObjectStore
-): void {
-  updateCursorRecords(taskStore, (record) => ({
-    ...record,
-    plannedTimePreference:
-      record.scheduledDate === null ? null : (record.plannedTimePreference ?? "anytime")
-  }));
-  updateCursorRecords(recoveryItemStore, (record) => ({
-    ...record,
-    originalPlannedTimePreference: record.originalPlannedTimePreference ?? "anytime"
-  }));
-}
-
-function updateCursorRecords(
-  store: IDBObjectStore,
-  update: (record: Record<string, unknown>) => Record<string, unknown>
-): void {
-  const request = store.openCursor();
-
-  request.onsuccess = () => {
-    const cursor = request.result;
-
-    if (!cursor) {
-      return;
-    }
-
-    if (isRecord(cursor.value)) {
-      cursor.update(update(cursor.value));
     }
 
     cursor.continue();

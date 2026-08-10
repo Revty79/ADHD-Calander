@@ -13,10 +13,6 @@ import {
 } from "react-native";
 
 import { ErrorNotice } from "../../src/components/ErrorNotice";
-import {
-  NativeDatePickerButton,
-  NativeTimePickerButton
-} from "../../src/components/NativeDateTimePickerButton";
 import { useCalendarEventRepository } from "../../src/database/DatabaseProvider";
 import { CalendarEventValidationError } from "../../src/database/repositories/calendarEventErrors";
 import { ReminderOffsetSelector } from "../../src/features/reminders/components/ReminderOffsetSelector";
@@ -25,9 +21,6 @@ import { ReminderOffsetMinutes } from "../../src/types/reminder";
 import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
 
 type FieldErrors = Partial<Record<CalendarEventValidationError["field"], string>>;
-type TimingMethod = "endTime" | "duration";
-
-const durationOptions = [15, 30, 45, 60, 90, 120] as const;
 
 export default function NewEventScreen() {
   const router = useRouter();
@@ -42,8 +35,7 @@ export default function NewEventScreen() {
   const [date, setDate] = useState<string>(initialDate);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [timingMethod, setTimingMethod] = useState<TimingMethod>("duration");
-  const [durationMinutes, setDurationMinutes] = useState<number>(60);
+  const [durationMinutes, setDurationMinutes] = useState("");
   const [notes, setNotes] = useState("");
   const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -60,8 +52,8 @@ export default function NewEventScreen() {
         title,
         date,
         startTime,
-        endTime: timingMethod === "endTime" ? endTime : null,
-        durationMinutes: timingMethod === "duration" ? durationMinutes : null,
+        endTime,
+        durationMinutes: durationMinutes.trim() ? Number(durationMinutes) : null,
         notes,
         reminderOffsets
       });
@@ -104,59 +96,56 @@ export default function NewEventScreen() {
         </FormField>
 
         <FormField label="Date" error={fieldErrors.date}>
-          <NativeDatePickerButton
-            accessibilityLabel="Choose event date"
-            onChange={setDate}
+          <TextInput
+            accessibilityLabel="Event date in year month day format"
+            autoCapitalize="none"
+            keyboardType="numbers-and-punctuation"
+            onChangeText={setDate}
+            placeholder="YYYY-MM-DD"
+            style={[styles.input, fieldErrors.date && styles.inputError]}
             value={date}
           />
         </FormField>
 
         <FormField label="Start time" error={fieldErrors.startTime}>
-          <NativeTimePickerButton
-            accessibilityLabel="Choose event start time"
-            onChange={setStartTime}
+          <TextInput
+            accessibilityLabel="Event start time in twenty four hour format"
+            autoCapitalize="none"
+            keyboardType="numbers-and-punctuation"
+            onChangeText={setStartTime}
+            placeholder="HH:MM"
+            style={[styles.input, fieldErrors.startTime && styles.inputError]}
             value={startTime}
           />
         </FormField>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Event length</Text>
-          <View accessibilityRole="radiogroup" style={styles.choiceWrap}>
-            <ChoiceButton
-              label="End time"
-              onPress={() => setTimingMethod("endTime")}
-              selected={timingMethod === "endTime"}
-            />
-            <ChoiceButton
-              label="Duration"
-              onPress={() => setTimingMethod("duration")}
-              selected={timingMethod === "duration"}
-            />
-          </View>
-        </View>
+        <FormField label="End time (optional)" error={fieldErrors.endTime}>
+          <TextInput
+            accessibilityLabel="Optional event end time in twenty four hour format"
+            autoCapitalize="none"
+            keyboardType="numbers-and-punctuation"
+            onChangeText={setEndTime}
+            placeholder="HH:MM"
+            style={[styles.input, fieldErrors.endTime && styles.inputError]}
+            value={endTime}
+          />
+        </FormField>
 
-        {timingMethod === "endTime" ? (
-          <FormField label="End time" error={fieldErrors.endTime}>
-            <NativeTimePickerButton
-              accessibilityLabel="Choose event end time"
-              onChange={setEndTime}
-              value={endTime}
-            />
-          </FormField>
-        ) : (
-          <FormField label="Duration" error={fieldErrors.durationMinutes}>
-            <View accessibilityRole="radiogroup" style={styles.choiceWrap}>
-              {durationOptions.map((duration) => (
-                <ChoiceButton
-                  key={duration}
-                  label={`${duration} min`}
-                  onPress={() => setDurationMinutes(duration)}
-                  selected={durationMinutes === duration}
-                />
-              ))}
-            </View>
-          </FormField>
-        )}
+        <Text style={styles.orText}>Use an end time or a duration, not both.</Text>
+
+        <FormField
+          label="Duration in minutes (optional)"
+          error={fieldErrors.durationMinutes}
+        >
+          <TextInput
+            accessibilityLabel="Optional event duration in minutes"
+            keyboardType="number-pad"
+            onChangeText={setDurationMinutes}
+            placeholder="For example, 45"
+            style={[styles.input, fieldErrors.durationMinutes && styles.inputError]}
+            value={durationMinutes}
+          />
+        </FormField>
 
         <FormField label="Notes (optional)">
           <TextInput
@@ -203,33 +192,6 @@ export default function NewEventScreen() {
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-function ChoiceButton({
-  label,
-  onPress,
-  selected
-}: {
-  label: string;
-  onPress(): void;
-  selected: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.choice,
-        selected && styles.choiceSelected,
-        pressed && styles.pressed
-      ]}
-    >
-      <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -302,32 +264,10 @@ const styles = StyleSheet.create({
     color: "#8d3434",
     fontSize: 14
   },
-  choiceWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  choice: {
-    backgroundColor: "#ffffff",
-    borderColor: "#b9b2a7",
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: 14
-  },
-  choiceSelected: {
-    backgroundColor: "#dfeae6",
-    borderColor: "#2f5d62"
-  },
-  choiceText: {
-    color: "#4a4742",
-    fontSize: 15,
-    fontWeight: "600"
-  },
-  choiceTextSelected: {
-    color: "#244b43",
-    fontWeight: "800"
+  orText: {
+    color: "#68645e",
+    fontSize: 13,
+    marginTop: -8
   },
   saveButton: {
     alignItems: "center",
