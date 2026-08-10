@@ -51,28 +51,29 @@ Android and future iOS builds use Expo SQLite with versioned SQL migrations.
 
 ### `tasks`
 
-| Column                       | Type    | Notes                                                                                                           |
-| ---------------------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
-| `id`                         | text    | Unique task ID.                                                                                                 |
-| `title`                      | text    | Required trimmed title.                                                                                         |
-| `description`                | text    | Optional trimmed description.                                                                                   |
-| `importance`                 | text    | `low`, `normal`, or `important`; legacy rows default to `normal`.                                               |
-| `status`                     | text    | Implemented values are `not_started`, `started`, `completed`, `delegated`, `removed`, and `broken_down`.        |
-| `parent_task_id`             | text    | Optional self-reference for a smaller task created by breakdown.                                                |
-| `scheduled_date`             | text    | Optional local `YYYY-MM-DD` date.                                                                               |
-| `scheduled_time`             | text    | Optional local `HH:MM` time; requires a scheduled date.                                                         |
-| `preferred_time`             | text    | Optional local `HH:MM` soft preference; requires a scheduled date and no `scheduled_time`.                      |
-| `planned_time_preference`    | text    | Compatibility-only migration 008 field; retained but ignored by current product behavior.                       |
-| `estimated_duration_minutes` | integer | Optional positive whole-number estimate.                                                                        |
-| `deadline_date`              | text    | Optional local `YYYY-MM-DD` last day; distinct from planned date/time.                                          |
-| `deadline_time`              | text    | Optional local `HH:MM` finish boundary; requires `deadline_date`. Date-only deadlines end at local midnight.    |
-| `reminder_offset_minutes`    | integer | Legacy single-reminder column retained for upgrade compatibility; new writes use `reminder_offsets`.            |
-| `reminder_offsets`           | text    | JSON array of up to five unique reminder offsets; supported values are `0`, `10`, `15`, `30`, `60`, and `1440`. |
-| `started_at`                 | text    | Optional ISO timestamp for the most recent Start task action.                                                   |
-| `created_at`                 | text    | ISO timestamp.                                                                                                  |
-| `updated_at`                 | text    | ISO timestamp.                                                                                                  |
-| `completed_at`               | text    | Optional ISO timestamp set on completion.                                                                       |
-| `deleted_at`                 | text    | Optional ISO timestamp reserved for future soft deletion.                                                       |
+| Column                       | Type    | Notes                                                                                                                     |
+| ---------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `id`                         | text    | Unique task ID.                                                                                                           |
+| `title`                      | text    | Required trimmed title.                                                                                                   |
+| `description`                | text    | Optional trimmed description.                                                                                             |
+| `importance`                 | text    | `low`, `normal`, or `important`; legacy rows default to `normal`.                                                         |
+| `status`                     | text    | Implemented values are `not_started`, `started`, `completed`, `delegated`, `removed`, and `broken_down`.                  |
+| `parent_task_id`             | text    | Optional self-reference for a smaller task created by breakdown.                                                          |
+| `scheduled_date`             | text    | Optional local `YYYY-MM-DD` date.                                                                                         |
+| `scheduled_time`             | text    | Optional local `HH:MM` time; requires a scheduled date.                                                                   |
+| `preferred_time`             | text    | Optional local `HH:MM` soft preference; requires a scheduled date and no `scheduled_time`.                                |
+| `planned_time_preference`    | text    | Compatibility-only migration 008 field; retained but ignored by current product behavior.                                 |
+| `estimated_duration_minutes` | integer | Optional positive whole-number estimate.                                                                                  |
+| `deadline_date`              | text    | Optional local `YYYY-MM-DD` last day; distinct from planned date/time.                                                    |
+| `deadline_time`              | text    | Optional local `HH:MM` finish boundary; requires `deadline_date`. Date-only deadlines end at local midnight.              |
+| `reminder_offset_minutes`    | integer | Legacy single-reminder column retained for upgrade compatibility; new writes use `reminder_offsets`.                      |
+| `reminder_offsets`           | text    | Legacy-compatible JSON projection of relative offsets; supported values are `0`, `5`, `10`, `15`, `30`, `60`, and `1440`. |
+| `reminders`                  | text    | Nullable authoritative JSON array of up to five relative or explicit local date/time reminders.                           |
+| `started_at`                 | text    | Optional ISO timestamp for the most recent Start task action.                                                             |
+| `created_at`                 | text    | ISO timestamp.                                                                                                            |
+| `updated_at`                 | text    | ISO timestamp.                                                                                                            |
+| `completed_at`               | text    | Optional ISO timestamp set on completion.                                                                                 |
+| `deleted_at`                 | text    | Optional ISO timestamp reserved for future soft deletion.                                                                 |
 
 Planning state is derived rather than stored redundantly: no date is Flexible,
 a date without `scheduled_time` is Planned, and a date with `scheduled_time` is
@@ -109,7 +110,8 @@ need to rewrite rows only to recognize planned states: `partially_completed`,
 | `duration_minutes`        | integer | Optional positive duration used instead of `end_time`.            |
 | `notes`                   | text    | Optional trimmed notes.                                           |
 | `reminder_offset_minutes` | integer | Legacy single-reminder column retained for upgrade compatibility. |
-| `reminder_offsets`        | text    | JSON array of up to five unique reminder offsets.                 |
+| `reminder_offsets`        | text    | Legacy-compatible JSON projection of relative reminder offsets.   |
+| `reminders`               | text    | Nullable authoritative JSON array of up to five reminders.        |
 | `created_at`              | text    | ISO timestamp.                                                    |
 | `updated_at`              | text    | ISO timestamp.                                                    |
 
@@ -145,6 +147,7 @@ A partial unique index permits only one `active` session.
 | `original_estimated_duration_minutes` | integer | Optional snapshot estimate.                                                |
 | `original_reminder_offset_minutes`    | integer | Legacy single-reminder snapshot retained for upgrade compatibility.        |
 | `original_reminder_offsets`           | text    | JSON-array reminder snapshot used when a decision is reopened.             |
+| `original_reminders`                  | text    | Nullable authoritative reminder snapshot, including explicit date/times.   |
 | `status`                              | text    | `pending` or `resolved`.                                                   |
 | `decision`                            | text    | `keep`, `reschedule`, `break_down`, `delegate`, `remove`, `skip`, or null. |
 | `note`                                | text    | Optional local delegation note.                                            |
@@ -242,6 +245,16 @@ three fields, so task identity, execution history, reminders, scheduling,
 Recovery, Recap, event, and settings data remain unchanged. Migration 8 remains
 applied and its compatibility-only fields remain present but unused.
 
+### Version 10: `independent_reminders`
+
+`src/database/migrations/010_independent_reminders.ts` adds nullable JSON
+`tasks.reminders`, `calendar_events.reminders`, and
+`recovery_items.original_reminders` columns. It does not rewrite existing rows.
+Readers fall back to the version 7 relative-offset arrays until a record is next
+written normally. New writes store the authoritative relative-or-absolute
+reminder array and retain the relative offsets as a compatibility projection.
+Migrations 8 and 9 remain applied and unchanged.
+
 ### Daily Recap Foundation
 
 No migration is required. Recap derives its view from the existing nullable
@@ -250,7 +263,7 @@ does not persist duplicate daily summary rows.
 
 ## Web Persistence
 
-The web build uses IndexedDB database version 9. It has:
+The web build uses IndexedDB database version 10. It has:
 
 - `tasks`, keyed by task ID with `scheduledDate`, `updatedAt`, and `parentTaskId`
   indexes.
@@ -274,7 +287,11 @@ any former `plannedTimePreference` record fields while preserving records on
 open. Version 9 advances the database version without rewriting records. Its
 readers treat missing `preferredTime`, `deadlineTime`, and Recovery
 `originalPreferredTime` fields as `null`; records receive these values on their
-next ordinary domain write. Older task records without
+next ordinary domain write. Version 10 advances storage without rewriting
+records. Missing `reminders` and `originalReminders` fields fall back to the
+version 7 relative-offset arrays; ordinary writes add the authoritative shared
+reminder shape. Existing version 8 and 9 databases therefore open forward and
+retain all records. Older task records without
 `estimatedDurationMinutes` deserialize with a `null` estimate, and records
 without `deadlineDate` receive a `null` deadline. Older task records without
 `importance` receive `normal`, records without `parentTaskId` receive `null`,
@@ -291,7 +308,7 @@ native data are intentionally separate.
 
 Recurring events, event editing/deletion, time zones,
 all-day events, external calendar identifiers, advanced notification policy,
-quiet hours, default reminders, custom reminder offsets, day plans,
+quiet hours, default reminders, arbitrary relative reminder offsets, day plans,
 recovery analytics, multi-level projects, partial-progress measurement,
 earliest-start constraints, recurring preferred work periods, soft scheduler
 ranking around a task's exact preferred time, energy requirements, import/export,

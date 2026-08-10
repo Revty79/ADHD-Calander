@@ -1,7 +1,7 @@
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { formatReminderOffsets } from "../../../notifications/reminderRules";
+import { formatReminders } from "../../../notifications/reminderRules";
 import { isTaskActive, Task } from "../../../types/task";
 import {
   formatLocalDateForDisplay,
@@ -87,9 +87,9 @@ export function TaskList({
                       Deadline {getTaskDeadlineLabel(task)}
                     </Text>
                   ) : null}
-                  {task.reminderOffsets.length > 0 ? (
+                  {task.reminders.length > 0 ? (
                     <Text style={styles.metaText}>
-                      Reminders: {formatReminderOffsets(task.reminderOffsets)}
+                      Reminders: {formatReminders(task.reminders)}
                     </Text>
                   ) : null}
                   <Text style={styles.metaText}>{getTaskPlanningLabel(task)}</Text>
@@ -105,62 +105,75 @@ export function TaskList({
                   <Text style={styles.timingNote}>{getTaskTimingNote(task)}</Text>
                 ) : null}
               </View>
-              {(actionLabel && onAction) || onStart || onPause ? (
-                <View style={styles.actions}>
-                  {task.status === "not_started" && onStart ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Start task ${task.title}`}
-                      onPress={() => onStart(task.id)}
-                      style={({ pressed }) => [
-                        styles.executionButton,
-                        pressed && styles.pressed
-                      ]}
-                    >
-                      <Text style={styles.executionButtonText}>Start task</Text>
-                    </Pressable>
-                  ) : null}
-                  {task.status === "started" && onPause ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Pause ${task.title} for now`}
-                      onPress={() => onPause(task.id)}
-                      style={({ pressed }) => [
-                        styles.executionButton,
-                        pressed && styles.pressed
-                      ]}
-                    >
-                      <Text style={styles.executionButtonText}>Pause for now</Text>
-                    </Pressable>
-                  ) : null}
-                  {onSchedule && isTaskActive(task) && task.scheduledTime === null ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Help me schedule ${task.title}`}
-                      onPress={() => onSchedule(task.id)}
-                      style={({ pressed }) => [
-                        styles.scheduleButton,
-                        pressed && styles.pressed
-                      ]}
-                    >
-                      <Text style={styles.scheduleButtonText}>Help me schedule</Text>
-                    </Pressable>
-                  ) : null}
-                  {actionLabel && onAction ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`${actionLabel} ${task.title}`}
-                      onPress={() => onAction(task.id)}
-                      style={({ pressed }) => [
-                        styles.actionButton,
-                        pressed && styles.pressed
-                      ]}
-                    >
-                      <Text style={styles.actionButtonText}>{actionLabel}</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : null}
+              <View style={styles.actions}>
+                <Link
+                  href={{ pathname: "/tasks/[id]/edit", params: { id: task.id } }}
+                  asChild
+                >
+                  <Pressable
+                    accessibilityLabel={`Edit ${task.title}`}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [
+                      styles.editButton,
+                      pressed && styles.pressed
+                    ]}
+                  >
+                    <Text style={styles.editButtonText}>Edit</Text>
+                  </Pressable>
+                </Link>
+                {task.status === "not_started" && onStart ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Start task ${task.title}`}
+                    onPress={() => onStart(task.id)}
+                    style={({ pressed }) => [
+                      styles.executionButton,
+                      pressed && styles.pressed
+                    ]}
+                  >
+                    <Text style={styles.executionButtonText}>Start task</Text>
+                  </Pressable>
+                ) : null}
+                {task.status === "started" && onPause ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Pause ${task.title} for now`}
+                    onPress={() => onPause(task.id)}
+                    style={({ pressed }) => [
+                      styles.executionButton,
+                      pressed && styles.pressed
+                    ]}
+                  >
+                    <Text style={styles.executionButtonText}>Pause for now</Text>
+                  </Pressable>
+                ) : null}
+                {onSchedule && isTaskActive(task) && task.scheduledTime === null ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Help me schedule ${task.title}`}
+                    onPress={() => onSchedule(task.id)}
+                    style={({ pressed }) => [
+                      styles.scheduleButton,
+                      pressed && styles.pressed
+                    ]}
+                  >
+                    <Text style={styles.scheduleButtonText}>Help me schedule</Text>
+                  </Pressable>
+                ) : null}
+                {actionLabel && onAction ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${actionLabel} ${task.title}`}
+                    onPress={() => onAction(task.id)}
+                    style={({ pressed }) => [
+                      styles.actionButton,
+                      pressed && styles.pressed
+                    ]}
+                  >
+                    <Text style={styles.actionButtonText}>{actionLabel}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
           ))}
         </View>
@@ -251,6 +264,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700"
   },
+  editButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 12
+  },
+  editButtonText: { color: "#24565c", fontSize: 14, fontWeight: "800" },
   executionButton: {
     alignItems: "center",
     backgroundColor: "#e7efeb",

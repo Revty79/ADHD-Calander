@@ -13,15 +13,22 @@ import { SqlRecoveryStorage } from "../src/database/sqlRecoveryStorage";
 import { SqlSettingsStorage } from "../src/database/sqlSettingsStorage";
 import { SqlTaskStorage } from "../src/database/sqlTaskStorage";
 import { NotificationAdapter } from "../src/notifications/notificationAdapter";
-import { getReminderTriggerDate } from "../src/notifications/reminderRules";
+import {
+  buildTaskReminderRequests,
+  getReminderTriggerDate
+} from "../src/notifications/reminderRules";
 import { ReminderService } from "../src/notifications/reminderService";
 import { ReminderSynchronizer } from "../src/notifications/reminderSynchronizer";
+import {
+  removeReminder,
+  upsertAbsoluteReminder
+} from "../src/features/reminders/reminderEditorModel";
 import {
   ReminderNotificationRequest,
   ReminderPermissionStatus
 } from "../src/types/reminder";
 import { CalendarEvent } from "../src/types/calendarEvent";
-import { Task } from "../src/types/task";
+import { getTaskPlanningState, Task } from "../src/types/task";
 import { createSqlJsDatabase } from "./helpers/sqlJsDatabase";
 
 const now = new Date(2026, 7, 1, 8, 0, 0);
@@ -208,29 +215,145 @@ describe("settings and reminder foundation", () => {
       title: "Submit the application",
       scheduledDate: "2026-08-06",
       scheduledTime: "11:00",
-      reminderOffsets: [60, 15, 0]
+      reminders: [
+        { kind: "relative", offsetMinutes: 60 },
+        { kind: "relative", offsetMinutes: 15 },
+        { kind: "absolute", date: "2026-08-05", time: "16:45" }
+      ]
     });
 
-    assert.deepEqual(
-      (await taskStorage.getTaskById(task.id))?.reminderOffsets,
-      [60, 15, 0]
-    );
+    assert.deepEqual((await taskStorage.getTaskById(task.id))?.reminders, task.reminders);
     assert.equal(adapter.scheduled.size, 3);
     assert.ok(adapter.scheduled.has(`adhd-calendar-task-${task.id}-60`));
     assert.ok(adapter.scheduled.has(`adhd-calendar-task-${task.id}-15`));
-    assert.ok(adapter.scheduled.has(`adhd-calendar-task-${task.id}-0`));
+    assert.ok(
+      adapter.scheduled.has(`adhd-calendar-task-${task.id}-absolute-2026-08-05-1645`)
+    );
 
     const reopenedDatabase = await createSqlJsDatabase(database.exportData());
     await initializeDatabase(reopenedDatabase);
     assert.deepEqual(
-      (await new SqlTaskStorage(reopenedDatabase).getTaskById(task.id))?.reminderOffsets,
-      [60, 15, 0]
+      (await new SqlTaskStorage(reopenedDatabase).getTaskById(task.id))?.reminders,
+      task.reminders
     );
 
     const completed = await taskRepository.completeTask(task.id);
 
-    assert.deepEqual(completed.reminderOffsets, [60, 15, 0]);
+    assert.deepEqual(completed.reminders, task.reminders);
     assert.equal(adapter.scheduled.size, 0);
+  });
+
+  it("keeps multiple reminders independent from Flexible, Planned, and Scheduled placement", async () => {
+    const { database, taskRepository } = await createReminderContext();
+    const flexible = await taskRepository.createTask({
+      title: "Flexible reminder task",
+      reminders: [
+        { kind: "absolute", date: "2026-08-04", time: "09:00" },
+        { kind: "absolute", date: "2026-08-05", time: "16:30" }
+      ]
+    });
+    const planned = await taskRepository.createTask({
+      title: "Planned reminder task",
+      scheduledDate: "2026-08-06",
+      preferredTime: "14:00",
+      reminders: [
+        { kind: "absolute", date: "2026-08-05", time: "09:00" },
+        { kind: "absolute", date: "2026-08-06", time: "12:30" }
+      ]
+    });
+    const scheduled = await taskRepository.createTask({
+      title: "Scheduled reminder task",
+      scheduledDate: "2026-08-06",
+      scheduledTime: "15:00",
+      reminders: [
+        { kind: "relative", offsetMinutes: 60 },
+        { kind: "absolute", date: "2026-08-05", time: "18:00" }
+      ]
+    });
+
+    assert.equal(getTaskPlanningState(flexible), "flexible");
+    assert.equal(getTaskPlanningState(planned), "planned");
+    assert.equal(planned.preferredTime, "14:00");
+    assert.equal(getTaskPlanningState(scheduled), "scheduled");
+    assert.deepEqual(
+      [flexible.reminders.length, planned.reminders.length, scheduled.reminders.length],
+      [2, 2, 2]
+    );
+
+    const reopenedDatabase = await createSqlJsDatabase(database.exportData());
+    await initializeDatabase(reopenedDatabase);
+    const reopenedTasks = await new SqlTaskStorage(reopenedDatabase).getAllTasks();
+
+    assert.deepEqual(
+      reopenedTasks.map((task) => ({
+        id: task.id,
+        planningState: getTaskPlanningState(task),
+        reminders: task.reminders
+      })),
+      [flexible, planned, scheduled].map((task) => ({
+        id: task.id,
+        planningState: getTaskPlanningState(task),
+        reminders: task.reminders
+      }))
+    );
+  });
+
+  it("edits or removes one custom reminder without changing the others", async () => {
+    const { adapter, service, taskRepository } = await createReminderContext();
+    await service.setRemindersEnabled(true);
+    const task = await taskRepository.createTask({
+      title: "Independent custom reminders",
+      reminders: [
+        { kind: "absolute", date: "2026-08-04", time: "09:00" },
+        { kind: "absolute", date: "2026-08-05", time: "16:30" }
+      ]
+    });
+    const firstReminder = task.reminders[0]!;
+    const secondReminder = task.reminders[1]!;
+    const editedReminders = upsertAbsoluteReminder(
+      task.reminders,
+      "absolute-2026-08-04-0900",
+      "2026-08-04",
+      "10:15"
+    );
+    const edited = await taskRepository.updateTask(task.id, {
+      ...task,
+      reminders: editedReminders
+    });
+
+    assert.equal(
+      adapter.scheduled.has(`adhd-calendar-task-${task.id}-absolute-2026-08-04-0900`),
+      false
+    );
+    assert.ok(
+      adapter.scheduled.has(`adhd-calendar-task-${task.id}-absolute-2026-08-04-1015`)
+    );
+    assert.ok(
+      adapter.scheduled.has(`adhd-calendar-task-${task.id}-absolute-2026-08-05-1630`)
+    );
+    assert.equal(edited.reminders.length, 2);
+    assert.deepEqual(
+      edited.reminders.find(
+        (reminder) => reminder.kind === "absolute" && reminder.date === "2026-08-05"
+      ),
+      secondReminder
+    );
+
+    const reduced = await taskRepository.updateTask(task.id, {
+      ...edited,
+      reminders: removeReminder(edited.reminders, secondReminder)
+    });
+
+    assert.equal(reduced.reminders.length, 1);
+    assert.equal(
+      adapter.scheduled.has(`adhd-calendar-task-${task.id}-absolute-2026-08-05-1630`),
+      false
+    );
+    assert.deepEqual(firstReminder, {
+      kind: "absolute",
+      date: "2026-08-04",
+      time: "09:00"
+    });
   });
 
   it("persists and schedules multiple event reminders with distinct identities", async () => {
@@ -242,25 +365,28 @@ describe("settings and reminder foundation", () => {
       title: "Dentist",
       date: "2026-08-06",
       startTime: "09:30",
-      reminderOffsets: [1440, 60, 15, 0]
+      reminders: [
+        { kind: "relative", offsetMinutes: 1440 },
+        { kind: "relative", offsetMinutes: 60 },
+        { kind: "relative", offsetMinutes: 15 },
+        { kind: "absolute", date: "2026-08-05", time: "18:30" }
+      ]
     });
 
-    assert.deepEqual(
-      (await eventStorage.getAllEvents())[0]?.reminderOffsets,
-      [1440, 60, 15, 0]
-    );
+    assert.deepEqual((await eventStorage.getAllEvents())[0]?.reminders, event.reminders);
     assert.equal(adapter.scheduled.size, 4);
     assert.ok(adapter.scheduled.has(`adhd-calendar-event-${event.id}-1440`));
     assert.ok(adapter.scheduled.has(`adhd-calendar-event-${event.id}-60`));
     assert.ok(adapter.scheduled.has(`adhd-calendar-event-${event.id}-15`));
-    assert.ok(adapter.scheduled.has(`adhd-calendar-event-${event.id}-0`));
+    assert.ok(
+      adapter.scheduled.has(`adhd-calendar-event-${event.id}-absolute-2026-08-05-1830`)
+    );
 
     const reopenedDatabase = await createSqlJsDatabase(database.exportData());
     await initializeDatabase(reopenedDatabase);
     assert.deepEqual(
-      (await new SqlCalendarEventStorage(reopenedDatabase).getAllEvents())[0]
-        ?.reminderOffsets,
-      [1440, 60, 15, 0]
+      (await new SqlCalendarEventStorage(reopenedDatabase).getAllEvents())[0]?.reminders,
+      event.reminders
     );
   });
 
@@ -320,7 +446,11 @@ describe("settings and reminder foundation", () => {
       ...task,
       scheduledDate: "2026-08-07",
       scheduledTime: "14:00",
-      reminderOffsets: [1440, 60, 0]
+      reminders: [
+        { kind: "relative", offsetMinutes: 1440 },
+        { kind: "relative", offsetMinutes: 60 },
+        { kind: "relative", offsetMinutes: 0 }
+      ]
     });
 
     assert.deepEqual(updated.reminderOffsets, [1440, 60, 0]);
@@ -365,6 +495,33 @@ describe("settings and reminder foundation", () => {
     assert.equal(trigger.getDate(), 5);
     assert.equal(trigger.getHours(), 23);
     assert.equal(trigger.getMinutes(), 40);
+
+    const [customRequest] = buildTaskReminderRequests({
+      id: "local-wall-clock",
+      title: "Keep local time",
+      description: null,
+      importance: "normal",
+      status: "not_started",
+      parentTaskId: null,
+      scheduledDate: null,
+      scheduledTime: null,
+      preferredTime: null,
+      estimatedDurationMinutes: null,
+      deadlineDate: null,
+      deadlineTime: null,
+      reminders: [{ kind: "absolute", date: "2026-08-06", time: "00:10" }],
+      reminderOffsets: [],
+      startedAt: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      completedAt: null,
+      deletedAt: null
+    });
+
+    assert.ok(customRequest);
+    assert.equal(customRequest.triggerDate.getDate(), 6);
+    assert.equal(customRequest.triggerDate.getHours(), 0);
+    assert.equal(customRequest.triggerDate.getMinutes(), 10);
   });
 
   it("synchronizes reminder metadata for every Recovery decision", async () => {

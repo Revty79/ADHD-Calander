@@ -1,5 +1,46 @@
 # Decision Log
 
+## 2026-08-10
+
+### Explicit Reminders Are Independent From Planning State
+
+Decision: Replace offset-only domain intent with a shared reminder union. A
+relative reminder uses a supported offset from an exact Scheduled task or fixed
+event start. An explicit reminder stores a validated local date and time and can
+belong to a Flexible, Planned, or Scheduled task without changing its placement.
+Each item supports at most five unique reminders. Legacy relative offset fields
+remain as compatibility projections.
+
+Reason: Reminder intent and task placement answer different questions. Using
+task schedule fields to represent a prompt would silently promote Flexible or
+Planned work and corrupt Calendar semantics. One shared model also keeps task
+and event validation, presentation, persistence, and notification identities in
+sync.
+
+### Reminder Storage Advances To Version 10 Without Rewriting Records
+
+Decision: Keep migrations 8 and 9 unchanged, add nullable shared reminder JSON
+columns in SQLite migration 10, and advance IndexedDB to version 10 without an
+upgrade rewrite. Readers fall back to version 7 offset arrays when the new field
+is absent. Relative notification identifiers retain their existing numeric
+suffix; explicit reminders use a deterministic local date/time suffix.
+
+Reason: Forward-only schema history lets already-upgraded installations open
+safely. Nullable additive columns and fallback readers preserve Tasks, Events,
+Recovery, Recap, Settings, execution history, and existing notification cleanup
+without destructive conversion.
+
+### Android Navigation Uses Labeled Icons And System Insets
+
+Decision: Keep visible labels, add recognizable Expo vector icons, enforce
+usable item height, and derive bottom padding from the Android safe-area inset.
+Add Guide as a real seventh destination with shared factual content on web and
+native.
+
+Reason: Placeholder-style marks and controls next to the gesture area made
+physical-phone navigation error-prone. System insets are more reliable than a
+device-specific padding guess, and labels preserve accessibility and clarity.
+
 ## 2026-08-08
 
 ### Execution State Is Separate From Planning State
@@ -88,8 +129,9 @@ fields instead of persisting a second planning-state column.
 Reason: One source of truth prevents impossible combinations. Flexible clears
 the planning date and both planning times, Planned stores a date with an optional
 soft `preferredTime`, and Scheduled stores a date plus actual `scheduledTime`.
-Only `scheduledTime` creates a hard placement. Reminder choices may remain saved
-while untimed but are inactive until an exact date and scheduled time exist.
+Only `scheduledTime` creates a hard placement. Explicit reminder date/times are
+independent from placement; relative choices require an exact date and
+scheduled time.
 
 ### One Breakdown Model
 

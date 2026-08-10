@@ -1,5 +1,5 @@
 import { LocalDateString, LocalTimeString } from "./dateTime";
-import { ReminderOffsetMinutes } from "./reminder";
+import { Reminder, ReminderOffsetMinutes } from "./reminder";
 import { TaskStatus } from "./task";
 
 export const recoverySessionStatuses = ["active", "completed"] as const;
@@ -27,6 +27,7 @@ export type RecoveryItem = {
   originalScheduledTime: LocalTimeString | null;
   originalPreferredTime: LocalTimeString | null;
   originalEstimatedDurationMinutes: number | null;
+  originalReminders: Reminder[];
   originalReminderOffsets: ReminderOffsetMinutes[];
   status: RecoveryItemStatus;
   decision: RecoveryDecisionType | null;

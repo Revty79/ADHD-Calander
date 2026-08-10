@@ -13,7 +13,7 @@ import {
   NativeTimePickerButton
 } from "../../../components/NativeDateTimePickerButton";
 import { TaskValidationError } from "../../../database/repositories/errors";
-import { ReminderOffsetMinutes } from "../../../types/reminder";
+import { Reminder } from "../../../types/reminder";
 import {
   CreateTaskInput,
   getTaskPlanningState,
@@ -21,7 +21,7 @@ import {
   TaskImportance,
   TaskPlanningState
 } from "../../../types/task";
-import { ReminderOffsetSelector } from "../../reminders/components/ReminderOffsetSelector";
+import { ReminderEditor } from "../../reminders/components/ReminderEditor";
 import { useReminderSettings } from "../../settings/hooks/useReminderSettings";
 import {
   getDeadlineQuickChoices,
@@ -71,9 +71,7 @@ export function TaskEditorForm({
   );
   const [deadlineDate, setDeadlineDate] = useState(initialTask?.deadlineDate ?? "");
   const [deadlineTime, setDeadlineTime] = useState(initialTask?.deadlineTime ?? "");
-  const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[]>(
-    initialTask?.reminderOffsets ?? []
-  );
+  const [reminders, setReminders] = useState<Reminder[]>(initialTask?.reminders ?? []);
   const [referenceDate] = useState(() => new Date());
   const [showDetails, setShowDetails] = useState(Boolean(initialTask || initialDate));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -113,7 +111,7 @@ export function TaskEditorForm({
           estimatedDurationMinutes,
           deadlineDate,
           deadlineTime,
-          reminderOffsets
+          reminders
         })
       );
     } catch (error) {
@@ -333,23 +331,18 @@ export function TaskEditorForm({
             </Field>
           ) : null}
 
-          {planningState === "scheduled" ? (
-            <ReminderOffsetSelector
-              disabled={Boolean(reminderDisabledMessage)}
-              {...(reminderDisabledMessage
-                ? { disabledMessage: reminderDisabledMessage }
-                : {})}
-              error={fieldErrors.reminderOffsets}
-              onChange={setReminderOffsets}
-              value={reminderOffsets}
-            />
-          ) : null}
-
-          {planningState !== "scheduled" && reminderOffsets.length > 0 ? (
-            <Text style={styles.helpText}>
-              Saved reminder choices are inactive until this task has a date and time.
-            </Text>
-          ) : null}
+          <ReminderEditor
+            allowRelative={planningState === "scheduled"}
+            deliveryMessage={
+              reminderSettings.isLoading
+                ? "Checking reminder delivery settings..."
+                : (reminderDisabledMessage ??
+                  "Reminder delivery is on. Only future reminder times are scheduled.")
+            }
+            error={fieldErrors.reminders ?? fieldErrors.reminderOffsets}
+            onChange={setReminders}
+            value={reminders}
+          />
         </View>
       )}
 

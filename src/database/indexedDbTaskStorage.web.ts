@@ -15,9 +15,12 @@ import {
 } from "../types/recovery";
 import {
   isReminderOffsetList,
-  isReminderOffsetMinutes,
-  normalizeReminderOffsets
+  isReminderOffsetMinutes
 } from "../notifications/reminderOffsets";
+import {
+  getRelativeReminderOffsets,
+  normalizeStoredReminders
+} from "../notifications/reminders";
 import {
   taskImportances,
   taskStatuses,
@@ -32,7 +35,7 @@ import { SettingsStorage, StoredSetting } from "./settingsStorage";
 import { TaskStorage } from "./taskStorage";
 
 const WEB_DATABASE_NAME = "adhd-calendar-web";
-const WEB_DATABASE_VERSION = 9;
+const WEB_DATABASE_VERSION = 10;
 const TASK_STORE_NAME = "tasks";
 const EVENT_STORE_NAME = "calendarEvents";
 const RECOVERY_SESSION_STORE_NAME = "recoverySessions";
@@ -64,6 +67,7 @@ type StoredTask = {
   updatedAt: string;
   completedAt?: string | null;
   startedAt?: string | null;
+  reminders?: Task["reminders"];
   reminderOffsets?: Task["reminderOffsets"];
   reminderOffsetMinutes?: number | null;
   deletedAt: string | null;
@@ -78,6 +82,7 @@ type StoredCalendarEvent = {
   endTime: string | null;
   durationMinutes: number | null;
   notes: string | null;
+  reminders?: CalendarEvent["reminders"];
   reminderOffsets?: CalendarEvent["reminderOffsets"];
   reminderOffsetMinutes?: number | null;
   createdAt: string;
@@ -102,6 +107,7 @@ type StoredRecoveryItem = {
   originalScheduledTime: string | null;
   originalPreferredTime?: RecoveryItem["originalPreferredTime"];
   originalEstimatedDurationMinutes: number | null;
+  originalReminders?: RecoveryItem["originalReminders"];
   originalReminderOffsets?: RecoveryItem["originalReminderOffsets"];
   originalReminderOffsetMinutes?: number | null;
   status: RecoveryItemStatus;
@@ -201,7 +207,11 @@ export async function openIndexedDbSettingsStorage(
 }
 
 export function serializeTaskForWeb(task: Task): StoredTask {
-  return { ...task, reminderOffsets: [...task.reminderOffsets] };
+  return {
+    ...task,
+    reminders: task.reminders.map((reminder) => ({ ...reminder })),
+    reminderOffsets: getRelativeReminderOffsets(task.reminders)
+  };
 }
 
 export function deserializeTaskFromWeb(value: unknown): Task {
@@ -224,6 +234,15 @@ export function deserializeTaskFromWeb(value: unknown): Task {
   const reminderOffsets =
     value.reminderOffsets ??
     (legacyReminderOffset === null ? [] : [legacyReminderOffset]);
+  let reminders: Task["reminders"];
+
+  try {
+    reminders = normalizeStoredReminders(value.reminders, reminderOffsets);
+  } catch (error) {
+    throw new WebStorageDataError(
+      error instanceof Error ? error.message : "Stored reminders are invalid."
+    );
+  }
 
   if (
     typeof value.id !== "string" ||
@@ -280,14 +299,19 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     completedAt,
-    reminderOffsets: normalizeReminderOffsets(reminderOffsets),
+    reminders,
+    reminderOffsets: getRelativeReminderOffsets(reminders),
     startedAt,
     deletedAt: value.deletedAt
   };
 }
 
 export function serializeCalendarEventForWeb(event: CalendarEvent): StoredCalendarEvent {
-  return { ...event, reminderOffsets: [...event.reminderOffsets] };
+  return {
+    ...event,
+    reminders: event.reminders.map((reminder) => ({ ...reminder })),
+    reminderOffsets: getRelativeReminderOffsets(event.reminders)
+  };
 }
 
 export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
@@ -304,6 +328,15 @@ export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
   const reminderOffsets =
     value.reminderOffsets ??
     (legacyReminderOffset === null ? [] : [legacyReminderOffset]);
+  let reminders: CalendarEvent["reminders"];
+
+  try {
+    reminders = normalizeStoredReminders(value.reminders, reminderOffsets);
+  } catch (error) {
+    throw new WebStorageDataError(
+      error instanceof Error ? error.message : "Stored reminders are invalid."
+    );
+  }
 
   if (
     typeof value.id !== "string" ||
@@ -339,7 +372,8 @@ export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
     endTime,
     durationMinutes,
     notes: value.notes,
-    reminderOffsets: normalizeReminderOffsets(reminderOffsets),
+    reminders,
+    reminderOffsets: getRelativeReminderOffsets(reminders),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt
   };
@@ -400,7 +434,8 @@ export function deserializeRecoverySessionFromWeb(
 export function serializeRecoveryItemForWeb(item: RecoveryItem): StoredRecoveryItem {
   return {
     ...item,
-    originalReminderOffsets: [...item.originalReminderOffsets],
+    originalReminders: item.originalReminders.map((reminder) => ({ ...reminder })),
+    originalReminderOffsets: getRelativeReminderOffsets(item.originalReminders),
     createdTaskIds: [...item.createdTaskIds]
   };
 }
@@ -419,6 +454,18 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
   const originalReminderOffsets =
     value.originalReminderOffsets ??
     (legacyReminderOffset === null ? [] : [legacyReminderOffset]);
+  let originalReminders: RecoveryItem["originalReminders"];
+
+  try {
+    originalReminders = normalizeStoredReminders(
+      value.originalReminders,
+      originalReminderOffsets
+    );
+  } catch (error) {
+    throw new WebStorageDataError(
+      error instanceof Error ? error.message : "Stored reminders are invalid."
+    );
+  }
   const status = value.status;
   const decision = value.decision;
   const rescheduledDate = value.rescheduledDate;
@@ -480,7 +527,8 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
     originalScheduledTime,
     originalPreferredTime,
     originalEstimatedDurationMinutes,
-    originalReminderOffsets: normalizeReminderOffsets(originalReminderOffsets),
+    originalReminders,
+    originalReminderOffsets: getRelativeReminderOffsets(originalReminders),
     status,
     decision,
     note: value.note,

@@ -1,9 +1,17 @@
 import { CalendarEvent, CreateCalendarEventInput } from "../../types/calendarEvent";
-import { getReminderTriggerDate } from "../../notifications/reminderRules";
+import {
+  getReminderDate,
+  getReminderTriggerDate
+} from "../../notifications/reminderRules";
 import {
   isReminderOffsetList,
   normalizeReminderOffsets
 } from "../../notifications/reminderOffsets";
+import {
+  getRelativeReminderOffsets,
+  normalizeReminders,
+  remindersFromOffsets
+} from "../../notifications/reminders";
 import {
   noOpReminderSynchronizer,
   ReminderSynchronizer
@@ -47,6 +55,21 @@ export class CalendarEventRepository {
       }
     }
 
+    for (const reminder of normalizedInput.reminders) {
+      if (reminder.kind !== "absolute") {
+        continue;
+      }
+
+      const reminderDate = getReminderDate(reminder, null, null);
+
+      if (!reminderDate || reminderDate.getTime() <= now.getTime()) {
+        throw new CalendarEventValidationError(
+          "Choose a future date and time for a custom reminder.",
+          "reminders"
+        );
+      }
+    }
+
     const event: CalendarEvent = {
       id: this.idGenerator(),
       title: normalizedInput.title,
@@ -56,6 +79,7 @@ export class CalendarEventRepository {
       endTime: normalizedInput.endTime,
       durationMinutes: normalizedInput.durationMinutes,
       notes: normalizedInput.notes,
+      reminders: normalizedInput.reminders,
       reminderOffsets: normalizedInput.reminderOffsets,
       createdAt: timestamp,
       updatedAt: timestamp
@@ -121,6 +145,7 @@ function normalizeCreateEventInput(
   | "endTime"
   | "durationMinutes"
   | "notes"
+  | "reminders"
   | "reminderOffsets"
 > {
   const title = input.title.trim();
@@ -189,6 +214,19 @@ function normalizeCreateEventInput(
     );
   }
 
+  let reminders: CalendarEvent["reminders"];
+
+  try {
+    reminders = normalizeReminders(
+      input.reminders ?? remindersFromOffsets(normalizeReminderOffsets(reminderOffsets))
+    );
+  } catch (error) {
+    throw new CalendarEventValidationError(
+      error instanceof Error ? error.message : "Choose valid reminder times.",
+      "reminders"
+    );
+  }
+
   return {
     title,
     date,
@@ -196,7 +234,8 @@ function normalizeCreateEventInput(
     endTime,
     durationMinutes,
     notes: input.notes?.trim() || null,
-    reminderOffsets: normalizeReminderOffsets(reminderOffsets)
+    reminders,
+    reminderOffsets: getRelativeReminderOffsets(reminders)
   };
 }
 

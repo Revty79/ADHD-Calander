@@ -9,22 +9,32 @@ intelligence.
 
 ## Domain Intent
 
-`Task.reminderOffsets` and `CalendarEvent.reminderOffsets` store unique arrays.
-Supported offsets are:
+`Task.reminders` and `CalendarEvent.reminders` use one shared union:
+
+- `relative`: a supported number of minutes before an exact task or event start.
+- `absolute`: one explicit local `YYYY-MM-DD` date and `HH:MM` time independent
+  from item placement.
+
+Supported relative offsets are:
 
 - `0`: at the scheduled time
+- `5`: 5 minutes before
 - `10`: 10 minutes before, retained for legacy choices
 - `15`: 15 minutes before
 - `30`: 30 minutes before, retained for legacy choices
 - `60`: 1 hour before
 - `1440`: 1 day before
 
-The UI presents understandable check controls and limits each item to five
-choices. Offset arrays remain stored when a task becomes Flexible, Planned,
-completed, removed, delegated, or broken down. This prevents silent loss. A
-choice schedules only while the item is active, has an exact local date/time,
-the trigger is still in the future, reminders are enabled, and native
-permission is granted.
+The shared editor presents understandable controls and limits each item to five
+choices. Scheduled tasks and fixed events expose relative choices. Every task
+and fixed event can add, edit, and remove explicit local reminder date/times.
+Adding a reminder never changes Flexible, Planned, or Scheduled state.
+
+Reminder arrays remain stored when a task changes placement, completes, is
+removed, is delegated, or is broken down. This prevents silent loss. A relative
+choice needs an exact item start. An explicit choice does not. Android schedules
+either only while the item is active, the trigger is in the future, reminders
+are enabled, and native permission is granted.
 
 Date and time components construct a local `Date`; date-only strings are never
 parsed through UTC. A past offset is skipped rather than scheduled late, but
@@ -43,12 +53,15 @@ Each reminder has a deterministic, distinct identifier:
 
 - `adhd-calendar-task-{taskId}-{offset}`
 - `adhd-calendar-event-{eventId}-{offset}`
+- `adhd-calendar-task-{taskId}-absolute-{date}-{time}`
+- `adhd-calendar-event-{eventId}-absolute-{date}-{time}`
 
 Before synchronizing one item, the service cancels every supported offset
-identity plus the legacy single identity. It then schedules only valid future
-requests. This removes stale notifications after changing a time or deselecting
-an offset without requiring a notification-ID table. Startup reconciliation
-cancels the full app schedule and rebuilds it from local intent.
+identity, the legacy single identity, and explicit identities from both the
+previous and updated record. It then schedules only valid future requests. This
+removes stale notifications after moving, editing, or removing one reminder
+without requiring a notification-ID table. Startup reconciliation cancels the
+full app schedule and rebuilds it from local intent.
 
 Adapter failures are logged and do not roll back task, event, completion, or
 Recovery persistence.
@@ -75,8 +88,8 @@ urgency.
   notifications because the task is no longer active.
 - Undo completion/restore/reopen: the task becomes active again; synchronization
   schedules only choices whose trigger remains in the future.
-- Flexible or Planned transition: preserve choices, cancel timed notifications,
-  and report that choices are inactive until an exact time exists.
+- Flexible or Planned transition: preserve all choices. Explicit reminders can
+  remain active; relative choices become inactive until an exact time exists.
 
 Accepting a scheduling suggestion continues to use `TaskRepository.scheduleTask`.
 The existing task identity and reminder array are preserved, then every trigger
@@ -91,11 +104,12 @@ later Calendar functional-hardening phase.
 
 ## Recovery Integration
 
-Recovery items snapshot `originalReminderOffsets`. Recovery decisions preserve
+Recovery items snapshot `originalReminders`. Recovery decisions preserve
 the original task's choices while active notification delivery changes with the
 task state:
 
-- Keep unscheduled and date-only Reschedule keep choices but schedule nothing.
+- Keep unscheduled and date-only Reschedule keep choices; explicit future
+  reminders can still deliver while relative reminders remain inactive.
 - Timed Reschedule rebuilds every valid trigger.
 - Break Down, Delegate, and Remove preserve original history but cancel active
   notifications; new smaller tasks begin without reminder choices.
@@ -106,9 +120,10 @@ enter Recovery and are never moved.
 
 ## Platform And Release Limits
 
-Android is the current notification target. Web reports reminders as
-unsupported and offers no controls that imply browser delivery. This phase does
-not request Android exact-alarm access.
+Android is the current notification-delivery target. Web saves and edits the
+same reminder intent but reports delivery as unsupported and never requests
+browser notification permission. This phase does not request Android
+exact-alarm access.
 
 Automated tests verify intent persistence, distinct identifiers, stale
 cancellation, completion/removal cancellation, rescheduling, Recovery, and
@@ -118,7 +133,7 @@ cancellation still require a physical-device preview-build test.
 ## Deliberately Deferred
 
 - Quiet hours and default offsets
-- Arbitrary custom reminder offsets
+- Arbitrary relative reminder offsets
 - Event reminder editing after creation
 - Recurring reminders, snooze, notification actions, badges, sounds, and
   urgency tiers

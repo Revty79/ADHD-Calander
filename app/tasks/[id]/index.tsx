@@ -11,7 +11,7 @@ import {
 
 import { ErrorNotice } from "../../../src/components/ErrorNotice";
 import { Screen } from "../../../src/components/Screen";
-import { formatReminderOffsets } from "../../../src/notifications/reminderRules";
+import { formatReminders } from "../../../src/notifications/reminderRules";
 import { useTaskDetail } from "../../../src/features/tasks/hooks/useTaskDetail";
 import {
   getTaskDeadlineLabel,
@@ -155,18 +155,11 @@ export default function TaskDetailScreen() {
               : "No estimate"
           }
         />
-        <DetailRow
-          label="Reminders"
-          value={formatReminderOffsets(task.reminderOffsets)}
-        />
-        {task.reminderOffsets.length > 0 ? (
+        <DetailRow label="Reminders" value={formatReminders(task.reminders)} />
+        {task.reminders.length > 0 ? (
           <DetailRow
             label="Reminder delivery"
-            value={
-              task.scheduledDate && task.scheduledTime
-                ? "Future reminder times are scheduled when reminders are enabled."
-                : "Saved and inactive until this task has a date and time."
-            }
+            value="Future custom reminders are independent of task placement. Relative reminders require a Scheduled task."
           />
         ) : null}
         {task.startedAt ? (

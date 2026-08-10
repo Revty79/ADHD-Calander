@@ -1,6 +1,7 @@
-import { ReminderOffsetMinutes, ReminderPermissionStatus } from "../../types/reminder";
+import { Reminder, ReminderPermissionStatus } from "../../types/reminder";
 import { CreateTaskInput, TaskImportance, TaskPlanningState } from "../../types/task";
 import { TaskValidationError } from "../../database/repositories/errors";
+import { getReminderDeliveryMessage } from "../reminders/reminderEditorModel";
 
 export const taskDurationOptions: (number | null)[] = [null, 10, 15, 30, 45, 60, 90, 120];
 
@@ -27,7 +28,7 @@ export type TaskEditorDraft = {
   estimatedDurationMinutes: number | null;
   deadlineDate: string;
   deadlineTime: string;
-  reminderOffsets: ReminderOffsetMinutes[];
+  reminders: Reminder[];
 };
 
 export function buildTaskEditorInput(draft: TaskEditorDraft): CreateTaskInput {
@@ -55,7 +56,7 @@ export function buildTaskEditorInput(draft: TaskEditorDraft): CreateTaskInput {
     estimatedDurationMinutes: draft.estimatedDurationMinutes,
     deadlineDate: draft.deadlineDate,
     deadlineTime: draft.deadlineDate ? draft.deadlineTime : null,
-    reminderOffsets: draft.reminderOffsets
+    reminders: draft.reminders
   };
 }
 
@@ -98,21 +99,9 @@ export function getTaskPlanningTransition(
 }
 
 export function getTaskReminderDisabledMessage(
-  planningState: TaskPlanningState,
+  _planningState: TaskPlanningState,
   permissionStatus: ReminderPermissionStatus | undefined,
   remindersEnabled: boolean | undefined
 ): string | null {
-  if (planningState !== "scheduled") {
-    return "Reminders are available after adding a date and time.";
-  }
-
-  if (permissionStatus === "denied" || permissionStatus === "unsupported") {
-    return "Reminders are unavailable on this device or browser.";
-  }
-
-  if (remindersEnabled !== true) {
-    return "Turn on reminders in Settings to choose them here.";
-  }
-
-  return null;
+  return getReminderDeliveryMessage(permissionStatus, remindersEnabled);
 }

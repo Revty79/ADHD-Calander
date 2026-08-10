@@ -91,7 +91,10 @@ describe("Web and Android parity contracts", () => {
         estimatedDurationMinutes: 30,
         deadlineDate: "2026-08-12",
         deadlineTime: "15:30",
-        reminderOffsets: [60, 0]
+        reminders: [
+          { kind: "relative", offsetMinutes: 60 },
+          { kind: "relative", offsetMinutes: 0 }
+        ]
       }),
       {
         title: "Prepare notes",
@@ -103,7 +106,10 @@ describe("Web and Android parity contracts", () => {
         estimatedDurationMinutes: 30,
         deadlineDate: "2026-08-12",
         deadlineTime: "15:30",
-        reminderOffsets: [60, 0]
+        reminders: [
+          { kind: "relative", offsetMinutes: 60 },
+          { kind: "relative", offsetMinutes: 0 }
+        ]
       }
     );
     assert.throws(
@@ -119,7 +125,7 @@ describe("Web and Android parity contracts", () => {
           estimatedDurationMinutes: 30,
           deadlineDate: "",
           deadlineTime: "",
-          reminderOffsets: []
+          reminders: []
         }),
       (error) => error instanceof TaskValidationError && error.field === "scheduledTime"
     );
@@ -136,13 +142,13 @@ describe("Web and Android parity contracts", () => {
           estimatedDurationMinutes: 30,
           deadlineDate: "",
           deadlineTime: "",
-          reminderOffsets: []
+          reminders: []
         }),
       (error) => error instanceof TaskValidationError && error.field === "scheduledDate"
     );
     assert.equal(
       getTaskReminderDisabledMessage("scheduled", "unsupported", false),
-      "Reminders are unavailable on this device or browser."
+      "Notification delivery is unavailable on this platform."
     );
     assert.deepEqual(selectRecapDate("not-a-date", localDate), {
       ok: false,
@@ -283,13 +289,20 @@ async function runPlanningWorkflow(harness: PlatformHarness) {
     estimatedDurationMinutes: 45,
     deadlineDate: nextLocalDate,
     deadlineTime: "17:00",
-    reminderOffsets: [60, 0]
+    reminders: [
+      { kind: "absolute", date: localDate, time: "08:00" },
+      { kind: "absolute", date: localDate, time: "08:30" }
+    ]
   });
   const plannedTask = await harness.taskRepository.createTask({
     title: "Planned review",
     scheduledDate: localDate,
     preferredTime: "14:30",
-    estimatedDurationMinutes: 30
+    estimatedDurationMinutes: 30,
+    reminders: [
+      { kind: "absolute", date: localDate, time: "09:00" },
+      { kind: "absolute", date: localDate, time: "09:30" }
+    ]
   });
   const updatedPlannedTask = await harness.taskRepository.updateTask(plannedTask.id, {
     title: "Planned review",
@@ -299,7 +312,8 @@ async function runPlanningWorkflow(harness: PlatformHarness) {
     preferredTime: null,
     estimatedDurationMinutes: 30,
     deadlineDate: nextLocalDate,
-    deadlineTime: "15:30"
+    deadlineTime: "15:30",
+    reminders: plannedTask.reminders
   });
   assert.equal(updatedPlannedTask.id, plannedTask.id);
 
@@ -334,7 +348,10 @@ async function runPlanningWorkflow(harness: PlatformHarness) {
     startTime: "10:30",
     durationMinutes: 60,
     notes: "Stay fixed",
-    reminderOffsets: [60, 0]
+    reminders: [
+      { kind: "relative", offsetMinutes: 60 },
+      { kind: "absolute", date: localDate, time: "08:45" }
+    ]
   });
   await harness.calendarEventRepository.createEvent({
     title: "Same-time fixed appointment",

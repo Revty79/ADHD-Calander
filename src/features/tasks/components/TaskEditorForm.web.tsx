@@ -1,15 +1,8 @@
 import { FormEvent, useRef, useState } from "react";
 
 import { TaskValidationError } from "../../../database/repositories/errors";
-import {
-  formatReminderOffset,
-  formatReminderOffsets
-} from "../../../notifications/reminderRules";
-import {
-  maxRemindersPerItem,
-  ReminderOffsetMinutes,
-  reminderSelectionOptions
-} from "../../../types/reminder";
+import { ReminderEditor } from "../../reminders/components/ReminderEditor";
+import { Reminder } from "../../../types/reminder";
 import {
   CreateTaskInput,
   getTaskPlanningState,
@@ -17,7 +10,6 @@ import {
   TaskImportance,
   TaskPlanningState
 } from "../../../types/task";
-import { useReminderSettings } from "../../settings/hooks/useReminderSettings";
 import {
   getDeadlineQuickChoices,
   getPlannedDateQuickChoices,
@@ -26,7 +18,6 @@ import {
 import {
   buildTaskEditorInput,
   getTaskPlanningTransition,
-  getTaskReminderDisabledMessage,
   taskDurationOptions,
   taskImportanceOptions,
   taskPlanningOptions
@@ -47,7 +38,6 @@ export function TaskEditorForm({
   onSubmit,
   submitLabel
 }: Props) {
-  const reminderSettings = useReminderSettings();
   const [title, setTitle] = useState(initialTask?.title ?? "");
   const [description, setDescription] = useState(initialTask?.description ?? "");
   const [importance, setImportance] = useState<TaskImportance>(
@@ -66,9 +56,7 @@ export function TaskEditorForm({
   );
   const [deadlineDate, setDeadlineDate] = useState(initialTask?.deadlineDate ?? "");
   const [deadlineTime, setDeadlineTime] = useState(initialTask?.deadlineTime ?? "");
-  const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[]>(
-    initialTask?.reminderOffsets ?? []
-  );
+  const [reminders, setReminders] = useState<Reminder[]>(initialTask?.reminders ?? []);
   const [referenceDate] = useState(() => new Date());
   const deadlineInput = useRef<HTMLInputElement>(null);
   const [detailsOpen, setDetailsOpen] = useState(Boolean(initialTask || initialDate));
@@ -110,7 +98,7 @@ export function TaskEditorForm({
           estimatedDurationMinutes,
           deadlineDate,
           deadlineTime,
-          reminderOffsets
+          reminders
         })
       );
     } catch (error) {
@@ -123,12 +111,6 @@ export function TaskEditorForm({
       setIsSaving(false);
     }
   }
-
-  const reminderDisabledMessage = getTaskReminderDisabledMessage(
-    planningState,
-    reminderSettings.status?.permissionStatus,
-    reminderSettings.status?.settings.remindersEnabled
-  );
 
   return (
     <form className="web-task-form" noValidate onSubmit={saveTask}>
@@ -390,64 +372,13 @@ export function TaskEditorForm({
             </div>
           ) : null}
 
-          {planningState === "scheduled" &&
-          reminderSettings.status?.permissionStatus === "unsupported" ? (
-            <section className="web-form-info" aria-labelledby="task-reminders-title">
-              <strong id="task-reminders-title">Reminders</strong>
-              <p>
-                Browser notification delivery is not supported. Set task reminders in the
-                Android app.
-              </p>
-              {reminderOffsets.length > 0 ? (
-                <p>Saved choices: {formatReminderOffsets(reminderOffsets)}</p>
-              ) : null}
-            </section>
-          ) : planningState === "scheduled" ? (
-            <fieldset className="web-choice-fieldset">
-              <legend>Reminders</legend>
-              <small>
-                {reminderDisabledMessage ??
-                  `Optional. Choose up to ${maxRemindersPerItem}. ${reminderOffsets.length} selected.`}
-              </small>
-              <div className="web-choice-options">
-                {reminderSelectionOptions.map((offset) => {
-                  const checked = reminderOffsets.includes(offset);
-                  const atLimit =
-                    reminderOffsets.length >= maxRemindersPerItem && !checked;
-
-                  return (
-                    <label key={offset}>
-                      <input
-                        checked={checked}
-                        disabled={Boolean(reminderDisabledMessage) || atLimit}
-                        name="task-reminders"
-                        onChange={() =>
-                          setReminderOffsets((current) =>
-                            checked
-                              ? current.filter((candidate) => candidate !== offset)
-                              : [...current, offset]
-                          )
-                        }
-                        type="checkbox"
-                        value={offset}
-                      />
-                      <span>{formatReminderOffset(offset)}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <FieldError
-                id="task-reminder-error"
-                message={fieldErrors.reminderOffsets}
-              />
-            </fieldset>
-          ) : null}
-
-          {planningState !== "scheduled" && reminderOffsets.length > 0 ? (
-            <p className="web-form-hint">
-              Saved reminder choices are inactive until this task has a date and time.
-            </p>
-          ) : null}
+          <ReminderEditor
+            allowRelative={planningState === "scheduled"}
+            deliveryMessage="Notification delivery is unavailable in the web build. Reminder choices still stay saved."
+            error={fieldErrors.reminders ?? fieldErrors.reminderOffsets}
+            onChange={setReminders}
+            value={reminders}
+          />
         </div>
       </details>
 

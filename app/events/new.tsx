@@ -13,14 +13,21 @@ import {
 } from "react-native";
 
 import { ErrorNotice } from "../../src/components/ErrorNotice";
+import {
+  NativeDatePickerButton,
+  NativeTimePickerButton
+} from "../../src/components/NativeDateTimePickerButton";
 import { useCalendarEventRepository } from "../../src/database/DatabaseProvider";
 import { CalendarEventValidationError } from "../../src/database/repositories/calendarEventErrors";
-import { ReminderOffsetSelector } from "../../src/features/reminders/components/ReminderOffsetSelector";
+import { ReminderEditor } from "../../src/features/reminders/components/ReminderEditor";
+import { getReminderDeliveryMessage } from "../../src/features/reminders/reminderEditorModel";
 import { useReminderSettings } from "../../src/features/settings/hooks/useReminderSettings";
-import { ReminderOffsetMinutes } from "../../src/types/reminder";
+import { Reminder } from "../../src/types/reminder";
 import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
 
 type FieldErrors = Partial<Record<CalendarEventValidationError["field"], string>>;
+
+const eventDurationOptions: (number | null)[] = [null, 15, 30, 45, 60, 90, 120];
 
 export default function NewEventScreen() {
   const router = useRouter();
@@ -35,9 +42,9 @@ export default function NewEventScreen() {
   const [date, setDate] = useState<string>(initialDate);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
-  const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,9 +60,9 @@ export default function NewEventScreen() {
         date,
         startTime,
         endTime,
-        durationMinutes: durationMinutes.trim() ? Number(durationMinutes) : null,
+        durationMinutes,
         notes,
-        reminderOffsets
+        reminders
       });
 
       router.replace({ pathname: "/(tabs)/calendar", params: { date } });
@@ -96,55 +103,75 @@ export default function NewEventScreen() {
         </FormField>
 
         <FormField label="Date" error={fieldErrors.date}>
-          <TextInput
-            accessibilityLabel="Event date in year month day format"
-            autoCapitalize="none"
-            keyboardType="numbers-and-punctuation"
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            style={[styles.input, fieldErrors.date && styles.inputError]}
+          <NativeDatePickerButton
+            accessibilityLabel="Choose event date"
+            onChange={setDate}
             value={date}
           />
         </FormField>
 
         <FormField label="Start time" error={fieldErrors.startTime}>
-          <TextInput
-            accessibilityLabel="Event start time in twenty four hour format"
-            autoCapitalize="none"
-            keyboardType="numbers-and-punctuation"
-            onChangeText={setStartTime}
-            placeholder="HH:MM"
-            style={[styles.input, fieldErrors.startTime && styles.inputError]}
+          <NativeTimePickerButton
+            accessibilityLabel="Choose event start time"
+            onChange={(value) => setStartTime(value)}
             value={startTime}
           />
         </FormField>
 
         <FormField label="End time (optional)" error={fieldErrors.endTime}>
-          <TextInput
-            accessibilityLabel="Optional event end time in twenty four hour format"
-            autoCapitalize="none"
-            keyboardType="numbers-and-punctuation"
-            onChangeText={setEndTime}
-            placeholder="HH:MM"
-            style={[styles.input, fieldErrors.endTime && styles.inputError]}
+          <NativeTimePickerButton
+            accessibilityLabel="Choose optional event end time"
+            onChange={(value) => {
+              setEndTime(value);
+              setDurationMinutes(null);
+            }}
             value={endTime}
           />
+          {endTime ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setEndTime("")}
+              style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.clearButtonText}>Clear end time</Text>
+            </Pressable>
+          ) : null}
         </FormField>
 
         <Text style={styles.orText}>Use an end time or a duration, not both.</Text>
 
-        <FormField
-          label="Duration in minutes (optional)"
-          error={fieldErrors.durationMinutes}
-        >
-          <TextInput
-            accessibilityLabel="Optional event duration in minutes"
-            keyboardType="number-pad"
-            onChangeText={setDurationMinutes}
-            placeholder="For example, 45"
-            style={[styles.input, fieldErrors.durationMinutes && styles.inputError]}
-            value={durationMinutes}
-          />
+        <FormField label="Duration (optional)" error={fieldErrors.durationMinutes}>
+          <View accessibilityRole="radiogroup" style={styles.choiceWrap}>
+            {eventDurationOptions.map((duration) => {
+              const selected = duration === durationMinutes;
+
+              return (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  key={duration ?? "none"}
+                  onPress={() => {
+                    setDurationMinutes(duration);
+
+                    if (duration !== null) {
+                      setEndTime("");
+                    }
+                  }}
+                  style={({ pressed }) => [
+                    styles.choice,
+                    selected && styles.choiceSelected,
+                    pressed && styles.pressed
+                  ]}
+                >
+                  <Text
+                    style={[styles.choiceText, selected && styles.choiceTextSelected]}
+                  >
+                    {duration === null ? "No duration" : `${duration} min`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </FormField>
 
         <FormField label="Notes (optional)">
@@ -159,14 +186,19 @@ export default function NewEventScreen() {
           />
         </FormField>
 
-        <ReminderOffsetSelector
-          disabled={
-            reminderSettings.isLoading ||
-            reminderSettings.status?.settings.remindersEnabled !== true
+        <ReminderEditor
+          allowRelative
+          deliveryMessage={
+            reminderSettings.isLoading
+              ? "Checking reminder delivery settings..."
+              : getReminderDeliveryMessage(
+                  reminderSettings.status?.permissionStatus,
+                  reminderSettings.status?.settings.remindersEnabled
+                )
           }
-          error={fieldErrors.reminderOffsets}
-          onChange={setReminderOffsets}
-          value={reminderOffsets}
+          error={fieldErrors.reminders ?? fieldErrors.reminderOffsets}
+          onChange={setReminders}
+          value={reminders}
         />
 
         {errorMessage ? (
@@ -269,6 +301,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: -8
   },
+  choiceWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  choice: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: "#aaa49a",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 13
+  },
+  choiceSelected: { backgroundColor: "#edf4f2", borderColor: "#2f5d62" },
+  choiceText: { color: "#4a4742", fontSize: 14, fontWeight: "600" },
+  choiceTextSelected: { color: "#244b4f", fontWeight: "800" },
+  clearButton: {
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 4
+  },
+  clearButtonText: { color: "#24565c", fontSize: 14, fontWeight: "700" },
   saveButton: {
     alignItems: "center",
     backgroundColor: "#2f5d62",

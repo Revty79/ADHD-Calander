@@ -47,7 +47,9 @@ plan into a larger next-day burden.
 
 ## Reminders Without Pressure
 
-- Reminders are optional and require an explicit scheduled date and time.
+- Reminders are optional and never change task or event placement.
+- Every task may use explicit local reminder date/times. Scheduled tasks and
+  fixed events may also use relative-to-start reminders.
 - Ask for notification permission only after the user chooses to enable reminders.
 - Keep task and calendar features fully usable after permission denial.
 - Use factual timing copy without blame, fake urgency, repeated nagging, or

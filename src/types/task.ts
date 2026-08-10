@@ -1,5 +1,5 @@
 import { LocalDateString, LocalTimeString } from "./dateTime";
-import { ReminderOffsetMinutes } from "./reminder";
+import { Reminder, ReminderInput, ReminderOffsetMinutes } from "./reminder";
 
 export const implementedTaskStatuses = [
   "not_started",
@@ -44,6 +44,7 @@ export type Task = {
   estimatedDurationMinutes: number | null;
   deadlineDate: LocalDateString | null;
   deadlineTime: LocalTimeString | null;
+  reminders: Reminder[];
   reminderOffsets: ReminderOffsetMinutes[];
   startedAt: string | null;
   createdAt: string;
@@ -62,6 +63,7 @@ export type CreateTaskInput = {
   estimatedDurationMinutes?: number | null;
   deadlineDate?: string | null;
   deadlineTime?: string | null;
+  reminders?: ReminderInput[];
   reminderOffsets?: number[];
 };
 

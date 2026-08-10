@@ -20,6 +20,7 @@ Shared code continues to own:
 - Repository errors and user-facing persistence wording.
 - Native database migrations and storage contracts.
 - Task-editor state transitions and submitted domain input.
+- Reminder model, editing rules, formatting, and validation.
 - Recap date validation and route-date fallback behavior.
 - Planning-setting labels and explanatory copy.
 
@@ -34,11 +35,14 @@ Platform-specific files own:
   daily recap.
 - `app/(tabs)/settings.web.tsx`: semantic accessibility, privacy, app-info, and
   accurate notification-support sections.
+- `app/(tabs)/guide.web.tsx`: the same factual Guide content as native.
 - `app/recovery/start.web.tsx`: confirmation-gated Recovery start or resume.
 - `app/tasks/new.web.tsx`: semantic browser form controls.
 - `app/tasks/[id]/schedule.web.tsx`: semantic suggestion selection and explicit
   scheduling confirmation.
 - `app/events/new.web.tsx`: semantic browser event form controls.
+- `src/features/reminders/components/ReminderEditor.web.tsx`: browser date/time
+  controls for the shared reminder model without claiming notification delivery.
 - `src/components/Screen.web.tsx`: web page sizing for shared placeholder pages.
 - `src/features/tasks/components/TaskList.web.tsx`: semantic web task lists.
 - `src/database/createRepositories.web.ts`: web repository composition.
@@ -52,7 +56,7 @@ and Expo Router select the correct file by platform.
 
 At widths above 760 pixels, the main routes appear in a left sidebar. The active
 route has a visible `Current` label, a stronger border, and `aria-current` state.
-At 760 pixels and below, navigation becomes a compact six-item header. Every
+At 760 pixels and below, navigation becomes a compact seven-item header. Every
 destination remains a normal keyboard-focusable link.
 
 A persistent "Plans changed?" action appears alongside the primary navigation
@@ -66,7 +70,7 @@ return to Today, Tasks, or its selected Calendar date.
 
 Native builds continue to initialize Expo SQLite, apply versioned SQL
 migrations, and use SQL storage adapters. The web build opens IndexedDB database
-`adhd-calendar-web` at version 9 with `tasks`, `calendarEvents`,
+`adhd-calendar-web` at version 10 with `tasks`, `calendarEvents`,
 `recoverySessions`, `recoveryItems`, and `appSettings` stores.
 
 `TaskRepository`, `CalendarEventRepository`, and `RecoveryRepository` depend on
@@ -85,13 +89,16 @@ records unchanged. Version 9 advances storage forward without rewriting records;
 missing `preferredTime`, `deadlineTime`, and Recovery `originalPreferredTime`
 values deserialize as `null` until the record is next written normally. Legacy
 version 8 planned-period fields remain readable but ignored as a compatibility
-fallback.
+fallback. Version 10 advances the database without rewriting records. Readers
+fall back from missing shared reminder fields to version 7 offset arrays, so
+existing version 8 and version 9 databases open without data loss.
 
 `SettingsRepository` uses the `appSettings` store through a shared storage
 contract. `ReminderService` is also composed on web, but receives
 `UnsupportedNotificationAdapter`: it schedules nothing and reports
-`unsupported`. The Settings screen explains that reminders are available in the
-Android app and never asks for browser notification permission.
+`unsupported`. Forms still edit and persist reminder intent through shared
+rules, while the forms and Settings screen explain that delivery is available
+only in the Android app and never ask for browser notification permission.
 
 `DailyRecapRepository` composes those shared repositories and persists nothing.
 IndexedDB recovery sessions are filtered by source date in the adapter without
@@ -138,13 +145,13 @@ for reduced motion.
 - Private browsing, user-cleared site data, storage pressure, or browser policy
   can remove IndexedDB data.
 - Web and native tasks are separate and cannot currently be imported or synced.
-- Web notification scheduling is deliberately unsupported; Settings reports the
-  Android-app-only availability accurately, and forms do not imply otherwise.
+- Web notification scheduling is deliberately unsupported; Settings and forms
+  report the Android-app-only delivery limit while still saving reminder intent.
 - Completed legacy tasks without a known completion timestamp cannot appear on
   a historical Recap date.
 - Completed recovery sessions are retained but do not yet have a history browser.
-- Event editing/deletion, task filtering and sorting controls, custom reminder
-  offsets, and recurring items are not implemented.
+- Event editing/deletion, task filtering and sorting controls, arbitrary
+  relative reminder offsets, and recurring items are not implemented.
 
 ## Future Cross-Platform Work
 

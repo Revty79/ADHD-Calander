@@ -74,7 +74,7 @@ describe("IndexedDB task storage", () => {
     const repository = await createRepository(databaseName, indexedDB);
 
     assert.deepEqual(await repository.getAllTasks(), []);
-    assert.equal((await readIndexedDbSnapshot(indexedDB, databaseName)).version, 9);
+    assert.equal((await readIndexedDbSnapshot(indexedDB, databaseName)).version, 10);
   });
 
   it("creates and reads a task after storage reinitialization", async () => {
@@ -259,6 +259,7 @@ describe("IndexedDB task storage", () => {
       estimatedDurationMinutes: null,
       deadlineDate: null,
       deadlineTime: null,
+      reminders: [],
       reminderOffsets: [],
       startedAt: null,
       createdAt: "2026-08-06T15:00:00.000Z",
@@ -376,6 +377,10 @@ describe("IndexedDB task storage", () => {
       estimatedDurationMinutes: 45,
       deadlineDate: "2026-08-09",
       deadlineTime: null,
+      reminders: [
+        { kind: "relative", offsetMinutes: 60 },
+        { kind: "relative", offsetMinutes: 15 }
+      ],
       reminderOffsets: [60, 15],
       startedAt: "2026-08-08T15:00:00.000Z",
       createdAt: "2026-08-07T14:00:00.000Z",
@@ -392,6 +397,7 @@ describe("IndexedDB task storage", () => {
       endTime: null,
       durationMinutes: 30,
       notes: "Keep this event",
+      reminders: [{ kind: "relative", offsetMinutes: 30 }],
       reminderOffsets: [30],
       createdAt: "2026-08-07T14:00:00.000Z",
       updatedAt: "2026-08-07T14:00:00.000Z"
@@ -406,6 +412,10 @@ describe("IndexedDB task storage", () => {
       originalScheduledTime: "09:30",
       originalPreferredTime: null,
       originalEstimatedDurationMinutes: 45,
+      originalReminders: [
+        { kind: "relative", offsetMinutes: 60 },
+        { kind: "relative", offsetMinutes: 15 }
+      ],
       originalReminderOffsets: [60, 15],
       status: "resolved",
       decision: "keep",
@@ -443,14 +453,14 @@ describe("IndexedDB task storage", () => {
       }
     ];
 
-    await createPreviousVersionEightDatabase(indexedDB, databaseName, {
+    await createPreviousVersionDatabase(indexedDB, databaseName, 8, {
       tasks: [
         {
           ...omitVersionNineTaskFields(existingTask),
           plannedTimePreference: "morning"
         }
       ],
-      calendarEvents: [serializeCalendarEventForWeb(existingEvent)],
+      calendarEvents: [omitVersionTenEventFields(existingEvent)],
       recoverySessions: [serializeRecoverySessionForWeb(existingRecoverySession)],
       recoveryItems: [
         {
@@ -496,7 +506,62 @@ describe("IndexedDB task storage", () => {
     const { version: afterVersion, ...afterRecords } = afterOpen;
 
     assert.equal(beforeVersion, 8);
-    assert.equal(afterVersion, 9);
+    assert.equal(afterVersion, 10);
+    assert.deepEqual(afterRecords, beforeRecords);
+  });
+
+  it("opens a previous version nine database and preserves reminder records", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "version-nine-reminder-compatibility-test";
+    const existingTask: Task = {
+      id: "version-nine-task",
+      title: "Existing version nine task",
+      description: "Keep every field",
+      importance: "important",
+      status: "started",
+      parentTaskId: null,
+      scheduledDate: "2026-08-09",
+      scheduledTime: "14:30",
+      preferredTime: null,
+      estimatedDurationMinutes: 45,
+      deadlineDate: "2026-08-10",
+      deadlineTime: "17:00",
+      reminders: [
+        { kind: "relative", offsetMinutes: 60 },
+        { kind: "relative", offsetMinutes: 15 }
+      ],
+      reminderOffsets: [60, 15],
+      startedAt: "2026-08-09T20:00:00.000Z",
+      createdAt: "2026-08-08T14:00:00.000Z",
+      updatedAt: "2026-08-09T20:00:00.000Z",
+      completedAt: null,
+      deletedAt: null
+    };
+
+    await createPreviousVersionDatabase(indexedDB, databaseName, 9, {
+      tasks: [omitVersionTenTaskFields(existingTask)],
+      calendarEvents: [],
+      recoverySessions: [],
+      recoveryItems: [],
+      appSettings: []
+    });
+    const beforeOpen = await readIndexedDbSnapshot(indexedDB, databaseName);
+    const storages = await openIndexedDbStorages({
+      databaseName,
+      indexedDB,
+      keyRange: IDBKeyRange
+    });
+
+    assert.deepEqual(
+      await storages.taskStorage.getTaskById(existingTask.id),
+      existingTask
+    );
+    const afterOpen = await readIndexedDbSnapshot(indexedDB, databaseName);
+    const { version: beforeVersion, ...beforeRecords } = beforeOpen;
+    const { version: afterVersion, ...afterRecords } = afterOpen;
+
+    assert.equal(beforeVersion, 9);
+    assert.equal(afterVersion, 10);
     assert.deepEqual(afterRecords, beforeRecords);
   });
 
@@ -593,6 +658,7 @@ describe("IndexedDB calendar event storage", () => {
       endTime: null,
       durationMinutes: 30,
       notes: null,
+      reminders: [],
       reminderOffsets: [],
       createdAt: "2026-08-06T15:00:00.000Z",
       updatedAt: "2026-08-06T15:00:00.000Z"
@@ -756,6 +822,7 @@ describe("IndexedDB recovery storage", () => {
       originalScheduledTime: null,
       originalPreferredTime: null,
       originalEstimatedDurationMinutes: null,
+      originalReminders: [],
       originalReminderOffsets: [],
       status: "pending",
       decision: "skip",
@@ -938,7 +1005,7 @@ function createVersionSixReminderDatabase(
 }
 
 function omitVersionNineTaskFields(task: Task): Record<string, unknown> {
-  const record: Record<string, unknown> = { ...serializeTaskForWeb(task) };
+  const record = omitVersionTenTaskFields(task);
   delete record.preferredTime;
   delete record.deadlineTime;
 
@@ -946,8 +1013,29 @@ function omitVersionNineTaskFields(task: Task): Record<string, unknown> {
 }
 
 function omitVersionNineRecoveryFields(item: RecoveryItem): Record<string, unknown> {
-  const record: Record<string, unknown> = { ...serializeRecoveryItemForWeb(item) };
+  const record = omitVersionTenRecoveryFields(item);
   delete record.originalPreferredTime;
+
+  return record;
+}
+
+function omitVersionTenTaskFields(task: Task): Record<string, unknown> {
+  const record: Record<string, unknown> = { ...serializeTaskForWeb(task) };
+  delete record.reminders;
+
+  return record;
+}
+
+function omitVersionTenEventFields(event: CalendarEvent): Record<string, unknown> {
+  const record: Record<string, unknown> = { ...serializeCalendarEventForWeb(event) };
+  delete record.reminders;
+
+  return record;
+}
+
+function omitVersionTenRecoveryFields(item: RecoveryItem): Record<string, unknown> {
+  const record: Record<string, unknown> = { ...serializeRecoveryItemForWeb(item) };
+  delete record.originalReminders;
 
   return record;
 }
@@ -961,13 +1049,14 @@ type IndexedDbSnapshot = {
   appSettings: unknown[];
 };
 
-function createPreviousVersionEightDatabase(
+function createPreviousVersionDatabase(
   indexedDB: IDBFactory,
   databaseName: string,
+  version: 8 | 9,
   records: Omit<IndexedDbSnapshot, "version">
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(databaseName, 8);
+    const request = indexedDB.open(databaseName, version);
 
     request.onupgradeneeded = () => {
       const database = request.result;

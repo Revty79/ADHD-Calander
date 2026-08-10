@@ -3,6 +3,8 @@ import { FormEvent, useMemo, useState } from "react";
 
 import { useCalendarEventRepository } from "../../src/database/DatabaseProvider";
 import { CalendarEventValidationError } from "../../src/database/repositories/calendarEventErrors";
+import { ReminderEditor } from "../../src/features/reminders/components/ReminderEditor";
+import { Reminder } from "../../src/types/reminder";
 import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
 
 type FieldErrors = Partial<Record<CalendarEventValidationError["field"], string>>;
@@ -21,6 +23,7 @@ export default function WebNewEventScreen() {
   const [endTime, setEndTime] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [notes, setNotes] = useState("");
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -38,7 +41,8 @@ export default function WebNewEventScreen() {
         startTime,
         endTime,
         durationMinutes: durationMinutes.trim() ? Number(durationMinutes) : null,
-        notes
+        notes,
+        reminders
       });
 
       router.replace({ pathname: "/(tabs)/calendar", params: { date } });
@@ -116,7 +120,14 @@ export default function WebNewEventScreen() {
             >
               <input
                 id="event-end-time"
-                onChange={(event) => setEndTime(event.currentTarget.value)}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setEndTime(value);
+
+                  if (value) {
+                    setDurationMinutes("");
+                  }
+                }}
                 type="time"
                 value={endTime}
               />
@@ -130,7 +141,14 @@ export default function WebNewEventScreen() {
               <input
                 id="event-duration"
                 min="1"
-                onChange={(event) => setDurationMinutes(event.currentTarget.value)}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  setDurationMinutes(value);
+
+                  if (value) {
+                    setEndTime("");
+                  }
+                }}
                 placeholder="For example, 45"
                 step="1"
                 type="number"
@@ -150,13 +168,13 @@ export default function WebNewEventScreen() {
             />
           </FormField>
 
-          <section className="web-form-info" aria-labelledby="event-reminders-title">
-            <strong id="event-reminders-title">Reminders</strong>
-            <p>
-              Browser notification delivery is not supported. Add multiple event reminders
-              in the Android app.
-            </p>
-          </section>
+          <ReminderEditor
+            allowRelative
+            deliveryMessage="Notification delivery is unavailable in the web build. Reminder choices still stay saved."
+            error={fieldErrors.reminders ?? fieldErrors.reminderOffsets}
+            onChange={setReminders}
+            value={reminders}
+          />
 
           {errorMessage ? (
             <div className="web-error-notice" role="alert">

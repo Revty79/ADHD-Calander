@@ -1,5 +1,11 @@
 export type CalendarEventValidationField =
-  "title" | "date" | "startTime" | "endTime" | "durationMinutes" | "reminderOffsets";
+  | "title"
+  | "date"
+  | "startTime"
+  | "endTime"
+  | "durationMinutes"
+  | "reminders"
+  | "reminderOffsets";
 
 export class CalendarEventValidationError extends Error {
   readonly field: CalendarEventValidationField;

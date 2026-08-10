@@ -37,6 +37,8 @@ The web Settings screen exposes equivalent semantic planning selects and
 accurately reports that task and event notifications are available in the
 Android app without requesting browser notification permission. The setting
 repository and IndexedDB adapter maintain cross-platform persistence parity.
+Web task and event forms may save reminder intent, but the unsupported adapter
+never presents that intent as browser notification delivery.
 
 No privacy-policy URL is shown because no approved policy target exists yet.
 The About section provides a structural place to add the finalized policy during

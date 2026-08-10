@@ -81,26 +81,28 @@ date.
 
 ## Reminder Integration
 
-A task or fixed event may store up to five distinct reminder offsets from the
-supported choices. Reminder intent does not change Calendar grouping: fixed
-events remain fixed, timed tasks remain planned, and untimed tasks remain
-flexible. Native item cards describe stored reminders with text, so their state
-is not communicated by color.
+A task or fixed event may store up to five reminders in the shared reminder
+model. Explicit local date/time reminders are independent from placement;
+relative reminders use an exact Scheduled task time or fixed-event start.
+Reminder intent does not change Calendar grouping: fixed events remain fixed,
+Scheduled tasks remain tasks, and Planned or Flexible tasks are not promoted by
+a reminder. Item cards describe stored reminders with text, so state is not
+communicated by color.
 
-`ReminderService` builds one local trigger per valid offset from the item's
-validated local date and time. Each request identifier includes the item type,
-item ID, and offset. Synchronization cancels every supported current identifier
-and the legacy single-reminder identifier before rebuilding future triggers, so
-date and time changes cannot leave stale OS requests. A master setting controls
-OS scheduling without erasing item intent. Completed, removed, untimed, or
-past-trigger items keep their saved reminder choices while delivery remains
-inactive.
+`ReminderService` builds one local trigger per reminder without parsing local
+calendar strings through UTC. Deterministic identifiers include item identity
+and either the legacy-compatible relative offset or explicit date/time key.
+Synchronization cancels current, previous, supported-offset, and legacy
+identifiers before rebuilding future triggers, so edits cannot leave stale OS
+requests. A master setting controls Android delivery without erasing intent.
+Completed, removed, or past-trigger items keep saved choices while delivery is
+inactive; an untimed task can still deliver future explicit reminders.
 
-Web keeps the same persisted domain shape but truthfully reports that browser
-notification delivery is unsupported and does not render fake reminder
-controls. Task editing updates the existing record through `TaskRepository`.
-Event reminders can be selected during event creation; general event editing,
-including later reminder changes, remains deferred.
+Web keeps the same persisted domain shape and reminder editor behavior while
+truthfully reporting that browser notification delivery is unsupported. Task
+editing updates the existing record through `TaskRepository`. Native event
+creation uses date/time pickers; web uses browser date/time controls. General
+event editing, including later reminder changes, remains deferred.
 
 ## Scheduling Assistance Integration
 
@@ -123,7 +125,7 @@ behavior does not invent duration or label a day overloaded.
 - Recurring or all-day events
 - Event editing/deletion
 - Drag-and-drop
-- Custom reminder offsets, quiet hours, and event reminder editing
+- Arbitrary relative reminder offsets, quiet hours, and event reminder editing
 - Time-zone-aware travel behavior
 - External calendar sync
 - Accounts, cloud sync, analytics, and AI

@@ -1,8 +1,11 @@
 import { CalendarEvent, CalendarEventKind } from "../types/calendarEvent";
 import { LocalDateString, LocalTimeString } from "../types/dateTime";
+import {
+  getRelativeReminderOffsets,
+  parseStoredReminders
+} from "../notifications/reminders";
 import { CalendarEventStorage } from "./calendarEventStorage";
 import { SqlExecutor } from "./sql";
-import { parseStoredReminderOffsets } from "../notifications/reminderOffsets";
 
 type CalendarEventRow = {
   id: string;
@@ -13,6 +16,7 @@ type CalendarEventRow = {
   endTime: LocalTimeString | null;
   durationMinutes: number | null;
   notes: string | null;
+  reminders: string | null;
   reminderOffsets: string;
   createdAt: string;
   updatedAt: string;
@@ -28,6 +32,7 @@ const eventSelect = `
     end_time AS endTime,
     duration_minutes AS durationMinutes,
     notes,
+    reminders,
     reminder_offsets AS reminderOffsets,
     created_at AS createdAt,
     updated_at AS updatedAt
@@ -50,9 +55,10 @@ export class SqlCalendarEventStorage implements CalendarEventStorage {
           duration_minutes,
           notes,
           reminder_offsets,
+          reminders,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       event.id,
       event.title,
@@ -62,7 +68,8 @@ export class SqlCalendarEventStorage implements CalendarEventStorage {
       event.endTime,
       event.durationMinutes,
       event.notes,
-      JSON.stringify(event.reminderOffsets),
+      JSON.stringify(getRelativeReminderOffsets(event.reminders)),
+      JSON.stringify(event.reminders),
       event.createdAt,
       event.updatedAt
     );
@@ -102,6 +109,8 @@ export class SqlCalendarEventStorage implements CalendarEventStorage {
 }
 
 function mapCalendarEventRow(row: CalendarEventRow): CalendarEvent {
+  const reminders = parseStoredReminders(row.reminders, row.reminderOffsets);
+
   return {
     id: row.id,
     title: row.title,
@@ -111,7 +120,8 @@ function mapCalendarEventRow(row: CalendarEventRow): CalendarEvent {
     endTime: row.endTime,
     durationMinutes: row.durationMinutes,
     notes: row.notes,
-    reminderOffsets: parseStoredReminderOffsets(row.reminderOffsets),
+    reminders,
+    reminderOffsets: getRelativeReminderOffsets(reminders),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };

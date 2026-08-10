@@ -37,13 +37,13 @@ monetization controls or speculative services now.
 
 ## Current First-Build Scope
 
-- Expo Router navigation for Today, Calendar, Tasks, Recovery, Recap, and Settings on
-  Android, future iOS builds, and responsive web browsers.
+- Expo Router navigation for Today, Calendar, Tasks, Recovery, Recap, Guide, and
+  Settings on Android, future iOS builds, and responsive web browsers.
 - Functional Today, Calendar, Tasks, and Recovery screens.
 - Month, Week, and Day calendar views with selectable dates and factual schedule
   summaries.
-- Basic fixed-event creation with title, date, start time, optional end time or
-  duration, and optional notes.
+- Fixed-event creation with title, native Android date/time pickers, browser
+  date/time controls, optional end time or duration, notes, and reminders.
 - Quick task creation with optional notes, importance, derived Flexible/Planned/
   Scheduled state, duration estimate, deadline, and reminders. Native pickers,
   browser controls, and quick local-date choices avoid formatted date/time
@@ -78,14 +78,16 @@ monetization controls or speculative services now.
   context without grades, streaks, or productivity scores.
 - A functional, calm Settings destination with local reminder control,
   permission status, accessibility guidance, local-data facts, and app version.
-- Up to five optional local reminders for a native scheduled task or fixed
-  event, using a small set of offsets, distinct notification identities, and
-  safe future-trigger filtering.
+- Up to five optional reminders per task or fixed event. Explicit local
+  date/times work independently for Flexible, Planned, and Scheduled tasks;
+  Scheduled tasks and events also support relative-to-start choices.
+- Shared task/event reminder editing, persistence, formatting, validation, and
+  distinct native notification identities with safe future-trigger filtering.
 - Reminder cancellation on task completion and synchronization for Keep,
   Reschedule, Break Down, Delegate, Remove, and reopen Recovery actions.
 - SQLite and IndexedDB settings persistence behind a shared repository boundary.
-- Accurate web notification-unavailable status without requesting browser
-  permission or adding fake notification behavior.
+- Web reminder-intent editing with the same shared rules and persistence, plus
+  accurate notification-unavailable status without requesting browser permission.
 - Optional task deadlines that remain distinct from scheduled dates.
 - A pure deterministic scheduler that considers fixed events, timed tasks,
   estimates, deadlines, local planning hours, fixed-event transition buffers,
@@ -102,7 +104,7 @@ monetization controls or speculative services now.
 - Partial-progress entry or percentage tracking
 - Three-priority planning system
 - Multi-level project management beyond direct task breakdown
-- Advanced notifications, quiet hours, snooze, and arbitrary custom reminders
+- Advanced notifications, quiet hours, snooze, and arbitrary relative offsets
 - Recurring calendar events
 - External calendar integration
 - Event editing or deletion

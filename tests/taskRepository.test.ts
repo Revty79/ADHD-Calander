@@ -78,7 +78,8 @@ describe("task database", () => {
       { version: 6, name: "task_functional_core" },
       { version: 7, name: "execution_multiple_reminders" },
       { version: 8, name: "planned_time_preferences" },
-      { version: 9, name: "task_preferred_deadline_times" }
+      { version: 9, name: "task_preferred_deadline_times" },
+      { version: 10, name: "independent_reminders" }
     ]);
 
     const taskColumns = await database.getAllAsync<{ name: string }>(
@@ -91,6 +92,7 @@ describe("task database", () => {
     assert.ok(taskColumns.some((column) => column.name === "planned_time_preference"));
     assert.ok(taskColumns.some((column) => column.name === "preferred_time"));
     assert.ok(taskColumns.some((column) => column.name === "deadline_time"));
+    assert.ok(taskColumns.some((column) => column.name === "reminders"));
     const recoveryItemColumns = await database.getAllAsync<{ name: string }>(
       "PRAGMA table_info(recovery_items);"
     );
@@ -102,6 +104,7 @@ describe("task database", () => {
     assert.ok(
       recoveryItemColumns.some((column) => column.name === "original_preferred_time")
     );
+    assert.ok(recoveryItemColumns.some((column) => column.name === "original_reminders"));
   });
 
   it("opens a database with migration eight applied without changing records", async () => {
@@ -136,6 +139,10 @@ describe("task database", () => {
       estimatedDurationMinutes: 45,
       deadlineDate: "2026-08-09",
       deadlineTime: null,
+      reminders: [
+        { kind: "relative", offsetMinutes: 60 },
+        { kind: "relative", offsetMinutes: 15 }
+      ],
       reminderOffsets: [60, 15],
       startedAt: "2026-08-08T15:00:00.000Z",
       createdAt: "2026-08-07T14:00:00.000Z",
@@ -152,6 +159,7 @@ describe("task database", () => {
       endTime: null,
       durationMinutes: 30,
       notes: "Keep native event",
+      reminders: [{ kind: "relative", offsetMinutes: 30 }],
       reminderOffsets: [30],
       createdAt: "2026-08-07T14:00:00.000Z",
       updatedAt: "2026-08-07T14:00:00.000Z"
@@ -173,6 +181,10 @@ describe("task database", () => {
           originalScheduledTime: "09:30",
           originalPreferredTime: null,
           originalEstimatedDurationMinutes: 45,
+          originalReminders: [
+            { kind: "relative", offsetMinutes: 60 },
+            { kind: "relative", offsetMinutes: 15 }
+          ],
           originalReminderOffsets: [60, 15],
           status: "resolved",
           decision: "keep",
@@ -299,9 +311,9 @@ describe("task database", () => {
     assert.deepEqual(await readCompatibilitySnapshot(reopenedDatabase), beforeOpen);
     assert.deepEqual(
       await reopenedDatabase.getFirstAsync<{ version: number; name: string }>(
-        "SELECT version, name FROM schema_migrations WHERE version = 9;"
+        "SELECT version, name FROM schema_migrations WHERE version = 10;"
       ),
-      { version: 9, name: "task_preferred_deadline_times" }
+      { version: 10, name: "independent_reminders" }
     );
     const openedTask = await new TaskRepository(
       new SqlTaskStorage(reopenedDatabase)
@@ -319,6 +331,89 @@ describe("task database", () => {
         getTaskPlanningState(existingTask)
       ],
       ["flexible", "planned", "scheduled"]
+    );
+  });
+
+  it("opens a database with migration nine applied and preserves reminder intent", async () => {
+    const database = await createSqlJsDatabase();
+    await database.execAsync(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+    `);
+
+    for (const migration of migrations.filter((candidate) => candidate.version <= 9)) {
+      await migration.up(database);
+      await database.runAsync(
+        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?);",
+        migration.version,
+        migration.name,
+        "2026-08-09T14:00:00.000Z"
+      );
+    }
+
+    await database.runAsync(
+      `
+        INSERT INTO tasks (
+          id, title, description, importance, status, parent_task_id,
+          scheduled_date, scheduled_time, preferred_time,
+          estimated_duration_minutes, deadline_date, deadline_time,
+          reminder_offsets, started_at, created_at, updated_at,
+          completed_at, deleted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `,
+      "migration-nine-task",
+      "Existing version nine task",
+      "Preserve native data",
+      "important",
+      "started",
+      null,
+      "2026-08-11",
+      "14:30",
+      null,
+      45,
+      "2026-08-12",
+      "17:00",
+      "[60,15]",
+      "2026-08-09T20:00:00.000Z",
+      "2026-08-09T14:00:00.000Z",
+      "2026-08-09T20:00:00.000Z",
+      null,
+      null
+    );
+    const preservedColumns = `
+      SELECT
+        id, title, description, importance, status, parent_task_id,
+        scheduled_date, scheduled_time, preferred_time,
+        estimated_duration_minutes, deadline_date, deadline_time,
+        reminder_offsets, started_at, created_at, updated_at,
+        completed_at, deleted_at
+      FROM tasks
+      WHERE id = 'migration-nine-task';
+    `;
+    const beforeOpen =
+      await database.getFirstAsync<Record<string, unknown>>(preservedColumns);
+
+    await initializeDatabase(database);
+
+    assert.deepEqual(
+      await database.getFirstAsync<Record<string, unknown>>(preservedColumns),
+      beforeOpen
+    );
+    assert.deepEqual(
+      await database.getFirstAsync<{ version: number; name: string }>(
+        "SELECT version, name FROM schema_migrations WHERE version = 10;"
+      ),
+      { version: 10, name: "independent_reminders" }
+    );
+    assert.deepEqual(
+      (await new SqlTaskStorage(database).getTaskById("migration-nine-task"))?.reminders,
+      [
+        { kind: "relative", offsetMinutes: 60 },
+        { kind: "relative", offsetMinutes: 15 }
+      ]
     );
   });
 
@@ -489,7 +584,8 @@ describe("task database", () => {
       preferredTime: "09:30",
       estimatedDurationMinutes: 45,
       deadlineDate: "2026-08-08",
-      deadlineTime: "16:00"
+      deadlineTime: "16:00",
+      reminders: [{ kind: "absolute", date: "2026-08-07", time: "12:00" }]
     });
 
     assert.equal(planned.id, original.id);
@@ -505,12 +601,16 @@ describe("task database", () => {
       scheduledDate: "2026-08-06",
       scheduledTime: "10:00",
       preferredTime: null,
-      reminderOffsets: [10]
+      reminders: [
+        { kind: "relative", offsetMinutes: 10 },
+        { kind: "absolute", date: "2026-08-07", time: "12:00" }
+      ]
     });
     assert.equal(scheduled.scheduledTime, "10:00");
     assert.equal(scheduled.preferredTime, null);
     assert.equal(getTaskPlanningState(scheduled), "scheduled");
     assert.deepEqual(scheduled.reminderOffsets, [10]);
+    assert.equal(scheduled.reminders.length, 2);
 
     const replanned = await repository.updateTask(original.id, {
       ...scheduled,
@@ -526,13 +626,14 @@ describe("task database", () => {
       scheduledDate: null,
       scheduledTime: null,
       preferredTime: null,
-      reminderOffsets: replanned.reminderOffsets
+      reminders: replanned.reminders
     });
     assert.equal(flexible.scheduledDate, null);
     assert.equal(flexible.scheduledTime, null);
     assert.equal(flexible.preferredTime, null);
     assert.equal(getTaskPlanningState(flexible), "flexible");
     assert.deepEqual(flexible.reminderOffsets, [10]);
+    assert.deepEqual(flexible.reminders, scheduled.reminders);
 
     const restoredDatabase = await createSqlJsDatabase(database.exportData());
     await initializeDatabase(restoredDatabase);
@@ -545,6 +646,7 @@ describe("task database", () => {
     assert.equal(restoredTask.preferredTime, null);
     assert.equal(restoredTask.deadlineDate, "2026-08-08");
     assert.equal(restoredTask.deadlineTime, "16:00");
+    assert.deepEqual(restoredTask.reminders, scheduled.reminders);
     assert.equal(restoredTask.id, original.id);
   });
 
@@ -1014,7 +1116,13 @@ async function readCompatibilitySnapshot(database: SqlExecutor) {
       `
     ),
     calendarEvents: await database.getAllAsync<Record<string, unknown>>(
-      "SELECT * FROM calendar_events ORDER BY id;"
+      `
+        SELECT
+          id, title, kind, date, start_time, end_time, duration_minutes,
+          notes, reminder_offset_minutes, reminder_offsets, created_at, updated_at
+        FROM calendar_events
+        ORDER BY id;
+      `
     ),
     recoverySessions: await database.getAllAsync<Record<string, unknown>>(
       "SELECT * FROM recovery_sessions ORDER BY id;"

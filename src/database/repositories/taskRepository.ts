@@ -8,11 +8,20 @@ import {
   TaskImportance,
   UpdateTaskInput
 } from "../../types/task";
-import { getReminderTriggerDate } from "../../notifications/reminderRules";
+import {
+  getReminderDate,
+  getReminderTriggerDate
+} from "../../notifications/reminderRules";
 import {
   isReminderOffsetList,
   normalizeReminderOffsets
 } from "../../notifications/reminderOffsets";
+import {
+  getRelativeReminderOffsets,
+  getReminderKey,
+  normalizeReminders,
+  remindersFromOffsets
+} from "../../notifications/reminders";
 import {
   noOpReminderSynchronizer,
   ReminderSynchronizer
@@ -37,6 +46,7 @@ type NormalizedTaskInput = Pick<
   | "estimatedDurationMinutes"
   | "deadlineDate"
   | "deadlineTime"
+  | "reminders"
   | "reminderOffsets"
 >;
 
@@ -52,6 +62,7 @@ export class TaskRepository {
     const normalizedInput = normalizeTaskInput(input);
     const now = this.clock();
     const timestamp = now.toISOString();
+    validateNewAbsoluteReminders(normalizedInput.reminders, now);
 
     const task: Task = {
       id: this.idGenerator(),
@@ -66,6 +77,7 @@ export class TaskRepository {
       estimatedDurationMinutes: normalizedInput.estimatedDurationMinutes,
       deadlineDate: normalizedInput.deadlineDate,
       deadlineTime: normalizedInput.deadlineTime,
+      reminders: normalizedInput.reminders,
       reminderOffsets: normalizedInput.reminderOffsets,
       startedAt: null,
       createdAt: timestamp,
@@ -91,6 +103,11 @@ export class TaskRepository {
 
     try {
       const existingTask = await this.requireStoredTask(id);
+      validateNewAbsoluteReminders(
+        normalizedInput.reminders,
+        now,
+        existingTask.reminders
+      );
       const updatedTask: Task = {
         ...existingTask,
         ...normalizedInput,
@@ -101,7 +118,7 @@ export class TaskRepository {
         throw new TaskNotFoundError();
       }
 
-      await this.reminderSynchronizer.syncTaskReminder(updatedTask);
+      await this.reminderSynchronizer.syncTaskReminder(updatedTask, existingTask);
 
       return updatedTask;
     } catch (error) {
@@ -263,6 +280,7 @@ export class TaskRepository {
         estimatedDurationMinutes: null,
         deadlineDate: null,
         deadlineTime: null,
+        reminders: [],
         reminderOffsets: [],
         startedAt: null,
         createdAt: timestamp,
@@ -659,6 +677,19 @@ function normalizeTaskInput(
     );
   }
 
+  let reminders: Task["reminders"];
+
+  try {
+    reminders = normalizeReminders(
+      input.reminders ?? remindersFromOffsets(normalizeReminderOffsets(reminderOffsets))
+    );
+  } catch (error) {
+    throw new TaskValidationError(
+      error instanceof Error ? error.message : "Choose valid reminder times.",
+      "reminders"
+    );
+  }
+
   return {
     title,
     description,
@@ -669,8 +700,32 @@ function normalizeTaskInput(
     estimatedDurationMinutes,
     deadlineDate,
     deadlineTime,
-    reminderOffsets: normalizeReminderOffsets(reminderOffsets)
+    reminders,
+    reminderOffsets: getRelativeReminderOffsets(reminders)
   };
+}
+
+function validateNewAbsoluteReminders(
+  reminders: readonly Task["reminders"][number][],
+  now: Date,
+  previousReminders: readonly Task["reminders"][number][] = []
+): void {
+  const previousKeys = new Set(previousReminders.map(getReminderKey));
+
+  for (const reminder of reminders) {
+    if (reminder.kind !== "absolute" || previousKeys.has(getReminderKey(reminder))) {
+      continue;
+    }
+
+    const triggerDate = getReminderDate(reminder, null, null);
+
+    if (!triggerDate || triggerDate.getTime() <= now.getTime()) {
+      throw new TaskValidationError(
+        "Choose a future date and time for a custom reminder.",
+        "reminders"
+      );
+    }
+  }
 }
 
 function normalizeScheduleTaskInput(input: ScheduleTaskInput): {

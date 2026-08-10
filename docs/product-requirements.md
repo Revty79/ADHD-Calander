@@ -56,7 +56,7 @@ offline and avoid unnecessary data collection.
 ## Current First-Build Scope
 
 The first build includes tab navigation, task and fixed-event creation, Today,
-Calendar, Tasks, Recovery, and Daily Recap views, local SQLite and IndexedDB
+Calendar, Tasks, Recovery, Daily Recap, and Guide views, local SQLite and IndexedDB
 persistence, completion, and completion undo. Recap uses actual local
 completion dates, keeps fixed commitments factual, and summarizes explicit
 Recovery decisions without scoring the day. Recovery supports explicit
@@ -68,8 +68,11 @@ optional exact preferred time that remains a soft preference, while Scheduled
 tasks require an actual start time. Deadlines may have an optional exact local
 time; date-only deadlines mean the end of that local day. Tasks can be started,
 paused, and completed while keeping planning state separate from execution state.
-Native scheduled tasks and fixed events may each have up to five optional local
-reminders; web reports that notification scheduling is unavailable there.
+Every task may carry up to five explicit local reminder date/times without
+changing whether it is Flexible, Planned, or Scheduled. Scheduled tasks and
+fixed events may also use relative reminders. Android schedules future reminder
+delivery when enabled and permitted. Web saves and edits the same reminder
+intent while clearly reporting that browser notification delivery is unavailable.
 Flexible tasks can request deterministic scheduling suggestions inside local
 planning boundaries. The user reviews no more than three factual options and
 must choose and confirm one before the existing task schedule changes.
@@ -98,9 +101,10 @@ Closing and reopening the app preserves task, recovery, and derived recap
 accuracy without punitive language or alarming overdue treatment.
 
 Optional reminders pass the same success test when enabled: multiple choices
-persist, follow the item's explicit local schedule, cancel pending delivery
-after completion or a resolving Recovery decision, and never prevent planning
-when permission is unavailable.
+persist, explicit reminder times remain independent from planning state,
+relative choices follow an exact item schedule, pending delivery is reconciled
+after edits, completion, removal, or a resolving Recovery decision, and reminder
+permission never prevents planning.
 
 Scheduling assistance passes when a flexible task with a duration can receive
 bounded, non-overlapping local-time suggestions around fixed events and timed

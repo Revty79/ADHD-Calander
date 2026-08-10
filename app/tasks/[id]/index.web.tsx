@@ -1,7 +1,7 @@
 import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 
-import { formatReminderOffsets } from "../../../src/notifications/reminderRules";
+import { formatReminders } from "../../../src/notifications/reminderRules";
 import { useTaskDetail } from "../../../src/features/tasks/hooks/useTaskDetail";
 import {
   getTaskDeadlineLabel,
@@ -153,11 +153,8 @@ export default function WebTaskDetailScreen() {
                       : "No estimate"
                   }
                 />
-                <DetailRow
-                  label="Reminders"
-                  value={formatReminderOffsets(task.reminderOffsets)}
-                />
-                {task.reminderOffsets.length > 0 ? (
+                <DetailRow label="Reminders" value={formatReminders(task.reminders)} />
+                {task.reminders.length > 0 ? (
                   <DetailRow
                     label="Reminder delivery"
                     value="Saved reminder choices do not schedule browser notifications."

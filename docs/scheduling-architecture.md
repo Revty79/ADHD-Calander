@@ -115,9 +115,10 @@ flows.
 `TaskRepository.scheduleTask` recalculates reminder validity against the accepted
 local date/time. Every stored reminder choice is preserved and synchronized
 through the existing `ReminderSynchronizer`. Synchronization cancels stale
-request identifiers and schedules only offsets whose new trigger remains in the
-future; a past trigger does not erase the user's saved choice. Search and ranking
-never schedule or cancel notifications.
+request identifiers, recalculates relative reminders against the accepted
+schedule, and leaves explicit local reminder date/times unchanged. Only future
+triggers are scheduled; a past trigger does not erase the saved choice. Search
+and ranking never schedule or cancel notifications.
 
 ## Recovery And Local Dates
 

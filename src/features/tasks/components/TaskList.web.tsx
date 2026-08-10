@@ -1,6 +1,6 @@
 import { Link } from "expo-router";
 
-import { formatReminderOffsets } from "../../../notifications/reminderRules";
+import { formatReminders } from "../../../notifications/reminderRules";
 import { isTaskActive, Task } from "../../../types/task";
 import {
   formatLocalDateForDisplay,
@@ -87,8 +87,8 @@ export function TaskList({
                   {task.deadlineDate ? (
                     <span>Deadline {getTaskDeadlineLabel(task)}</span>
                   ) : null}
-                  {task.reminderOffsets.length > 0 ? (
-                    <span>Reminders: {formatReminderOffsets(task.reminderOffsets)}</span>
+                  {task.reminders.length > 0 ? (
+                    <span>Reminders: {formatReminders(task.reminders)}</span>
                   ) : null}
                   <span>{getTaskPlanningLabel(task)}</span>
                   <span>{getTaskImportanceLabel(task.importance)}</span>
@@ -99,50 +99,55 @@ export function TaskList({
                   <p className="web-task-timing-note">{getTaskTimingNote(task)}</p>
                 ) : null}
               </div>
-              {(actionLabel && onAction) || onStart || onPause ? (
-                <div className="web-task-actions">
-                  {task.status === "not_started" && onStart ? (
-                    <button
-                      aria-label={`Start task ${task.title}`}
-                      className="web-gentle-action-button"
-                      onClick={() => onStart(task.id)}
-                      type="button"
-                    >
-                      Start task
-                    </button>
-                  ) : null}
-                  {task.status === "started" && onPause ? (
-                    <button
-                      aria-label={`Pause ${task.title} for now`}
-                      className="web-gentle-action-button"
-                      onClick={() => onPause(task.id)}
-                      type="button"
-                    >
-                      Pause for now
-                    </button>
-                  ) : null}
-                  {onSchedule && isTaskActive(task) && task.scheduledTime === null ? (
-                    <button
-                      aria-label={`Help me schedule ${task.title}`}
-                      className="web-primary-button web-task-schedule-button"
-                      onClick={() => onSchedule(task.id)}
-                      type="button"
-                    >
-                      Help me schedule
-                    </button>
-                  ) : null}
-                  {actionLabel && onAction ? (
-                    <button
-                      aria-label={`${actionLabel} ${task.title}`}
-                      className="web-secondary-button"
-                      onClick={() => onAction(task.id)}
-                      type="button"
-                    >
-                      {actionLabel}
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
+              <div className="web-task-actions">
+                <Link
+                  aria-label={`Edit ${task.title}`}
+                  className="web-secondary-link"
+                  href={{ pathname: "/tasks/[id]/edit", params: { id: task.id } }}
+                >
+                  Edit
+                </Link>
+                {task.status === "not_started" && onStart ? (
+                  <button
+                    aria-label={`Start task ${task.title}`}
+                    className="web-gentle-action-button"
+                    onClick={() => onStart(task.id)}
+                    type="button"
+                  >
+                    Start task
+                  </button>
+                ) : null}
+                {task.status === "started" && onPause ? (
+                  <button
+                    aria-label={`Pause ${task.title} for now`}
+                    className="web-gentle-action-button"
+                    onClick={() => onPause(task.id)}
+                    type="button"
+                  >
+                    Pause for now
+                  </button>
+                ) : null}
+                {onSchedule && isTaskActive(task) && task.scheduledTime === null ? (
+                  <button
+                    aria-label={`Help me schedule ${task.title}`}
+                    className="web-primary-button web-task-schedule-button"
+                    onClick={() => onSchedule(task.id)}
+                    type="button"
+                  >
+                    Help me schedule
+                  </button>
+                ) : null}
+                {actionLabel && onAction ? (
+                  <button
+                    aria-label={`${actionLabel} ${task.title}`}
+                    className="web-secondary-button"
+                    onClick={() => onAction(task.id)}
+                    type="button"
+                  >
+                    {actionLabel}
+                  </button>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

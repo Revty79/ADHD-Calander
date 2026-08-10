@@ -30,7 +30,7 @@ import {
   getEventDurationMinutes
 } from "../../src/features/calendar/calendarSchedule";
 import { useCalendarSchedule } from "../../src/features/calendar/hooks/useCalendarSchedule";
-import { formatReminderOffsets } from "../../src/notifications/reminderRules";
+import { formatReminders } from "../../src/notifications/reminderRules";
 import { CalendarEvent } from "../../src/types/calendarEvent";
 import { LocalDateString } from "../../src/types/dateTime";
 import { Task } from "../../src/types/task";
@@ -489,9 +489,9 @@ function EventCard({ event }: { event: CalendarEvent }) {
         {event.endTime ? ` - ${event.endTime}` : ""}
         {duration ? ` · ${duration}` : ""}
       </Text>
-      {event.reminderOffsets.length > 0 ? (
+      {event.reminders.length > 0 ? (
         <Text style={styles.scheduleMeta}>
-          Reminders: {formatReminderOffsets(event.reminderOffsets)}
+          Reminders: {formatReminders(event.reminders)}
         </Text>
       ) : null}
       {event.notes ? <Text style={styles.scheduleNotes}>{event.notes}</Text> : null}
@@ -523,9 +523,9 @@ function TaskScheduleCard({
       {getTaskTimingNote(task) ? (
         <Text style={styles.timingNote}>{getTaskTimingNote(task)}</Text>
       ) : null}
-      {task.reminderOffsets.length > 0 ? (
+      {task.reminders.length > 0 ? (
         <Text style={styles.scheduleMeta}>
-          Reminders: {formatReminderOffsets(task.reminderOffsets)}
+          Reminders: {formatReminders(task.reminders)}
         </Text>
       ) : null}
     </View>

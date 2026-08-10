@@ -1,11 +1,13 @@
 import { CalendarEvent } from "../types/calendarEvent";
 import {
+  Reminder,
   ReminderNotificationRequest,
   ReminderOffsetMinutes,
   reminderOffsetOptions
 } from "../types/reminder";
 import { isTaskActive, Task } from "../types/task";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../utils/dates";
+import { getReminderKey } from "./reminders";
 export { isReminderOffsetMinutes } from "./reminderOffsets";
 
 export function getReminderTriggerDate(
@@ -35,28 +37,22 @@ export function getReminderTriggerDate(
 }
 
 export function buildTaskReminderRequests(task: Task): ReminderNotificationRequest[] {
-  if (
-    !isTaskActive(task) ||
-    task.deletedAt !== null ||
-    task.scheduledDate === null ||
-    task.scheduledTime === null
-  ) {
+  if (!isTaskActive(task) || task.deletedAt !== null) {
     return [];
   }
 
-  return task.reminderOffsets.flatMap((offset) => {
-    const triggerDate = getReminderTriggerDate(
-      task.scheduledDate!,
-      task.scheduledTime!,
-      offset
-    );
+  return task.reminders.flatMap((reminder) => {
+    const triggerDate = getReminderDate(reminder, task.scheduledDate, task.scheduledTime);
 
     return triggerDate
       ? [
           {
-            identifier: getTaskReminderIdentifier(task.id, offset),
+            identifier: getTaskReminderIdentifier(task.id, reminder),
             title: task.title,
-            body: `Planned for ${formatLocalTime(task.scheduledDate!, task.scheduledTime!)}.`,
+            body:
+              reminder.kind === "relative" && task.scheduledDate && task.scheduledTime
+                ? `Scheduled for ${formatLocalTime(task.scheduledDate, task.scheduledTime)}.`
+                : `Reminder set for ${formatReminderDateTime(triggerDate)}.`,
             triggerDate,
             itemType: "task" as const,
             itemId: task.id
@@ -69,18 +65,20 @@ export function buildTaskReminderRequests(task: Task): ReminderNotificationReque
 export function buildEventReminderRequests(
   event: CalendarEvent
 ): ReminderNotificationRequest[] {
-  return event.reminderOffsets.flatMap((offset) => {
-    const triggerDate = getReminderTriggerDate(event.date, event.startTime, offset);
+  return event.reminders.flatMap((reminder) => {
+    const triggerDate = getReminderDate(reminder, event.date, event.startTime);
 
     return triggerDate
       ? [
           {
-            identifier: getEventReminderIdentifier(event.id, offset),
+            identifier: getEventReminderIdentifier(event.id, reminder),
             title: event.title,
             body:
-              offset === 0
+              reminder.kind === "relative" && reminder.offsetMinutes === 0
                 ? "On your calendar now."
-                : `On your calendar ${formatReminderOffset(offset).toLowerCase()}.`,
+                : reminder.kind === "relative"
+                  ? `On your calendar ${formatReminderOffset(reminder.offsetMinutes).toLowerCase()}.`
+                  : `Reminder set for ${formatReminderDateTime(triggerDate)}.`,
             triggerDate,
             itemType: "event" as const,
             itemId: event.id
@@ -92,29 +90,37 @@ export function buildEventReminderRequests(
 
 export function getTaskReminderIdentifier(
   taskId: string,
-  offset: ReminderOffsetMinutes
+  reminder: Reminder | ReminderOffsetMinutes
 ): string {
-  return `adhd-calendar-task-${taskId}-${offset}`;
+  return `adhd-calendar-task-${taskId}-${getIdentifierSuffix(reminder)}`;
 }
 
 export function getEventReminderIdentifier(
   eventId: string,
-  offset: ReminderOffsetMinutes
+  reminder: Reminder | ReminderOffsetMinutes
 ): string {
-  return `adhd-calendar-event-${eventId}-${offset}`;
+  return `adhd-calendar-event-${eventId}-${getIdentifierSuffix(reminder)}`;
 }
 
-export function getAllTaskReminderIdentifiers(taskId: string): string[] {
+export function getAllTaskReminderIdentifiers(
+  taskId: string,
+  reminders: readonly Reminder[] = []
+): string[] {
   return [
     `adhd-calendar-task-${taskId}`,
-    ...reminderOffsetOptions.map((offset) => getTaskReminderIdentifier(taskId, offset))
+    ...reminderOffsetOptions.map((offset) => getTaskReminderIdentifier(taskId, offset)),
+    ...reminders.map((reminder) => getTaskReminderIdentifier(taskId, reminder))
   ];
 }
 
-export function getAllEventReminderIdentifiers(eventId: string): string[] {
+export function getAllEventReminderIdentifiers(
+  eventId: string,
+  reminders: readonly Reminder[] = []
+): string[] {
   return [
     `adhd-calendar-event-${eventId}`,
-    ...reminderOffsetOptions.map((offset) => getEventReminderIdentifier(eventId, offset))
+    ...reminderOffsetOptions.map((offset) => getEventReminderIdentifier(eventId, offset)),
+    ...reminders.map((reminder) => getEventReminderIdentifier(eventId, reminder))
   ];
 }
 
@@ -124,7 +130,7 @@ export function formatReminderOffset(offset: ReminderOffsetMinutes | null): stri
   }
 
   if (offset === 0) {
-    return "At the scheduled time";
+    return "At start";
   }
 
   if (offset === 60) {
@@ -146,6 +152,34 @@ export function formatReminderOffsets(offsets: ReminderOffsetMinutes[]): string 
   return offsets.map(formatReminderOffset).join(", ");
 }
 
+export function formatReminder(reminder: Reminder): string {
+  if (reminder.kind === "relative") {
+    return formatReminderOffset(reminder.offsetMinutes);
+  }
+
+  const triggerDate = getReminderTriggerDate(reminder.date, reminder.time, 0);
+
+  return triggerDate ? formatReminderDateTime(triggerDate) : "Custom reminder";
+}
+
+export function formatReminders(reminders: readonly Reminder[]): string {
+  return reminders.length === 0
+    ? "No reminders"
+    : reminders.map(formatReminder).join(", ");
+}
+
+export function getReminderDate(
+  reminder: Reminder,
+  anchorDate: string | null,
+  anchorTime: string | null
+): Date | null {
+  return reminder.kind === "absolute"
+    ? getReminderTriggerDate(reminder.date, reminder.time, 0)
+    : anchorDate && anchorTime
+      ? getReminderTriggerDate(anchorDate, anchorTime, reminder.offsetMinutes)
+      : null;
+}
+
 function formatLocalTime(date: string, time: string): string {
   const value = getReminderTriggerDate(date, time, 0);
 
@@ -157,4 +191,23 @@ function formatLocalTime(date: string, time: string): string {
     hour: "numeric",
     minute: "2-digit"
   }).format(value);
+}
+
+function formatReminderDateTime(triggerDate: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(triggerDate);
+}
+
+function getIdentifierSuffix(reminder: Reminder | ReminderOffsetMinutes): string {
+  if (typeof reminder === "number") {
+    return String(reminder);
+  }
+
+  return reminder.kind === "relative"
+    ? String(reminder.offsetMinutes)
+    : getReminderKey(reminder);
 }

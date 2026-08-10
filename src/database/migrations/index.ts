@@ -7,6 +7,7 @@ import { taskFunctionalCoreMigration } from "./006_task_functional_core";
 import { executionMultipleRemindersMigration } from "./007_execution_multiple_reminders";
 import { plannedTimePreferencesCompatibilityMigration } from "./008_planned_time_preferences";
 import { taskPreferredDeadlineTimesMigration } from "./009_task_preferred_deadline_times";
+import { independentRemindersMigration } from "./010_independent_reminders";
 import { Migration } from "./types";
 
 export const migrations: Migration[] = [
@@ -18,5 +19,6 @@ export const migrations: Migration[] = [
   taskFunctionalCoreMigration,
   executionMultipleRemindersMigration,
   plannedTimePreferencesCompatibilityMigration,
-  taskPreferredDeadlineTimesMigration
+  taskPreferredDeadlineTimesMigration,
+  independentRemindersMigration
 ];

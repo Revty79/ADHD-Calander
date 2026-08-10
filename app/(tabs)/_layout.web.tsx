@@ -6,6 +6,7 @@ const navigationItems: { href: Href; label: string }[] = [
   { href: "/tasks", label: "Tasks" },
   { href: "/recovery", label: "Recovery" },
   { href: "/recap", label: "Recap" },
+  { href: "/guide", label: "Guide" },
   { href: "/settings", label: "Settings" }
 ];
 

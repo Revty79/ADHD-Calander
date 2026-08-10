@@ -80,14 +80,14 @@ Stored values are validated when read.
 SQLite migration 4 and IndexedDB version 4 originally added the single reminder
 offset to the Recovery item snapshot. SQLite migration 7 and IndexedDB version
 7 add reminder-offset arrays and execution timestamps while preserving that
-legacy data. Recovery now snapshots every selected reminder offset. Keep,
-Break Down, Delegate, and Remove preserve the original task's reminder choices
-while delivery becomes inactive for the resulting untimed or resolved task.
-Reschedule preserves the choices and rebuilds only future triggers from the new
-local schedule. Child tasks start without reminders. Reopening restores the
-original reminder snapshot, execution state, and schedule. Each persisted
-mutation is synchronized through `ReminderService`; fixed events remain outside
-Recovery.
+legacy data. SQLite migration 10 and IndexedDB version 10 add the shared
+relative-or-explicit reminder snapshot without rewriting old records. Keep,
+Break Down, Delegate, and Remove preserve original reminder intent while
+resolved tasks stop delivery. Reschedule preserves explicit reminders and
+recalculates relative reminders from any new exact schedule. Child tasks start
+without reminders. Reopening restores the original reminder snapshot,
+execution state, and schedule. Each persisted mutation is synchronized through
+`ReminderService`; fixed events remain outside Recovery.
 
 Daily Recap reads every active or completed Recovery session whose `sourceDate`
 matches the selected recap date. Final decisions are summarized as plan
@@ -104,7 +104,7 @@ is derived, reopening an active decision immediately changes the next summary.
 - Capacity scoring and essential-task selection
 - Full task hierarchy or project management
 - Sharing, contacts, or delegate messaging
-- Quiet hours, custom reminder offsets, and advanced notification actions
+- Quiet hours, arbitrary relative reminder offsets, and advanced notification actions
 - Recurring work and external calendars
 - Recovery analytics, streaks, and performance scoring
 - Accounts, cloud sync, and AI

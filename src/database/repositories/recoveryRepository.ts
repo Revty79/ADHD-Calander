@@ -275,6 +275,7 @@ export class RecoveryRepository {
         scheduledDate: item.originalScheduledDate,
         scheduledTime: item.originalScheduledTime,
         preferredTime: item.originalPreferredTime,
+        reminders: item.originalReminders,
         reminderOffsets: item.originalReminderOffsets,
         completedAt: null,
         updatedAt: timestamp
@@ -436,6 +437,7 @@ function createRecoveryItem(
     originalScheduledTime: task.scheduledTime,
     originalPreferredTime: task.preferredTime,
     originalEstimatedDurationMinutes: task.estimatedDurationMinutes,
+    originalReminders: task.reminders.map((reminder) => ({ ...reminder })),
     originalReminderOffsets: [...task.reminderOffsets],
     status: "pending",
     decision: null,
@@ -468,6 +470,7 @@ function createUnscheduledTask(
     estimatedDurationMinutes: null,
     deadlineDate: null,
     deadlineTime: null,
+    reminders: [],
     reminderOffsets: [],
     startedAt: null,
     createdAt: timestamp,

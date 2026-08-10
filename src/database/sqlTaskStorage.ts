@@ -5,9 +5,12 @@ import {
   TaskImportance,
   TaskStatus
 } from "../types/task";
+import {
+  getRelativeReminderOffsets,
+  parseStoredReminders
+} from "../notifications/reminders";
 import { SqlExecutor } from "./sql";
 import { TaskStorage } from "./taskStorage";
-import { parseStoredReminderOffsets } from "../notifications/reminderOffsets";
 
 type TaskRow = {
   id: string;
@@ -22,6 +25,7 @@ type TaskRow = {
   estimatedDurationMinutes: number | null;
   deadlineDate: LocalDateString | null;
   deadlineTime: LocalTimeString | null;
+  reminders: string | null;
   reminderOffsets: string;
   startedAt: string | null;
   createdAt: string;
@@ -44,6 +48,7 @@ const taskSelect = `
     estimated_duration_minutes AS estimatedDurationMinutes,
     deadline_date AS deadlineDate,
     deadline_time AS deadlineTime,
+    reminders,
     reminder_offsets AS reminderOffsets,
     started_at AS startedAt,
     created_at AS createdAt,
@@ -73,12 +78,13 @@ export class SqlTaskStorage implements TaskStorage {
           deadline_date,
           deadline_time,
           reminder_offsets,
+          reminders,
           started_at,
           created_at,
           updated_at,
           completed_at,
           deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       task.id,
       task.title,
@@ -92,7 +98,8 @@ export class SqlTaskStorage implements TaskStorage {
       task.estimatedDurationMinutes,
       task.deadlineDate,
       task.deadlineTime,
-      JSON.stringify(task.reminderOffsets),
+      JSON.stringify(getRelativeReminderOffsets(task.reminders)),
+      JSON.stringify(task.reminders),
       task.startedAt,
       task.createdAt,
       task.updatedAt,
@@ -168,6 +175,7 @@ export class SqlTaskStorage implements TaskStorage {
           deadline_date = ?,
           deadline_time = ?,
           reminder_offsets = ?,
+          reminders = ?,
           started_at = ?,
           created_at = ?,
           updated_at = ?,
@@ -187,7 +195,8 @@ export class SqlTaskStorage implements TaskStorage {
       task.estimatedDurationMinutes,
       task.deadlineDate,
       task.deadlineTime,
-      JSON.stringify(task.reminderOffsets),
+      JSON.stringify(getRelativeReminderOffsets(task.reminders)),
+      JSON.stringify(task.reminders),
       task.startedAt,
       task.createdAt,
       task.updatedAt,
@@ -225,6 +234,8 @@ export class SqlTaskStorage implements TaskStorage {
 }
 
 function mapTaskRow(row: TaskRow): Task {
+  const reminders = parseStoredReminders(row.reminders, row.reminderOffsets);
+
   return {
     id: row.id,
     title: row.title,
@@ -238,7 +249,8 @@ function mapTaskRow(row: TaskRow): Task {
     estimatedDurationMinutes: row.estimatedDurationMinutes,
     deadlineDate: row.deadlineDate,
     deadlineTime: row.deadlineTime,
-    reminderOffsets: parseStoredReminderOffsets(row.reminderOffsets),
+    reminders,
+    reminderOffsets: getRelativeReminderOffsets(reminders),
     startedAt: row.startedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

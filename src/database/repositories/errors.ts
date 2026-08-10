@@ -7,6 +7,7 @@ export type TaskValidationField =
   | "estimatedDurationMinutes"
   | "deadlineDate"
   | "deadlineTime"
+  | "reminders"
   | "reminderOffsets"
   | "breakdownTitles";
 

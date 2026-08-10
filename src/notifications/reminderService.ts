@@ -107,16 +107,25 @@ export class ReminderService implements ReminderSynchronizer {
     }
   }
 
-  async syncTaskReminder(task: Task): Promise<void> {
+  async syncTaskReminder(task: Task, previousTask?: Task): Promise<void> {
     await this.safelySynchronize(
-      getAllTaskReminderIdentifiers(task.id),
+      uniqueIdentifiers([
+        ...getAllTaskReminderIdentifiers(task.id, task.reminders),
+        ...getAllTaskReminderIdentifiers(task.id, previousTask?.reminders ?? [])
+      ]),
       buildTaskReminderRequests(task)
     );
   }
 
-  async syncEventReminder(event: CalendarEvent): Promise<void> {
+  async syncEventReminder(
+    event: CalendarEvent,
+    previousEvent?: CalendarEvent
+  ): Promise<void> {
     await this.safelySynchronize(
-      getAllEventReminderIdentifiers(event.id),
+      uniqueIdentifiers([
+        ...getAllEventReminderIdentifiers(event.id, event.reminders),
+        ...getAllEventReminderIdentifiers(event.id, previousEvent?.reminders ?? [])
+      ]),
       buildEventReminderRequests(event)
     );
   }
@@ -157,4 +166,8 @@ export class ReminderService implements ReminderSynchronizer {
 
     await this.notificationAdapter.scheduleReminder(request);
   }
+}
+
+function uniqueIdentifiers(identifiers: string[]): string[] {
+  return [...new Set(identifiers)];
 }

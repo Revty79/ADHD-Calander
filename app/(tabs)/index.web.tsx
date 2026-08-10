@@ -3,7 +3,7 @@ import { useCallback, useMemo } from "react";
 
 import { TaskList } from "../../src/features/tasks/components/TaskList";
 import { useTodayPlan } from "../../src/features/today/hooks/useTodayPlan";
-import { formatReminderOffsets } from "../../src/notifications/reminderRules";
+import { formatReminders } from "../../src/notifications/reminderRules";
 import { isTaskActive, isTaskCompleted } from "../../src/types/task";
 import { formatLocalDateForDisplay, getLocalDateString } from "../../src/utils/dates";
 
@@ -99,10 +99,8 @@ export default function WebTodayScreen() {
                       <div>
                         <strong>{event.title}</strong>
                         <span>Fixed</span>
-                        {event.reminderOffsets.length > 0 ? (
-                          <span>
-                            Reminders: {formatReminderOffsets(event.reminderOffsets)}
-                          </span>
+                        {event.reminders.length > 0 ? (
+                          <span>Reminders: {formatReminders(event.reminders)}</span>
                         ) : null}
                       </div>
                     </li>
