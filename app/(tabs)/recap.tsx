@@ -19,18 +19,18 @@ import {
   formatRecoveryDecision,
   getOpenReasonLabel
 } from "../../src/features/recap/recapPresentation";
+import {
+  getRecapRouteDate,
+  selectRecapDate
+} from "../../src/features/recap/recapDateSelection";
 import { recapRecoveryDecisionTypes } from "../../src/types/recap";
 import { LocalDateString } from "../../src/types/dateTime";
-import {
-  formatLocalDateForDisplay,
-  getLocalDateString,
-  normalizeLocalDateInput
-} from "../../src/utils/dates";
+import { formatLocalDateForDisplay, getLocalDateString } from "../../src/utils/dates";
 
 export default function RecapScreen() {
   const params = useLocalSearchParams<{ date?: string | string[] }>();
   const today = useMemo(() => getLocalDateString(), []);
-  const routeDate = getRouteDate(params.date, today);
+  const routeDate = getRecapRouteDate(params.date, today);
 
   return <RecapContent initialDate={routeDate} key={routeDate} today={today} />;
 }
@@ -55,21 +55,16 @@ function RecapContent({
 
   const chooseDate = useCallback(
     (date: string) => {
-      const normalizedDate = normalizeLocalDateInput(date);
+      const selection = selectRecapDate(date, today);
 
-      if (!normalizedDate) {
-        setDateError("Use a date in YYYY-MM-DD format.");
-        return;
-      }
-
-      if (normalizedDate > today) {
-        setDateError("Choose today or an earlier date.");
+      if (!selection.ok) {
+        setDateError(selection.errorMessage);
         return;
       }
 
       setDateError(null);
-      setSelectedDate(normalizedDate);
-      setDateInput(normalizedDate);
+      setSelectedDate(selection.date);
+      setDateInput(selection.date);
     },
     [today]
   );
@@ -270,16 +265,6 @@ function RecapContent({
       ) : null}
     </Screen>
   );
-}
-
-function getRouteDate(
-  value: string | string[] | undefined,
-  today: ReturnType<typeof getLocalDateString>
-) {
-  const routeValue = Array.isArray(value) ? value[0] : value;
-  const normalizedDate = routeValue ? normalizeLocalDateInput(routeValue) : null;
-
-  return normalizedDate && normalizedDate <= today ? normalizedDate : today;
 }
 
 const styles = StyleSheet.create({

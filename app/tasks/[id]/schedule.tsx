@@ -9,6 +9,7 @@ import {
   useSchedulingSuggestions
 } from "../../../src/features/scheduling/hooks/useSchedulingSuggestions";
 import { SchedulingSuggestion } from "../../../src/features/scheduling/types";
+import { getTaskDeadlineLabel } from "../../../src/features/tasks/taskPresentation";
 import { formatLocalDateForDisplay } from "../../../src/utils/dates";
 
 export default function ScheduleTaskScreen() {
@@ -73,7 +74,7 @@ export default function ScheduleTaskScreen() {
             ) : null}
             {scheduling.result.task.deadlineDate ? (
               <Text style={styles.meta}>
-                Deadline: {formatLocalDateForDisplay(scheduling.result.task.deadlineDate)}
+                Deadline: {getTaskDeadlineLabel(scheduling.result.task)}
               </Text>
             ) : null}
             <Text style={styles.meta}>

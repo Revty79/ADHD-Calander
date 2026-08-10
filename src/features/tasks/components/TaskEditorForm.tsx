@@ -13,7 +13,7 @@ import {
   NativeTimePickerButton
 } from "../../../components/NativeDateTimePickerButton";
 import { TaskValidationError } from "../../../database/repositories/errors";
-import { ReminderOffsetMinutes, ReminderPermissionStatus } from "../../../types/reminder";
+import { ReminderOffsetMinutes } from "../../../types/reminder";
 import {
   CreateTaskInput,
   getTaskPlanningState,
@@ -28,6 +28,14 @@ import {
   getPlannedDateQuickChoices,
   TaskDateQuickChoice
 } from "../taskDateChoices";
+import {
+  buildTaskEditorInput,
+  getTaskPlanningTransition,
+  getTaskReminderDisabledMessage,
+  taskDurationOptions,
+  taskImportanceOptions,
+  taskPlanningOptions
+} from "../taskEditorModel";
 
 type FieldErrors = Partial<Record<TaskValidationError["field"], string>>;
 
@@ -37,18 +45,6 @@ type Props = {
   onSubmit(input: CreateTaskInput): Promise<void>;
   submitLabel: string;
 };
-
-const durationOptions = [null, 10, 15, 30, 45, 60, 90, 120] as const;
-const importanceOptions: { label: string; value: TaskImportance }[] = [
-  { label: "Low", value: "low" },
-  { label: "Normal", value: "normal" },
-  { label: "Important", value: "important" }
-];
-const planningOptions: { label: string; value: TaskPlanningState }[] = [
-  { label: "Flexible", value: "flexible" },
-  { label: "Planned", value: "planned" },
-  { label: "Scheduled", value: "scheduled" }
-];
 
 export function TaskEditorForm({
   initialDate = "",
@@ -69,10 +65,12 @@ export function TaskEditorForm({
     initialTask?.scheduledDate ?? initialDate
   );
   const [scheduledTime, setScheduledTime] = useState(initialTask?.scheduledTime ?? "");
+  const [preferredTime, setPreferredTime] = useState(initialTask?.preferredTime ?? "");
   const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState<number | null>(
     initialTask?.estimatedDurationMinutes ?? null
   );
   const [deadlineDate, setDeadlineDate] = useState(initialTask?.deadlineDate ?? "");
+  const [deadlineTime, setDeadlineTime] = useState(initialTask?.deadlineTime ?? "");
   const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[]>(
     initialTask?.reminderOffsets ?? []
   );
@@ -83,16 +81,18 @@ export function TaskEditorForm({
   const [isSaving, setIsSaving] = useState(false);
 
   function choosePlanningState(nextState: TaskPlanningState) {
-    setPlanningState(nextState);
+    const transition = getTaskPlanningTransition(
+      nextState,
+      scheduledDate,
+      scheduledTime,
+      preferredTime,
+      getPlannedDateQuickChoices(referenceDate)[0]?.value ?? ""
+    );
 
-    if (nextState === "flexible") {
-      setScheduledDate("");
-      setScheduledTime("");
-    } else if (nextState === "planned") {
-      setScheduledTime("");
-    } else if (!scheduledDate) {
-      setScheduledDate(getPlannedDateQuickChoices(referenceDate)[0]?.value ?? "");
-    }
+    setPlanningState(transition.planningState);
+    setScheduledDate(transition.scheduledDate);
+    setScheduledTime(transition.scheduledTime);
+    setPreferredTime(transition.preferredTime);
   }
 
   async function saveTask() {
@@ -101,16 +101,21 @@ export function TaskEditorForm({
     setIsSaving(true);
 
     try {
-      await onSubmit({
-        title,
-        description,
-        importance,
-        scheduledDate: planningState === "flexible" ? null : scheduledDate,
-        scheduledTime: planningState === "scheduled" ? scheduledTime : null,
-        estimatedDurationMinutes,
-        deadlineDate,
-        reminderOffsets
-      });
+      await onSubmit(
+        buildTaskEditorInput({
+          title,
+          description,
+          importance,
+          planningState,
+          scheduledDate,
+          scheduledTime,
+          preferredTime,
+          estimatedDurationMinutes,
+          deadlineDate,
+          deadlineTime,
+          reminderOffsets
+        })
+      );
     } catch (error) {
       if (error instanceof TaskValidationError) {
         setFieldErrors({ [error.field]: error.message });
@@ -122,7 +127,7 @@ export function TaskEditorForm({
     }
   }
 
-  const reminderDisabledMessage = getReminderDisabledMessage(
+  const reminderDisabledMessage = getTaskReminderDisabledMessage(
     planningState,
     reminderSettings.status?.permissionStatus,
     reminderSettings.status?.settings.remindersEnabled
@@ -166,15 +171,15 @@ export function TaskEditorForm({
           <ChoiceGroup<TaskImportance>
             label="Importance"
             onChange={setImportance}
-            options={importanceOptions}
+            options={taskImportanceOptions}
             value={importance}
           />
 
           <ChoiceGroup<TaskPlanningState>
-            help="Flexible has no date. Planned has a date. Scheduled has a date and time."
+            help="Flexible has no date. Planned has a date and optional preferred time. Scheduled has a fixed date and start time."
             label="Planning state"
             onChange={choosePlanningState}
-            options={planningOptions}
+            options={taskPlanningOptions}
             value={planningState}
           />
 
@@ -211,11 +216,34 @@ export function TaskEditorForm({
             </Field>
           ) : null}
 
+          {planningState === "planned" ? (
+            <Field label="Preferred time (optional)" error={fieldErrors.preferredTime}>
+              <Text style={styles.helpText}>
+                This is a preference, not a fixed calendar reservation.
+              </Text>
+              <NativeTimePickerButton
+                accessibilityLabel="Choose an optional preferred time"
+                onChange={setPreferredTime}
+                value={preferredTime}
+              />
+              {preferredTime ? (
+                <Pressable
+                  accessibilityLabel="Clear preferred time"
+                  accessibilityRole="button"
+                  onPress={() => setPreferredTime("")}
+                  style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.clearButtonText}>Clear preferred time</Text>
+                </Pressable>
+              ) : null}
+            </Field>
+          ) : null}
+
           <View style={styles.field}>
             <Text style={styles.label}>Estimated duration</Text>
             <Text style={styles.helpText}>Choose a practical estimate if it helps.</Text>
             <View accessibilityRole="radiogroup" style={styles.optionWrap}>
-              {durationOptions.map((duration) => {
+              {taskDurationOptions.map((duration) => {
                 const selected = duration === estimatedDurationMinutes;
                 const label = duration === null ? "No estimate" : `${duration} min`;
 
@@ -247,10 +275,16 @@ export function TaskEditorForm({
             ) : null}
           </View>
 
-          <Field label="Deadline" error={fieldErrors.deadlineDate}>
+          <Field label="Deadline date (optional)" error={fieldErrors.deadlineDate}>
             <DateQuickChoices
               choices={getDeadlineQuickChoices(referenceDate)}
-              onChange={(value) => setDeadlineDate(value ?? "")}
+              onChange={(value) => {
+                setDeadlineDate(value ?? "");
+
+                if (value === null) {
+                  setDeadlineTime("");
+                }
+              }}
               value={deadlineDate}
             />
             <NativeDatePickerButton
@@ -261,7 +295,43 @@ export function TaskEditorForm({
             <Text style={styles.helpText}>
               A deadline is the last day to finish, not when you plan to work.
             </Text>
+            {deadlineDate ? (
+              <Pressable
+                accessibilityLabel="Clear deadline date and time"
+                accessibilityRole="button"
+                onPress={() => {
+                  setDeadlineDate("");
+                  setDeadlineTime("");
+                }}
+                style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.clearButtonText}>Clear deadline</Text>
+              </Pressable>
+            ) : null}
           </Field>
+
+          {deadlineDate ? (
+            <Field label="Deadline time (optional)" error={fieldErrors.deadlineTime}>
+              <Text style={styles.helpText}>
+                Without a time, the deadline is the end of the selected day.
+              </Text>
+              <NativeTimePickerButton
+                accessibilityLabel="Choose an optional deadline time"
+                onChange={setDeadlineTime}
+                value={deadlineTime}
+              />
+              {deadlineTime ? (
+                <Pressable
+                  accessibilityLabel="Clear deadline time"
+                  accessibilityRole="button"
+                  onPress={() => setDeadlineTime("")}
+                  style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.clearButtonText}>Clear deadline time</Text>
+                </Pressable>
+              ) : null}
+            </Field>
+          ) : null}
 
           {planningState === "scheduled" ? (
             <ReminderOffsetSelector
@@ -410,26 +480,6 @@ function ChoiceGroup<T extends string>({
       </View>
     </View>
   );
-}
-
-function getReminderDisabledMessage(
-  planningState: TaskPlanningState,
-  permissionStatus: ReminderPermissionStatus | undefined,
-  remindersEnabled: boolean | undefined
-): string | null {
-  if (planningState !== "scheduled") {
-    return "Reminders are available after adding a date and time.";
-  }
-
-  if (permissionStatus === "denied" || permissionStatus === "unsupported") {
-    return "Reminders are unavailable on this device or browser.";
-  }
-
-  if (remindersEnabled !== true) {
-    return "Turn on reminders in Settings to choose them here.";
-  }
-
-  return null;
 }
 
 const styles = StyleSheet.create({

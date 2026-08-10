@@ -63,8 +63,11 @@ Recovery decisions without scoring the day. Recovery supports explicit
 task-by-task decisions without automatic next-day scheduling. Settings provides
 a local reminder master control, accessibility and privacy guidance, and app
 information. Task planning uses human date/time controls with quick local-date
-choices instead of requiring formatted strings. Tasks can be started, paused,
-and completed while keeping planning state separate from execution state.
+choices instead of requiring formatted strings. Planned tasks may carry an
+optional exact preferred time that remains a soft preference, while Scheduled
+tasks require an actual start time. Deadlines may have an optional exact local
+time; date-only deadlines mean the end of that local day. Tasks can be started,
+paused, and completed while keeping planning state separate from execution state.
 Native scheduled tasks and fixed events may each have up to five optional local
 reminders; web reports that notification scheduling is unavailable there.
 Flexible tasks can request deterministic scheduling suggestions inside local

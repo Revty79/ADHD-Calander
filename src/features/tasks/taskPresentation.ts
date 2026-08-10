@@ -4,7 +4,12 @@ import {
   Task,
   TaskImportance
 } from "../../types/task";
-import { getLocalDateString, getLocalTimeString } from "../../utils/dates";
+import {
+  formatLocalDateForDisplay,
+  formatLocalTimeForDisplay,
+  getLocalDateString,
+  getLocalTimeString
+} from "../../utils/dates";
 
 export function getTaskStatusLabel(status: Task["status"]): string {
   switch (status) {
@@ -30,7 +35,13 @@ export function getTaskTimingNote(task: Task, now = new Date()): string | null {
 
   const today = getLocalDateString(now);
 
-  if (task.deadlineDate !== null && task.deadlineDate < today) {
+  if (
+    task.deadlineDate !== null &&
+    (task.deadlineDate < today ||
+      (task.deadlineDate === today &&
+        task.deadlineTime !== null &&
+        task.deadlineTime < getLocalTimeString(now)))
+  ) {
     return "Deadline passed · Still open";
   }
 
@@ -67,4 +78,22 @@ export function getTaskPlanningLabel(task: Task): string {
     default:
       return "Flexible";
   }
+}
+
+export function getTaskDeadlineLabel(task: Task): string {
+  if (task.deadlineDate === null) {
+    return "No deadline";
+  }
+
+  const date = formatLocalDateForDisplay(task.deadlineDate);
+
+  return task.deadlineTime === null
+    ? `${date} · End of day`
+    : `${date} at ${formatLocalTimeForDisplay(task.deadlineTime)}`;
+}
+
+export function getTaskPreferredTimeLabel(task: Task): string | null {
+  return task.preferredTime === null
+    ? null
+    : `Preferred ${formatLocalTimeForDisplay(task.preferredTime)}`;
 }

@@ -4,6 +4,7 @@ import { isTaskActive, Task } from "../../types/task";
 import { getLocalDateString } from "../../utils/dates";
 import { addLocalDays } from "../calendar/calendarDates";
 import { getEventDurationMinutes } from "../calendar/calendarSchedule";
+import { getDeadlineEndMinutesForDate, localTimeToMinutes } from "../tasks/taskDeadline";
 import { DailyLoad, SchedulingEngineInput, SchedulingSuggestion } from "./types";
 
 type MinuteInterval = {
@@ -26,8 +27,8 @@ export function generateSchedulingSuggestions(
     return [];
   }
 
-  const planningStart = timeToMinutes(input.preferences.planningDayStart);
-  const planningEnd = timeToMinutes(input.preferences.planningDayEnd);
+  const planningStart = localTimeToMinutes(input.preferences.planningDayStart);
+  const planningEnd = localTimeToMinutes(input.preferences.planningDayEnd);
   const today = getLocalDateString(input.now);
   const candidates: RankedSuggestion[] = [];
 
@@ -37,6 +38,9 @@ export function generateSchedulingSuggestions(
     if (input.task.deadlineDate !== null && date > input.task.deadlineDate) {
       continue;
     }
+
+    const deadlineEnd = getDeadlineEndMinutesForDate(input.task, date);
+    const effectiveEnd = Math.min(planningEnd, deadlineEnd ?? planningEnd);
 
     const events = input.events.filter((event) => event.date === date);
     const tasks = input.tasks.filter(
@@ -65,7 +69,7 @@ export function generateSchedulingSuggestions(
       );
     }
 
-    if (effectiveStart + durationMinutes > planningEnd) {
+    if (effectiveStart + durationMinutes > effectiveEnd) {
       continue;
     }
 
@@ -74,13 +78,13 @@ export function generateSchedulingSuggestions(
         getFixedEventInterval(
           event,
           planningStart,
-          planningEnd,
+          effectiveEnd,
           input.preferences.transitionBufferMinutes
         )
       ),
-      ...tasks.map((task) => getTimedTaskInterval(task, planningStart, planningEnd))
+      ...tasks.map((task) => getTimedTaskInterval(task, planningStart, effectiveEnd))
     ]);
-    const freeGaps = getFreeGaps(effectiveStart, planningEnd, busyIntervals);
+    const freeGaps = getFreeGaps(effectiveStart, effectiveEnd, busyIntervals);
 
     for (const gap of freeGaps) {
       const start = roundUpToIncrement(gap.start, candidateIncrementMinutes);
@@ -99,7 +103,8 @@ export function generateSchedulingSuggestions(
           durationMinutes,
           input.preferences.transitionBufferMinutes,
           dailyLoad,
-          input.task.deadlineDate
+          input.task.deadlineDate,
+          input.task.deadlineTime
         ),
         dailyLoad,
         loadBand: Math.floor(dailyLoad.totalScheduledMinutes / 120)
@@ -149,7 +154,7 @@ function getFixedEventInterval(
   planningEnd: number,
   transitionBufferMinutes: number
 ): MinuteInterval {
-  const start = timeToMinutes(event.startTime);
+  const start = localTimeToMinutes(event.startTime);
   const knownDuration = getEventDurationMinutes(event);
   const end = knownDuration > 0 ? start + knownDuration : planningEnd;
 
@@ -168,7 +173,7 @@ function getTimedTaskInterval(
   planningStart: number,
   planningEnd: number
 ): MinuteInterval {
-  const start = timeToMinutes(task.scheduledTime!);
+  const start = localTimeToMinutes(task.scheduledTime!);
   const end =
     task.estimatedDurationMinutes === null
       ? planningEnd
@@ -275,7 +280,8 @@ function buildExplanation(
   durationMinutes: number,
   transitionBufferMinutes: number,
   dailyLoad: DailyLoad,
-  deadlineDate: LocalDateString | null
+  deadlineDate: LocalDateString | null,
+  deadlineTime: LocalTimeString | null
 ): string {
   const parts = [
     `The full ${durationMinutes}-minute estimate fits within your planning hours.`
@@ -290,7 +296,11 @@ function buildExplanation(
   }
 
   if (deadlineDate !== null) {
-    parts.push(`This time is on or before the ${deadlineDate} deadline.`);
+    parts.push(
+      deadlineTime === null
+        ? `This time finishes by the end of the ${deadlineDate} deadline day.`
+        : `This time finishes by the ${deadlineDate} at ${deadlineTime} deadline.`
+    );
   }
 
   parts.push(
@@ -319,12 +329,6 @@ function formatMinutes(minutes: number): string {
 
 function roundUpToIncrement(value: number, increment: number): number {
   return Math.ceil(value / increment) * increment;
-}
-
-function timeToMinutes(time: LocalTimeString): number {
-  const [hours, minutes] = time.split(":").map(Number);
-
-  return (hours ?? 0) * 60 + (minutes ?? 0);
 }
 
 function minutesToTime(minutes: number): LocalTimeString {

@@ -87,3 +87,19 @@ export function formatLocalDateForDisplay(value: LocalDateString): string {
     day: "numeric"
   }).format(date);
 }
+
+export function formatLocalTimeForDisplay(value: LocalTimeString): string {
+  const normalizedTime = normalizeOptionalTime(value);
+
+  if (!normalizedTime) {
+    return value;
+  }
+
+  const [hour, minute] = normalizedTime.split(":").map(Number);
+  const date = new Date(2026, 0, 1, hour ?? 0, minute ?? 0);
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
+}

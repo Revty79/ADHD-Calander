@@ -17,6 +17,7 @@ import {
   noOpReminderSynchronizer,
   ReminderSynchronizer
 } from "../../notifications/reminderSynchronizer";
+import { doesTaskPlacementMeetDeadline } from "../../features/tasks/taskDeadline";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../../utils/dates";
 import { createTaskId } from "../../utils/ids";
 import { TaskStorage } from "../taskStorage";
@@ -32,8 +33,10 @@ type NormalizedTaskInput = Pick<
   | "importance"
   | "scheduledDate"
   | "scheduledTime"
+  | "preferredTime"
   | "estimatedDurationMinutes"
   | "deadlineDate"
+  | "deadlineTime"
   | "reminderOffsets"
 >;
 
@@ -59,8 +62,10 @@ export class TaskRepository {
       parentTaskId: null,
       scheduledDate: normalizedInput.scheduledDate,
       scheduledTime: normalizedInput.scheduledTime,
+      preferredTime: normalizedInput.preferredTime,
       estimatedDurationMinutes: normalizedInput.estimatedDurationMinutes,
       deadlineDate: normalizedInput.deadlineDate,
+      deadlineTime: normalizedInput.deadlineTime,
       reminderOffsets: normalizedInput.reminderOffsets,
       startedAt: null,
       createdAt: timestamp,
@@ -186,13 +191,22 @@ export class TaskRepository {
         );
       }
 
+      const estimatedDurationMinutes =
+        normalizedInput.estimatedDurationMinutes ?? existingTask.estimatedDurationMinutes;
+
       if (
-        existingTask.deadlineDate !== null &&
-        normalizedInput.scheduledDate > existingTask.deadlineDate
+        !doesTaskPlacementMeetDeadline(
+          {
+            scheduledDate: normalizedInput.scheduledDate,
+            scheduledTime: normalizedInput.scheduledTime,
+            estimatedDurationMinutes
+          },
+          existingTask
+        )
       ) {
         throw new TaskValidationError(
-          "Choose a time on or before this task's deadline.",
-          "deadlineDate"
+          "Choose a time that finishes by this task's deadline.",
+          existingTask.deadlineTime === null ? "deadlineDate" : "deadlineTime"
         );
       }
 
@@ -200,9 +214,8 @@ export class TaskRepository {
         ...existingTask,
         scheduledDate: normalizedInput.scheduledDate,
         scheduledTime: normalizedInput.scheduledTime,
-        estimatedDurationMinutes:
-          normalizedInput.estimatedDurationMinutes ??
-          existingTask.estimatedDurationMinutes,
+        preferredTime: null,
+        estimatedDurationMinutes,
         updatedAt: now.toISOString()
       };
 
@@ -246,8 +259,10 @@ export class TaskRepository {
         parentTaskId: parentTask.id,
         scheduledDate: null,
         scheduledTime: null,
+        preferredTime: null,
         estimatedDurationMinutes: null,
         deadlineDate: null,
+        deadlineTime: null,
         reminderOffsets: [],
         startedAt: null,
         createdAt: timestamp,
@@ -552,6 +567,30 @@ function normalizeTaskInput(
     );
   }
 
+  const rawPreferredTime = input.preferredTime?.trim() ?? "";
+  const preferredTime = normalizeOptionalTime(rawPreferredTime);
+
+  if (rawPreferredTime && !preferredTime) {
+    throw new TaskValidationError(
+      "Use a preferred time in HH:MM format.",
+      "preferredTime"
+    );
+  }
+
+  if (preferredTime && !scheduledDate) {
+    throw new TaskValidationError(
+      "Choose a planned date before adding a preferred time.",
+      "preferredTime"
+    );
+  }
+
+  if (preferredTime && scheduledTime) {
+    throw new TaskValidationError(
+      "Preferred time is only available for Planned tasks.",
+      "preferredTime"
+    );
+  }
+
   const estimatedDurationMinutes = input.estimatedDurationMinutes ?? null;
 
   if (
@@ -572,10 +611,42 @@ function normalizeTaskInput(
     throw new TaskValidationError("Use a deadline in YYYY-MM-DD format.", "deadlineDate");
   }
 
+  const rawDeadlineTime = input.deadlineTime?.trim() ?? "";
+  const deadlineTime = normalizeOptionalTime(rawDeadlineTime);
+
+  if (rawDeadlineTime && !deadlineTime) {
+    throw new TaskValidationError("Use a deadline time in HH:MM format.", "deadlineTime");
+  }
+
+  if (deadlineTime && !deadlineDate) {
+    throw new TaskValidationError(
+      "Choose a deadline date before adding a deadline time.",
+      "deadlineTime"
+    );
+  }
+
   if (scheduledDate && deadlineDate && scheduledDate > deadlineDate) {
     throw new TaskValidationError(
       "Choose a deadline on or after the planned date.",
       "deadlineDate"
+    );
+  }
+
+  if (
+    scheduledDate &&
+    scheduledTime &&
+    !doesTaskPlacementMeetDeadline(
+      {
+        scheduledDate,
+        scheduledTime,
+        estimatedDurationMinutes
+      },
+      { deadlineDate, deadlineTime }
+    )
+  ) {
+    throw new TaskValidationError(
+      "Choose a scheduled time that finishes by the deadline.",
+      deadlineTime === null ? "deadlineDate" : "deadlineTime"
     );
   }
 
@@ -594,8 +665,10 @@ function normalizeTaskInput(
     importance,
     scheduledDate,
     scheduledTime,
+    preferredTime,
     estimatedDurationMinutes,
     deadlineDate,
+    deadlineTime,
     reminderOffsets: normalizeReminderOffsets(reminderOffsets)
   };
 }
@@ -727,5 +800,7 @@ function compareTasks(first: Task, second: Task): number {
     return priorityOrder;
   }
 
-  return first.createdAt.localeCompare(second.createdAt);
+  return (
+    first.createdAt.localeCompare(second.createdAt) || first.id.localeCompare(second.id)
+  );
 }

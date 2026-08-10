@@ -15,6 +15,12 @@ import { Screen } from "../../src/components/Screen";
 import { useReminderSettings } from "../../src/features/settings/hooks/useReminderSettings";
 import { usePlanningSettings } from "../../src/features/settings/hooks/usePlanningSettings";
 import {
+  formatPlanningTime,
+  formatSuggestedTaskTimeOption,
+  formatTransitionBufferOption,
+  planningSettingsSummary
+} from "../../src/features/settings/planningPresentation";
+import {
   maxSuggestedTaskMinutesOptions,
   planningDayEndOptions,
   planningDayStartOptions,
@@ -142,7 +148,7 @@ export default function SettingsScreen() {
                 )
               }
               options={transitionBufferOptions.map((value) => ({
-                label: value === 0 ? "None" : `${value} min`,
+                label: formatTransitionBufferOption(value),
                 value
               }))}
               selectedValue={planning.settings.transitionBufferMinutes}
@@ -157,15 +163,12 @@ export default function SettingsScreen() {
                 )
               }
               options={maxSuggestedTaskMinutesOptions.map((value) => ({
-                label: `${value / 60} hr`,
+                label: formatSuggestedTaskTimeOption(value),
                 value
               }))}
               selectedValue={planning.settings.maxSuggestedTaskMinutesPerDay}
             />
-            <Text style={styles.planningNote}>
-              Suggestions search seven days by default and never fill time without your
-              confirmation.
-            </Text>
+            <Text style={styles.planningNote}>{planningSettingsSummary}</Text>
           </>
         )}
       </SettingsSection>
@@ -292,16 +295,6 @@ function PlanningChoiceGroup({
       </View>
     </View>
   );
-}
-
-function formatPlanningTime(value: string): string {
-  const [hours, minutes] = value.split(":").map(Number);
-  const date = new Date(2026, 0, 1, hours ?? 0, minutes ?? 0);
-
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit"
-  }).format(date);
 }
 
 function SettingsButton({

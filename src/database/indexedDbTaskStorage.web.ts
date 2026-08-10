@@ -32,7 +32,7 @@ import { SettingsStorage, StoredSetting } from "./settingsStorage";
 import { TaskStorage } from "./taskStorage";
 
 const WEB_DATABASE_NAME = "adhd-calendar-web";
-const WEB_DATABASE_VERSION = 7;
+const WEB_DATABASE_VERSION = 9;
 const TASK_STORE_NAME = "tasks";
 const EVENT_STORE_NAME = "calendarEvents";
 const RECOVERY_SESSION_STORE_NAME = "recoverySessions";
@@ -56,8 +56,10 @@ type StoredTask = {
   parentTaskId?: string | null;
   scheduledDate: string | null;
   scheduledTime: string | null;
+  preferredTime?: Task["preferredTime"];
   estimatedDurationMinutes?: number | null;
   deadlineDate?: Task["deadlineDate"];
+  deadlineTime?: Task["deadlineTime"];
   createdAt: string;
   updatedAt: string;
   completedAt?: string | null;
@@ -98,6 +100,7 @@ type StoredRecoveryItem = {
   originalStatus: TaskStatus;
   originalScheduledDate: string;
   originalScheduledTime: string | null;
+  originalPreferredTime?: RecoveryItem["originalPreferredTime"];
   originalEstimatedDurationMinutes: number | null;
   originalReminderOffsets?: RecoveryItem["originalReminderOffsets"];
   originalReminderOffsetMinutes?: number | null;
@@ -211,8 +214,10 @@ export function deserializeTaskFromWeb(value: unknown): Task {
   const parentTaskId = value.parentTaskId ?? null;
   const scheduledDate = value.scheduledDate;
   const scheduledTime = value.scheduledTime;
+  const preferredTime = value.preferredTime ?? null;
   const estimatedDurationMinutes = value.estimatedDurationMinutes ?? null;
   const deadlineDate = value.deadlineDate ?? null;
+  const deadlineTime = value.deadlineTime ?? null;
   const completedAt = value.completedAt ?? null;
   const startedAt = value.startedAt ?? null;
   const legacyReminderOffset = value.reminderOffsetMinutes ?? null;
@@ -231,8 +236,10 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     !isNullableString(parentTaskId) ||
     !isValidStoredDate(scheduledDate) ||
     !isValidStoredTime(scheduledTime) ||
+    !isValidStoredTime(preferredTime) ||
     !isValidStoredDuration(estimatedDurationMinutes) ||
     !isValidStoredDate(deadlineDate) ||
+    !isValidStoredTime(deadlineTime) ||
     !isReminderOffsetList(reminderOffsets) ||
     typeof value.createdAt !== "string" ||
     typeof value.updatedAt !== "string" ||
@@ -247,6 +254,16 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     throw new WebStorageDataError("Stored task time requires a scheduled date.");
   }
 
+  if (preferredTime !== null && (scheduledDate === null || scheduledTime !== null)) {
+    throw new WebStorageDataError(
+      "Stored preferred time requires a planned task without a scheduled time."
+    );
+  }
+
+  if (deadlineTime !== null && deadlineDate === null) {
+    throw new WebStorageDataError("Stored deadline time requires a deadline date.");
+  }
+
   return {
     id: value.id,
     title: value.title,
@@ -256,8 +273,10 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     parentTaskId,
     scheduledDate,
     scheduledTime,
+    preferredTime,
     estimatedDurationMinutes,
     deadlineDate,
+    deadlineTime,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     completedAt,
@@ -394,6 +413,7 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
   const originalScheduledDate = value.originalScheduledDate;
   const originalStatus = value.originalStatus;
   const originalScheduledTime = value.originalScheduledTime;
+  const originalPreferredTime = value.originalPreferredTime ?? null;
   const originalEstimatedDurationMinutes = value.originalEstimatedDurationMinutes;
   const legacyReminderOffset = value.originalReminderOffsetMinutes ?? null;
   const originalReminderOffsets =
@@ -414,6 +434,7 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
     typeof originalScheduledDate !== "string" ||
     normalizeLocalDateInput(originalScheduledDate) !== originalScheduledDate ||
     !isValidStoredTime(originalScheduledTime) ||
+    !isValidStoredTime(originalPreferredTime) ||
     !isValidStoredDuration(originalEstimatedDurationMinutes) ||
     !isReminderOffsetList(originalReminderOffsets) ||
     typeof status !== "string" ||
@@ -434,6 +455,12 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
     throw new WebStorageDataError("Stored recovery time requires a recovery date.");
   }
 
+  if (originalPreferredTime !== null && originalScheduledTime !== null) {
+    throw new WebStorageDataError(
+      "Stored Recovery preferred time requires an originally planned task."
+    );
+  }
+
   if (
     (status === "pending" && decision !== null && decision !== "skip") ||
     (status === "resolved" && (decision === null || decision === "skip"))
@@ -451,6 +478,7 @@ export function deserializeRecoveryItemFromWeb(value: unknown): RecoveryItem {
     originalStatus,
     originalScheduledDate,
     originalScheduledTime,
+    originalPreferredTime,
     originalEstimatedDurationMinutes,
     originalReminderOffsets: normalizeReminderOffsets(originalReminderOffsets),
     status,

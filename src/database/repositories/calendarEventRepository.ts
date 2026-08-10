@@ -223,5 +223,7 @@ function compareCalendarEvents(first: CalendarEvent, second: CalendarEvent): num
     return timeOrder;
   }
 
-  return first.createdAt.localeCompare(second.createdAt);
+  return (
+    first.createdAt.localeCompare(second.createdAt) || first.id.localeCompare(second.id)
+  );
 }

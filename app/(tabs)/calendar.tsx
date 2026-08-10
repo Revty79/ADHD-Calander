@@ -35,10 +35,15 @@ import { CalendarEvent } from "../../src/types/calendarEvent";
 import { LocalDateString } from "../../src/types/dateTime";
 import { Task } from "../../src/types/task";
 import {
+  getTaskPreferredTimeLabel,
   getTaskStatusLabel,
   getTaskTimingNote
 } from "../../src/features/tasks/taskPresentation";
-import { getLocalDateString, normalizeLocalDateInput } from "../../src/utils/dates";
+import {
+  formatLocalTimeForDisplay,
+  getLocalDateString,
+  normalizeLocalDateInput
+} from "../../src/utils/dates";
 
 type CalendarView = "month" | "week" | "day";
 
@@ -354,7 +359,10 @@ function WeekView({
               ))}
               {day.plannedTasks.map((task) => (
                 <Text key={task.id} numberOfLines={2} style={styles.weekTaskItem}>
-                  {task.scheduledTime} Task: {task.title}
+                  {task.scheduledTime
+                    ? `${formatLocalTimeForDisplay(task.scheduledTime)} Scheduled: `
+                    : "Scheduled: "}
+                  {task.title}
                   {task.estimatedDurationMinutes
                     ? ` · ${formatDuration(task.estimatedDurationMinutes)}`
                     : ""}
@@ -362,7 +370,10 @@ function WeekView({
               ))}
               {day.flexibleTasks.map((task) => (
                 <Text key={task.id} numberOfLines={2} style={styles.weekTaskItem}>
-                  Flexible: {task.title}
+                  Planned: {task.title}
+                  {getTaskPreferredTimeLabel(task)
+                    ? ` · ${getTaskPreferredTimeLabel(task)}`
+                    : ""}
                   {task.estimatedDurationMinutes
                     ? ` · ${formatDuration(task.estimatedDurationMinutes)}`
                     : ""}
@@ -409,19 +420,19 @@ function DayDetails({
 
       <ScheduleSection
         emptyMessage="No tasks have a start time on this day."
-        title="Planned"
+        title="Scheduled"
       >
         {day.plannedTasks.map((task) => (
-          <TaskScheduleCard key={task.id} task={task} variant="planned" />
+          <TaskScheduleCard key={task.id} task={task} variant="scheduled" />
         ))}
       </ScheduleSection>
 
       <ScheduleSection
-        emptyMessage="No flexible tasks are associated with this date."
-        title="Flexible"
+        emptyMessage="No planned tasks are associated with this date."
+        title="Planned"
       >
         {day.flexibleTasks.map((task) => (
-          <TaskScheduleCard key={task.id} task={task} variant="flexible" />
+          <TaskScheduleCard key={task.id} task={task} variant="planned" />
         ))}
       </ScheduleSection>
 
@@ -493,18 +504,19 @@ function TaskScheduleCard({
   variant
 }: {
   task: Task;
-  variant: "planned" | "flexible";
+  variant: "scheduled" | "planned";
 }) {
   const duration = formatDuration(task.estimatedDurationMinutes);
 
   return (
     <View style={[styles.scheduleCard, styles.taskCard]}>
       <Text style={styles.taskLabel}>
-        {variant === "planned" ? "PLANNED TASK" : "FLEXIBLE TASK"}
+        {variant === "scheduled" ? "SCHEDULED TASK" : "PLANNED TASK"}
       </Text>
       <Text style={styles.scheduleCardTitle}>{task.title}</Text>
       <Text style={styles.scheduleMeta}>
-        {task.scheduledTime ? `${task.scheduledTime} · ` : ""}
+        {task.scheduledTime ? `${formatLocalTimeForDisplay(task.scheduledTime)} · ` : ""}
+        {getTaskPreferredTimeLabel(task) ? `${getTaskPreferredTimeLabel(task)} · ` : ""}
         {duration ? `${duration} · ` : ""}
         {getTaskStatusLabel(task.status)}
       </Text>

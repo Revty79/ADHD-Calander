@@ -29,7 +29,7 @@ import { RecoveryRepository } from "../src/database/repositories/recoveryReposit
 import { SettingsRepository } from "../src/database/repositories/settingsRepository";
 import { CalendarEvent } from "../src/types/calendarEvent";
 import { RecoveryItem, RecoverySession } from "../src/types/recovery";
-import { Task } from "../src/types/task";
+import { getTaskPlanningState, Task } from "../src/types/task";
 
 function createRepository(databaseName: string, indexedDB = new IDBFactory()) {
   let id = 0;
@@ -69,9 +69,12 @@ describe("IndexedDB task storage", () => {
   });
 
   it("initializes an empty web task store", async () => {
-    const repository = await createRepository("initialization-test");
+    const indexedDB = new IDBFactory();
+    const databaseName = "initialization-test";
+    const repository = await createRepository(databaseName, indexedDB);
 
     assert.deepEqual(await repository.getAllTasks(), []);
+    assert.equal((await readIndexedDbSnapshot(indexedDB, databaseName)).version, 9);
   });
 
   it("creates and reads a task after storage reinitialization", async () => {
@@ -89,6 +92,42 @@ describe("IndexedDB task storage", () => {
     const tasks = await reopenedRepository.getAllTasks();
 
     assert.deepEqual(tasks, [createdTask]);
+  });
+
+  it("persists and clears planned preferred time and deadline time", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "task-time-persistence-test";
+    const firstRepository = await createRepository(databaseName, indexedDB);
+    const task = await firstRepository.createTask({
+      title: "Prepare browser notes",
+      scheduledDate: "2026-08-08",
+      preferredTime: "14:00",
+      deadlineDate: "2026-08-09",
+      deadlineTime: "15:30"
+    });
+
+    const reopenedRepository = await createRepository(databaseName, indexedDB);
+    const reopenedTask = await reopenedRepository.getTaskById(task.id);
+
+    assert.equal(reopenedTask.id, task.id);
+    assert.equal(getTaskPlanningState(reopenedTask), "planned");
+    assert.equal(reopenedTask.preferredTime, "14:00");
+    assert.equal(reopenedTask.deadlineTime, "15:30");
+
+    const cleared = await reopenedRepository.updateTask(task.id, {
+      ...reopenedTask,
+      preferredTime: null,
+      deadlineTime: null
+    });
+    const finalRepository = await createRepository(databaseName, indexedDB);
+    const finalTask = await finalRepository.getTaskById(task.id);
+
+    assert.equal(cleared.id, task.id);
+    assert.equal(finalTask.id, task.id);
+    assert.equal(getTaskPlanningState(finalTask), "planned");
+    assert.equal(finalTask.preferredTime, null);
+    assert.equal(finalTask.deadlineDate, "2026-08-09");
+    assert.equal(finalTask.deadlineTime, null);
   });
 
   it("persists started state and multiple reminders after browser restart", async () => {
@@ -216,8 +255,10 @@ describe("IndexedDB task storage", () => {
       parentTaskId: null,
       scheduledDate: "2026-08-06",
       scheduledTime: null,
+      preferredTime: null,
       estimatedDurationMinutes: null,
       deadlineDate: null,
+      deadlineTime: null,
       reminderOffsets: [],
       startedAt: null,
       createdAt: "2026-08-06T15:00:00.000Z",
@@ -317,6 +358,146 @@ describe("IndexedDB task storage", () => {
       (await reopened.taskStorage.getTaskById("version-six-task"))?.reminderOffsets,
       [30]
     );
+  });
+
+  it("opens a previous version eight database without changing existing records", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "version-eight-rollback-compatibility-test";
+    const existingTask: Task = {
+      id: "version-eight-task",
+      title: "Existing completed task",
+      description: "Preserve this history",
+      importance: "important",
+      status: "completed",
+      parentTaskId: null,
+      scheduledDate: "2026-08-08",
+      scheduledTime: "09:30",
+      preferredTime: null,
+      estimatedDurationMinutes: 45,
+      deadlineDate: "2026-08-09",
+      deadlineTime: null,
+      reminderOffsets: [60, 15],
+      startedAt: "2026-08-08T15:00:00.000Z",
+      createdAt: "2026-08-07T14:00:00.000Z",
+      updatedAt: "2026-08-08T16:00:00.000Z",
+      completedAt: "2026-08-08T16:00:00.000Z",
+      deletedAt: null
+    };
+    const existingEvent: CalendarEvent = {
+      id: "version-eight-event",
+      title: "Existing fixed commitment",
+      kind: "fixed",
+      date: "2026-08-08",
+      startTime: "11:00",
+      endTime: null,
+      durationMinutes: 30,
+      notes: "Keep this event",
+      reminderOffsets: [30],
+      createdAt: "2026-08-07T14:00:00.000Z",
+      updatedAt: "2026-08-07T14:00:00.000Z"
+    };
+    const existingRecoveryItem: RecoveryItem = {
+      id: "version-eight-recovery-item",
+      sessionId: "version-eight-recovery-session",
+      taskId: existingTask.id,
+      originalTitle: existingTask.title,
+      originalStatus: "not_started",
+      originalScheduledDate: "2026-08-08",
+      originalScheduledTime: "09:30",
+      originalPreferredTime: null,
+      originalEstimatedDurationMinutes: 45,
+      originalReminderOffsets: [60, 15],
+      status: "resolved",
+      decision: "keep",
+      note: null,
+      rescheduledDate: null,
+      rescheduledTime: null,
+      createdTaskIds: [],
+      reviewedAt: "2026-08-08T17:00:00.000Z",
+      createdAt: "2026-08-08T17:00:00.000Z",
+      updatedAt: "2026-08-08T17:00:00.000Z"
+    };
+    const existingRecoverySession: RecoverySession = {
+      id: existingRecoveryItem.sessionId,
+      sourceDate: "2026-08-08",
+      status: "completed",
+      startedAt: "2026-08-08T17:00:00.000Z",
+      completedAt: "2026-08-08T17:05:00.000Z",
+      items: [existingRecoveryItem]
+    };
+    const existingSettings = [
+      {
+        key: "reminders_enabled",
+        value: "true",
+        updatedAt: "2026-08-07T14:00:00.000Z"
+      },
+      {
+        key: "planning_day_start",
+        value: "07:00",
+        updatedAt: "2026-08-07T14:00:00.000Z"
+      },
+      {
+        key: "transition_buffer_minutes",
+        value: "30",
+        updatedAt: "2026-08-07T14:00:00.000Z"
+      }
+    ];
+
+    await createPreviousVersionEightDatabase(indexedDB, databaseName, {
+      tasks: [
+        {
+          ...omitVersionNineTaskFields(existingTask),
+          plannedTimePreference: "morning"
+        }
+      ],
+      calendarEvents: [serializeCalendarEventForWeb(existingEvent)],
+      recoverySessions: [serializeRecoverySessionForWeb(existingRecoverySession)],
+      recoveryItems: [
+        {
+          ...omitVersionNineRecoveryFields(existingRecoveryItem),
+          originalPlannedTimePreference: "morning"
+        }
+      ],
+      appSettings: existingSettings
+    });
+    const beforeOpen = await readIndexedDbSnapshot(indexedDB, databaseName);
+
+    const storages = await openIndexedDbStorages({
+      databaseName,
+      indexedDB,
+      keyRange: IDBKeyRange
+    });
+    const openedTask = await storages.taskStorage.getTaskById(existingTask.id);
+
+    assert.deepEqual(openedTask, existingTask);
+    assert.deepEqual(await storages.calendarEventStorage.getAllEvents(), [existingEvent]);
+    assert.deepEqual(await storages.recoveryStorage.getSessionsForDate("2026-08-08"), [
+      existingRecoverySession
+    ]);
+    assert.deepEqual(
+      await storages.settingsStorage.getSetting("planning_day_start"),
+      existingSettings[1]
+    );
+    assert.deepEqual(
+      [
+        getTaskPlanningState({
+          ...existingTask,
+          scheduledDate: null,
+          scheduledTime: null
+        }),
+        getTaskPlanningState({ ...existingTask, scheduledTime: null }),
+        getTaskPlanningState(existingTask)
+      ],
+      ["flexible", "planned", "scheduled"]
+    );
+    assert.equal(openedTask && "plannedTimePreference" in openedTask, false);
+    const afterOpen = await readIndexedDbSnapshot(indexedDB, databaseName);
+    const { version: beforeVersion, ...beforeRecords } = beforeOpen;
+    const { version: afterVersion, ...afterRecords } = afterOpen;
+
+    assert.equal(beforeVersion, 8);
+    assert.equal(afterVersion, 9);
+    assert.deepEqual(afterRecords, beforeRecords);
   });
 
   it("persists edits, breakdown relationships, removal, and restoration", async () => {
@@ -573,6 +754,7 @@ describe("IndexedDB recovery storage", () => {
       originalStatus: "not_started",
       originalScheduledDate: "2026-08-06",
       originalScheduledTime: null,
+      originalPreferredTime: null,
       originalEstimatedDurationMinutes: null,
       originalReminderOffsets: [],
       status: "pending",
@@ -753,4 +935,122 @@ function createVersionSixReminderDatabase(
       };
     };
   });
+}
+
+function omitVersionNineTaskFields(task: Task): Record<string, unknown> {
+  const record: Record<string, unknown> = { ...serializeTaskForWeb(task) };
+  delete record.preferredTime;
+  delete record.deadlineTime;
+
+  return record;
+}
+
+function omitVersionNineRecoveryFields(item: RecoveryItem): Record<string, unknown> {
+  const record: Record<string, unknown> = { ...serializeRecoveryItemForWeb(item) };
+  delete record.originalPreferredTime;
+
+  return record;
+}
+
+type IndexedDbSnapshot = {
+  version: number;
+  tasks: unknown[];
+  calendarEvents: unknown[];
+  recoverySessions: unknown[];
+  recoveryItems: unknown[];
+  appSettings: unknown[];
+};
+
+function createPreviousVersionEightDatabase(
+  indexedDB: IDBFactory,
+  databaseName: string,
+  records: Omit<IndexedDbSnapshot, "version">
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(databaseName, 8);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      const taskStore = database.createObjectStore("tasks", { keyPath: "id" });
+      taskStore.createIndex("scheduledDate", "scheduledDate", { unique: false });
+      taskStore.createIndex("updatedAt", "updatedAt", { unique: false });
+      taskStore.createIndex("parentTaskId", "parentTaskId", { unique: false });
+      const eventStore = database.createObjectStore("calendarEvents", {
+        keyPath: "id"
+      });
+      eventStore.createIndex("date", "date", { unique: false });
+      eventStore.createIndex("updatedAt", "updatedAt", { unique: false });
+      const recoverySessionStore = database.createObjectStore("recoverySessions", {
+        keyPath: "id"
+      });
+      recoverySessionStore.createIndex("status", "status", { unique: false });
+      recoverySessionStore.createIndex("completedAt", "completedAt", {
+        unique: false
+      });
+      const recoveryItemStore = database.createObjectStore("recoveryItems", {
+        keyPath: "id"
+      });
+      recoveryItemStore.createIndex("sessionId", "sessionId", { unique: false });
+      recoveryItemStore.createIndex("status", "status", { unique: false });
+      database.createObjectStore("appSettings", { keyPath: "key" });
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const storeNames = Object.keys(records);
+      const transaction = database.transaction(storeNames, "readwrite");
+
+      for (const storeName of storeNames) {
+        for (const record of records[storeName as keyof typeof records]) {
+          transaction.objectStore(storeName).put(record);
+        }
+      }
+
+      transaction.onerror = () => reject(transaction.error);
+      transaction.oncomplete = () => {
+        database.close();
+        resolve();
+      };
+    };
+  });
+}
+
+async function readIndexedDbSnapshot(
+  indexedDB: IDBFactory,
+  databaseName: string
+): Promise<IndexedDbSnapshot> {
+  const database = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(databaseName);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
+  const storeNames = [
+    "tasks",
+    "calendarEvents",
+    "recoverySessions",
+    "recoveryItems",
+    "appSettings"
+  ] as const;
+  const transaction = database.transaction([...storeNames], "readonly");
+  const records = await Promise.all(
+    storeNames.map(
+      (storeName) =>
+        new Promise<unknown[]>((resolve, reject) => {
+          const request = transaction.objectStore(storeName).getAll();
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => resolve(request.result);
+        })
+    )
+  );
+  const [tasks, calendarEvents, recoverySessions, recoveryItems, appSettings] = records;
+  database.close();
+
+  return {
+    version: database.version,
+    tasks: tasks ?? [],
+    calendarEvents: calendarEvents ?? [],
+    recoverySessions: recoverySessions ?? [],
+    recoveryItems: recoveryItems ?? [],
+    appSettings: appSettings ?? []
+  };
 }

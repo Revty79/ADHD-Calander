@@ -86,9 +86,10 @@ Decision: Derive Flexible, Planned, and Scheduled from nullable task date/time
 fields instead of persisting a second planning-state column.
 
 Reason: One source of truth prevents impossible combinations. Flexible clears
-date and time, Planned stores a date without a time, and Scheduled stores both.
-Reminder choices may remain saved while untimed but are inactive until an exact
-date and time exist.
+the planning date and both planning times, Planned stores a date with an optional
+soft `preferredTime`, and Scheduled stores a date plus actual `scheduledTime`.
+Only `scheduledTime` creates a hard placement. Reminder choices may remain saved
+while untimed but are inactive until an exact date and scheduled time exist.
 
 ### One Breakdown Model
 
@@ -148,12 +149,26 @@ usable time, but it does not invent availability.
 
 ### Deadline Is Separate From Schedule
 
-Decision: Add only nullable `Task.deadlineDate` in this phase. Treat it as the
-latest eligible local date, never as an automatic placement.
+Decision: Store nullable `Task.deadlineDate` and nullable `Task.deadlineTime`.
+Treat a date-only deadline as the end of that local calendar day and an exact
+deadline time as a hard finish boundary, never as an automatic placement.
 
-Reason: A deadline is required for useful bounded suggestions, while earliest
-start, preferred time, and energy fields would expand the creation form and
-ranking rules without current evidence.
+Reason: A finish boundary is required for useful bounded suggestions. Local
+date/time strings avoid UTC shifts, and keeping deadline fields separate from
+planning fields permits Flexible, Planned, and Scheduled tasks to share the same
+deadline rules.
+
+### Planned Preferred Time Is Soft
+
+Decision: Store an optional exact local `Task.preferredTime` only on Planned
+tasks. It never derives Scheduled state, reserves Calendar space, blocks a
+scheduling candidate, or activates reminders. Converting to Scheduled moves an
+explicit preferred time into `scheduledTime`; converting back moves the chosen
+start into `preferredTime` while preserving task identity.
+
+Reason: A user can record when work would suit them without representing that
+preference as a fixed commitment. Soft scheduler ranking remains separate
+follow-up work rather than an implied or hidden behavior.
 
 ### Recovery Scheduling Link Deferred
 

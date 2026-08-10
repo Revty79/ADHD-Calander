@@ -6,6 +6,10 @@ import {
   useSchedulingSuggestions
 } from "../../../src/features/scheduling/hooks/useSchedulingSuggestions";
 import { SchedulingSuggestion } from "../../../src/features/scheduling/types";
+import {
+  getTaskDeadlineLabel,
+  getTaskPlanningLabel
+} from "../../../src/features/tasks/taskPresentation";
 import { formatLocalDateForDisplay } from "../../../src/utils/dates";
 
 export default function WebScheduleTaskScreen() {
@@ -79,7 +83,9 @@ export default function WebScheduleTaskScreen() {
           <>
             <section className="web-scheduling-task" aria-labelledby="task-title">
               <div>
-                <p className="web-eyebrow">Flexible task</p>
+                <p className="web-eyebrow">
+                  {getTaskPlanningLabel(scheduling.result.task)} task
+                </p>
                 <h2 id="task-title">{scheduling.result.task.title}</h2>
                 {scheduling.result.task.description ? (
                   <p>{scheduling.result.task.description}</p>
@@ -89,9 +95,7 @@ export default function WebScheduleTaskScreen() {
                 {scheduling.result.task.deadlineDate ? (
                   <div>
                     <dt>Deadline</dt>
-                    <dd>
-                      {formatLocalDateForDisplay(scheduling.result.task.deadlineDate)}
-                    </dd>
+                    <dd>{getTaskDeadlineLabel(scheduling.result.task)}</dd>
                   </div>
                 ) : null}
                 <div>

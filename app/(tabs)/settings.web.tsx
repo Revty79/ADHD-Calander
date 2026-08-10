@@ -3,6 +3,12 @@ import Constants from "expo-constants";
 import { useReminderSettings } from "../../src/features/settings/hooks/useReminderSettings";
 import { usePlanningSettings } from "../../src/features/settings/hooks/usePlanningSettings";
 import {
+  formatPlanningTime,
+  formatSuggestedTaskTimeOption,
+  formatTransitionBufferOption,
+  planningSettingsSummary
+} from "../../src/features/settings/planningPresentation";
+import {
   maxSuggestedTaskMinutesOptions,
   planningDayEndOptions,
   planningDayStartOptions,
@@ -104,7 +110,7 @@ export default function WebSettingsScreen() {
                   )
                 }
                 options={transitionBufferOptions.map((value) => ({
-                  label: value === 0 ? "None" : `${value} minutes`,
+                  label: formatTransitionBufferOption(value),
                   value: String(value)
                 }))}
                 value={String(planning.settings.transitionBufferMinutes)}
@@ -119,15 +125,12 @@ export default function WebSettingsScreen() {
                   )
                 }
                 options={maxSuggestedTaskMinutesOptions.map((value) => ({
-                  label: `${value / 60} hours`,
+                  label: formatSuggestedTaskTimeOption(value),
                   value: String(value)
                 }))}
                 value={String(planning.settings.maxSuggestedTaskMinutesPerDay)}
               />
-              <p className="web-form-hint">
-                Suggestions search seven days by default and never place a task without
-                your confirmation.
-              </p>
+              <p className="web-form-hint">{planningSettingsSummary}</p>
             </div>
           )}
         </SettingsSection>
@@ -244,14 +247,4 @@ function PlanningSelect({
       </select>
     </div>
   );
-}
-
-function formatPlanningTime(value: string): string {
-  const [hours, minutes] = value.split(":").map(Number);
-  const date = new Date(2026, 0, 1, hours ?? 0, minutes ?? 0);
-
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit"
-  }).format(date);
 }

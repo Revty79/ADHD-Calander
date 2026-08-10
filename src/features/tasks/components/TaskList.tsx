@@ -3,10 +3,15 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { formatReminderOffsets } from "../../../notifications/reminderRules";
 import { isTaskActive, Task } from "../../../types/task";
-import { formatLocalDateForDisplay } from "../../../utils/dates";
 import {
+  formatLocalDateForDisplay,
+  formatLocalTimeForDisplay
+} from "../../../utils/dates";
+import {
+  getTaskDeadlineLabel,
   getTaskImportanceLabel,
   getTaskPlanningLabel,
+  getTaskPreferredTimeLabel,
   getTaskStatusLabel,
   getTaskTimingNote
 } from "../taskPresentation";
@@ -65,7 +70,12 @@ export function TaskList({
                     </Text>
                   ) : null}
                   {task.scheduledTime ? (
-                    <Text style={styles.metaText}>{task.scheduledTime}</Text>
+                    <Text style={styles.metaText}>
+                      {formatLocalTimeForDisplay(task.scheduledTime)}
+                    </Text>
+                  ) : null}
+                  {getTaskPreferredTimeLabel(task) ? (
+                    <Text style={styles.metaText}>{getTaskPreferredTimeLabel(task)}</Text>
                   ) : null}
                   {task.estimatedDurationMinutes ? (
                     <Text style={styles.metaText}>
@@ -74,7 +84,7 @@ export function TaskList({
                   ) : null}
                   {task.deadlineDate ? (
                     <Text style={styles.metaText}>
-                      Deadline {formatLocalDateForDisplay(task.deadlineDate)}
+                      Deadline {getTaskDeadlineLabel(task)}
                     </Text>
                   ) : null}
                   {task.reminderOffsets.length > 0 ? (

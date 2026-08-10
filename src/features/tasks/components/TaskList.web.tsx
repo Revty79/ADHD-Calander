@@ -2,10 +2,15 @@ import { Link } from "expo-router";
 
 import { formatReminderOffsets } from "../../../notifications/reminderRules";
 import { isTaskActive, Task } from "../../../types/task";
-import { formatLocalDateForDisplay } from "../../../utils/dates";
 import {
+  formatLocalDateForDisplay,
+  formatLocalTimeForDisplay
+} from "../../../utils/dates";
+import {
+  getTaskDeadlineLabel,
   getTaskImportanceLabel,
   getTaskPlanningLabel,
+  getTaskPreferredTimeLabel,
   getTaskStatusLabel,
   getTaskTimingNote
 } from "../taskPresentation";
@@ -69,13 +74,18 @@ export function TaskList({
                     )
                   ) : null}
                   {task.scheduledTime ? (
-                    <time dateTime={task.scheduledTime}>{task.scheduledTime}</time>
+                    <time dateTime={task.scheduledTime}>
+                      {formatLocalTimeForDisplay(task.scheduledTime)}
+                    </time>
+                  ) : null}
+                  {getTaskPreferredTimeLabel(task) ? (
+                    <span>{getTaskPreferredTimeLabel(task)}</span>
                   ) : null}
                   {task.estimatedDurationMinutes ? (
                     <span>{task.estimatedDurationMinutes} min estimate</span>
                   ) : null}
                   {task.deadlineDate ? (
-                    <span>Deadline {formatLocalDateForDisplay(task.deadlineDate)}</span>
+                    <span>Deadline {getTaskDeadlineLabel(task)}</span>
                   ) : null}
                   {task.reminderOffsets.length > 0 ? (
                     <span>Reminders: {formatReminderOffsets(task.reminderOffsets)}</span>

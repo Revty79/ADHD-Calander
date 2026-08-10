@@ -115,6 +115,7 @@ export class RecoveryRepository {
           ...task,
           scheduledDate: null,
           scheduledTime: null,
+          preferredTime: null,
           updatedAt: timestamp
         }
       ],
@@ -147,6 +148,7 @@ export class RecoveryRepository {
           ...task,
           scheduledDate,
           scheduledTime,
+          preferredTime: scheduledTime === null ? task.preferredTime : null,
           updatedAt: timestamp
         }
       ],
@@ -272,6 +274,7 @@ export class RecoveryRepository {
         status: item.originalStatus,
         scheduledDate: item.originalScheduledDate,
         scheduledTime: item.originalScheduledTime,
+        preferredTime: item.originalPreferredTime,
         reminderOffsets: item.originalReminderOffsets,
         completedAt: null,
         updatedAt: timestamp
@@ -431,6 +434,7 @@ function createRecoveryItem(
     originalStatus: task.status,
     originalScheduledDate: sourceDate,
     originalScheduledTime: task.scheduledTime,
+    originalPreferredTime: task.preferredTime,
     originalEstimatedDurationMinutes: task.estimatedDurationMinutes,
     originalReminderOffsets: [...task.reminderOffsets],
     status: "pending",
@@ -460,8 +464,10 @@ function createUnscheduledTask(
     parentTaskId,
     scheduledDate: null,
     scheduledTime: null,
+    preferredTime: null,
     estimatedDurationMinutes: null,
     deadlineDate: null,
+    deadlineTime: null,
     reminderOffsets: [],
     startedAt: null,
     createdAt: timestamp,

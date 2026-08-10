@@ -11,10 +11,11 @@ the existing task changes.
 The domain distinction remains explicit:
 
 - `CalendarEvent` is a fixed commitment and is never moved by the scheduler.
-- A task with a date and start time is scheduled flexible work and blocks that
+- A task with a date and actual start time is Scheduled work and blocks that
   interval while active.
-- A task with no start time is flexible/unscheduled work. A date without a time
-  does not claim an exact interval.
+- A task with no date is Flexible work. A date without an actual start time is
+  Planned work and does not claim an exact interval, even when it has an exact
+  soft `preferredTime`.
 
 ## Boundaries
 
@@ -34,7 +35,9 @@ calm refresh message.
 ## Candidate-Window Rules
 
 1. Search local dates from today through the bounded horizon, stopping at the
-   task's deadline when one exists.
+   task's deadline when one exists. On an exact deadline date, a candidate must
+   finish no later than `deadlineTime`; a date-only deadline ends at the end of
+   that local calendar day.
 2. Search only between the configured planning-day start and end. On today,
    search begins after the current local time rounded to the next 15-minute
    increment.
@@ -55,6 +58,11 @@ calm refresh message.
 9. Candidate starts use 15-minute increments. The engine produces the earliest
    fitting start in each free gap rather than treating every possible increment
    as a separate productivity opportunity.
+
+`preferredTime` is deliberately absent from hard-window calculation. It does
+not create a busy interval or reject an otherwise valid candidate. Soft ranking
+around that preference is deferred; the current engine does not imply that a
+preferred time affected a suggestion.
 
 The default preferences are 08:00-20:00 planning hours, 15 minutes around fixed
 events, and 180 maximum suggested task minutes per day. These are planning
@@ -96,7 +104,8 @@ Selecting a card does not persist anything. A separate Confirm schedule action
 is required.
 
 Acceptance preserves task ID, title, description, status, deadline, and record
-history. It updates the task's local scheduled date/time and stores the selected
+history. It updates the task's local scheduled date/time, clears the former soft
+`preferredTime` because the task is now Scheduled, and stores the selected
 estimate when needed. It never creates a `CalendarEvent` or duplicate task.
 Calendar and Today observe the same task record through their existing refresh
 flows.
@@ -126,7 +135,7 @@ conversion is introduced for schedule placement.
 - AI, LLM, natural-language scheduling, and opaque optimization
 - Automatic scheduling or rescheduling
 - Predictive energy or mental-state inference
-- Earliest-start and preferred-time task fields
+- Earliest-start task fields and soft preferred-time candidate ranking
 - Energy requirements and user energy profiles
 - Weekly availability editors and recurring availability
 - Manual time-picker scheduling from the no-window screen

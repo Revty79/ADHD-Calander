@@ -14,6 +14,7 @@ import {
   SchedulingSuggestionUnavailableError
 } from "../src/features/scheduling/schedulingService";
 import { SchedulingEngineInput } from "../src/features/scheduling/types";
+import { doesTaskPlacementMeetDeadline } from "../src/features/tasks/taskDeadline";
 import { ReminderSynchronizer } from "../src/notifications/reminderSynchronizer";
 import { CalendarEvent } from "../src/types/calendarEvent";
 import { PlanningPreferences } from "../src/types/settings";
@@ -133,6 +134,65 @@ describe("rule-based scheduling engine", () => {
       ["2026-08-10", "2026-08-11"]
     );
     assert.ok(suggestions.every((suggestion) => suggestion.date <= "2026-08-11"));
+  });
+
+  it("requires suggestions to finish by an exact local deadline", () => {
+    const suggestions = generate({
+      task: createTask({
+        estimatedDurationMinutes: 30,
+        deadlineDate: "2026-08-10",
+        deadlineTime: "09:00"
+      }),
+      preferences: { ...defaultPreferences, planningDayEnd: "12:00" },
+      horizonDays: 1
+    });
+
+    assert.deepEqual(
+      suggestions.map(({ startTime, endTime }) => [startTime, endTime]),
+      [["08:00", "08:30"]]
+    );
+    assert.match(suggestions[0]?.explanation ?? "", /09:00 deadline/);
+  });
+
+  it("treats a date-only deadline as end of local day", () => {
+    const deadline = { deadlineDate: "2026-08-10", deadlineTime: null } as const;
+
+    assert.equal(
+      doesTaskPlacementMeetDeadline(
+        {
+          scheduledDate: "2026-08-10",
+          scheduledTime: "23:30",
+          estimatedDurationMinutes: 30
+        },
+        deadline
+      ),
+      true
+    );
+    assert.equal(
+      doesTaskPlacementMeetDeadline(
+        {
+          scheduledDate: "2026-08-10",
+          scheduledTime: "23:30",
+          estimatedDurationMinutes: 31
+        },
+        deadline
+      ),
+      false
+    );
+  });
+
+  it("keeps a planned preferred time soft and non-blocking", () => {
+    const suggestions = generate({
+      task: createTask({
+        scheduledDate: "2026-08-10",
+        preferredTime: "17:00",
+        estimatedDurationMinutes: 30
+      }),
+      preferences: { ...defaultPreferences, planningDayEnd: "10:00" },
+      horizonDays: 1
+    });
+
+    assert.equal(suggestions[0]?.startTime, "08:00");
   });
 
   it("preserves local calendar strings without UTC conversion", () => {
@@ -297,9 +357,10 @@ describe("scheduling acceptance workflow", () => {
     const task = await taskRepository.createTask({
       title: "Prepare the application",
       scheduledDate: "2026-08-12",
-      scheduledTime: "18:00",
+      preferredTime: "18:00",
       estimatedDurationMinutes: 30,
       deadlineDate: "2026-08-13",
+      deadlineTime: "17:00",
       reminderOffsets: [10]
     });
     await eventRepository.createEvent({
@@ -322,7 +383,9 @@ describe("scheduling acceptance workflow", () => {
     assert.equal(scheduled.id, task.id);
     assert.equal(scheduled.scheduledDate, suggestion.date);
     assert.equal(scheduled.scheduledTime, suggestion.startTime);
+    assert.equal(scheduled.preferredTime, null);
     assert.equal(scheduled.deadlineDate, "2026-08-13");
+    assert.equal(scheduled.deadlineTime, "17:00");
     assert.deepEqual(scheduled.reminderOffsets, [10]);
     assert.equal((await taskStorage.getAllTasks()).length, 1);
     assert.equal(synchronizer.tasks.at(-1)?.id, task.id);
@@ -334,7 +397,9 @@ describe("scheduling acceptance workflow", () => {
 
     assert.equal(restored?.scheduledDate, suggestion.date);
     assert.equal(restored?.scheduledTime, suggestion.startTime);
+    assert.equal(restored?.preferredTime, null);
     assert.equal(restored?.deadlineDate, "2026-08-13");
+    assert.equal(restored?.deadlineTime, "17:00");
   });
 
   it("revalidates a suggestion before acceptance", async () => {
@@ -426,8 +491,10 @@ function createTask(overrides: Partial<Task> = {}): Task {
     parentTaskId: null,
     scheduledDate: null,
     scheduledTime: null,
+    preferredTime: null,
     estimatedDurationMinutes: 30,
     deadlineDate: null,
+    deadlineTime: null,
     reminderOffsets: [],
     startedAt: null,
     createdAt: timestamp,

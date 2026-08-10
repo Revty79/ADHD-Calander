@@ -40,8 +40,10 @@ export type Task = {
   parentTaskId: string | null;
   scheduledDate: LocalDateString | null;
   scheduledTime: LocalTimeString | null;
+  preferredTime: LocalTimeString | null;
   estimatedDurationMinutes: number | null;
   deadlineDate: LocalDateString | null;
+  deadlineTime: LocalTimeString | null;
   reminderOffsets: ReminderOffsetMinutes[];
   startedAt: string | null;
   createdAt: string;
@@ -56,8 +58,10 @@ export type CreateTaskInput = {
   importance?: TaskImportance;
   scheduledDate?: string | null;
   scheduledTime?: string | null;
+  preferredTime?: string | null;
   estimatedDurationMinutes?: number | null;
   deadlineDate?: string | null;
+  deadlineTime?: string | null;
   reminderOffsets?: number[];
 };
 

@@ -25,6 +25,7 @@ export type RecoveryItem = {
   originalStatus: TaskStatus;
   originalScheduledDate: LocalDateString;
   originalScheduledTime: LocalTimeString | null;
+  originalPreferredTime: LocalTimeString | null;
   originalEstimatedDurationMinutes: number | null;
   originalReminderOffsets: ReminderOffsetMinutes[];
   status: RecoveryItemStatus;

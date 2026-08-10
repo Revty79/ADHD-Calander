@@ -19,6 +19,9 @@ Shared code continues to own:
 - Task ordering and non-deleted task filtering.
 - Repository errors and user-facing persistence wording.
 - Native database migrations and storage contracts.
+- Task-editor state transitions and submitted domain input.
+- Recap date validation and route-date fallback behavior.
+- Planning-setting labels and explanatory copy.
 
 Platform-specific files own:
 
@@ -63,7 +66,7 @@ return to Today, Tasks, or its selected Calendar date.
 
 Native builds continue to initialize Expo SQLite, apply versioned SQL
 migrations, and use SQL storage adapters. The web build opens IndexedDB database
-`adhd-calendar-web` at version 7 with `tasks`, `calendarEvents`,
+`adhd-calendar-web` at version 9 with `tasks`, `calendarEvents`,
 `recoverySessions`, `recoveryItems`, and `appSettings` stores.
 
 `TaskRepository`, `CalendarEventRepository`, and `RecoveryRepository` depend on
@@ -74,8 +77,15 @@ transaction.
 
 IndexedDB version 7 stores task and event reminder-offset arrays, Recovery
 reminder snapshots, and task execution timestamps. Its upgrade path converts
-version 6 single-reminder records and preserves in-progress tasks. Legacy fields
-remain readable as a compatibility fallback.
+version 6 single-reminder records and preserves in-progress tasks. Version 8 is
+a forward-only compatibility marker retained after the planned-time-preference
+product rollback. It performs no current product migration, allows databases
+already opened by the former version 8 build to reopen, and leaves existing
+records unchanged. Version 9 advances storage forward without rewriting records;
+missing `preferredTime`, `deadlineTime`, and Recovery `originalPreferredTime`
+values deserialize as `null` until the record is next written normally. Legacy
+version 8 planned-period fields remain readable but ignored as a compatibility
+fallback.
 
 `SettingsRepository` uses the `appSettings` store through a shared storage
 contract. `ReminderService` is also composed on web, but receives
@@ -87,7 +97,7 @@ Android app and never asks for browser notification permission.
 IndexedDB recovery sessions are filtered by source date in the adapter without
 an object-store version change. Legacy task records that omit `completedAt` are
 read as having an unknown completion time, and records that omit `deadlineDate`
-are read with no deadline.
+or its optional `deadlineTime` are read with no deadline date or exact time.
 
 IndexedDB was selected because Expo SQLite web support in the installed SDK 57
 is documented as alpha and requires WebAssembly configuration plus

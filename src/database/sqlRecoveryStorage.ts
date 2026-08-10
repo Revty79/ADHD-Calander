@@ -28,6 +28,7 @@ type RecoveryItemRow = {
   originalStatus: TaskStatus;
   originalScheduledDate: LocalDateString;
   originalScheduledTime: LocalTimeString | null;
+  originalPreferredTime: LocalTimeString | null;
   originalEstimatedDurationMinutes: number | null;
   originalReminderOffsets: string;
   status: RecoveryItemStatus;
@@ -60,6 +61,7 @@ const itemSelect = `
     original_status AS originalStatus,
     original_scheduled_date AS originalScheduledDate,
     original_scheduled_time AS originalScheduledTime,
+    original_preferred_time AS originalPreferredTime,
     original_estimated_duration_minutes AS originalEstimatedDurationMinutes,
     original_reminder_offsets AS originalReminderOffsets,
     status,
@@ -207,6 +209,7 @@ export class SqlRecoveryStorage implements RecoveryStorage {
           original_status,
           original_scheduled_date,
           original_scheduled_time,
+          original_preferred_time,
           original_estimated_duration_minutes,
           original_reminder_offsets,
           status,
@@ -218,7 +221,7 @@ export class SqlRecoveryStorage implements RecoveryStorage {
           reviewed_at,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       item.id,
       item.sessionId,
@@ -227,6 +230,7 @@ export class SqlRecoveryStorage implements RecoveryStorage {
       item.originalStatus,
       item.originalScheduledDate,
       item.originalScheduledTime,
+      item.originalPreferredTime,
       item.originalEstimatedDurationMinutes,
       JSON.stringify(item.originalReminderOffsets),
       item.status,
@@ -286,6 +290,7 @@ function mapRecoveryItemRow(row: RecoveryItemRow): RecoveryItem {
     originalStatus: row.originalStatus,
     originalScheduledDate: row.originalScheduledDate,
     originalScheduledTime: row.originalScheduledTime,
+    originalPreferredTime: row.originalPreferredTime,
     originalEstimatedDurationMinutes: row.originalEstimatedDurationMinutes,
     originalReminderOffsets: parseStoredReminderOffsets(row.originalReminderOffsets),
     status: row.status,

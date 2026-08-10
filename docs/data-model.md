@@ -61,8 +61,11 @@ Android and future iOS builds use Expo SQLite with versioned SQL migrations.
 | `parent_task_id`             | text    | Optional self-reference for a smaller task created by breakdown.                                                |
 | `scheduled_date`             | text    | Optional local `YYYY-MM-DD` date.                                                                               |
 | `scheduled_time`             | text    | Optional local `HH:MM` time; requires a scheduled date.                                                         |
+| `preferred_time`             | text    | Optional local `HH:MM` soft preference; requires a scheduled date and no `scheduled_time`.                      |
+| `planned_time_preference`    | text    | Compatibility-only migration 008 field; retained but ignored by current product behavior.                       |
 | `estimated_duration_minutes` | integer | Optional positive whole-number estimate.                                                                        |
 | `deadline_date`              | text    | Optional local `YYYY-MM-DD` last day; distinct from planned date/time.                                          |
+| `deadline_time`              | text    | Optional local `HH:MM` finish boundary; requires `deadline_date`. Date-only deadlines end at local midnight.    |
 | `reminder_offset_minutes`    | integer | Legacy single-reminder column retained for upgrade compatibility; new writes use `reminder_offsets`.            |
 | `reminder_offsets`           | text    | JSON array of up to five unique reminder offsets; supported values are `0`, `10`, `15`, `30`, `60`, and `1440`. |
 | `started_at`                 | text    | Optional ISO timestamp for the most recent Start task action.                                                   |
@@ -72,8 +75,11 @@ Android and future iOS builds use Expo SQLite with versioned SQL migrations.
 | `deleted_at`                 | text    | Optional ISO timestamp reserved for future soft deletion.                                                       |
 
 Planning state is derived rather than stored redundantly: no date is Flexible,
-a date without a time is Planned, and a date with a time is Scheduled. A
-deadline remains independent from all three states.
+a date without `scheduled_time` is Planned, and a date with `scheduled_time` is
+Scheduled. A Planned task may have `preferred_time` without becoming Scheduled
+or claiming a hard interval. A deadline remains independent from all three
+states. Without `deadline_time`, its boundary is the end of the local deadline
+date; an exact deadline time is a hard finish boundary.
 
 Execution state is separate: `not_started`, `started`, and `completed` describe
 whether work has begun, while the date/time fields describe planning. Pausing
@@ -134,6 +140,8 @@ A partial unique index permits only one `active` session.
 | `original_status`                     | text    | Snapshot used when an active decision is reopened.                         |
 | `original_scheduled_date`             | text    | Snapshot local date.                                                       |
 | `original_scheduled_time`             | text    | Optional snapshot local time.                                              |
+| `original_preferred_time`             | text    | Optional Planned soft-time snapshot restored when a decision is reopened.  |
+| `original_planned_time_preference`    | text    | Compatibility-only migration 008 snapshot; retained but ignored.           |
 | `original_estimated_duration_minutes` | integer | Optional snapshot estimate.                                                |
 | `original_reminder_offset_minutes`    | integer | Legacy single-reminder snapshot retained for upgrade compatibility.        |
 | `original_reminder_offsets`           | text    | JSON-array reminder snapshot used when a decision is reopened.             |
@@ -215,6 +223,25 @@ Any legacy `started` row receives its existing `updated_at` as the best
 available factual start timestamp. Legacy reminder columns remain in place so
 upgrading an installed APK never requires destructive table replacement.
 
+### Version 8: `planned_time_preferences`
+
+`src/database/migrations/008_planned_time_preferences.ts` remains in migration
+history so databases upgraded by the reverted release and fresh installations
+share one forward-only schema version. It retains nullable
+`tasks.planned_time_preference` and the defaulted Recovery snapshot column
+`recovery_items.original_planned_time_preference`. Current repositories, types,
+validation, scheduling, and UI deliberately ignore both compatibility fields;
+task planning remains derived only as Flexible, Planned, or Scheduled.
+
+### Version 9: `task_preferred_deadline_times`
+
+`src/database/migrations/009_task_preferred_deadline_times.ts` adds nullable
+`tasks.preferred_time`, nullable `tasks.deadline_time`, and nullable
+`recovery_items.original_preferred_time`. Existing rows receive `null` for all
+three fields, so task identity, execution history, reminders, scheduling,
+Recovery, Recap, event, and settings data remain unchanged. Migration 8 remains
+applied and its compatibility-only fields remain present but unused.
+
 ### Daily Recap Foundation
 
 No migration is required. Recap derives its view from the existing nullable
@@ -223,7 +250,7 @@ does not persist duplicate daily summary rows.
 
 ## Web Persistence
 
-The web build uses IndexedDB database version 7. It has:
+The web build uses IndexedDB database version 9. It has:
 
 - `tasks`, keyed by task ID with `scheduledDate`, `updatedAt`, and `parentTaskId`
   indexes.
@@ -240,13 +267,20 @@ the parent-task index without rewriting records. Version 7 upgrades legacy
 single reminder fields to arrays and adds nullable `startedAt`. Older task,
 event, and Recovery item records also retain fallback readers, so a record that
 has not yet been rewritten still produces an empty or one-element reminder
-array safely.
-Older task records without `estimatedDurationMinutes` deserialize with a `null`
-estimate, and records without `deadlineDate` receive a `null` deadline. Older
-task records without `importance` receive `normal`, records without
-`parentTaskId` receive `null`, and records that omit `completedAt` deserialize with a `null`
-completion time and are not assigned to a historical Recap date. Stored records
-are validated when read.
+array safely. Version 8 is retained as a compatibility marker so browsers that
+already reached version 8 never receive a prohibited downgrade request. The
+current app performs no planned-time-preference product migration and ignores
+any former `plannedTimePreference` record fields while preserving records on
+open. Version 9 advances the database version without rewriting records. Its
+readers treat missing `preferredTime`, `deadlineTime`, and Recovery
+`originalPreferredTime` fields as `null`; records receive these values on their
+next ordinary domain write. Older task records without
+`estimatedDurationMinutes` deserialize with a `null` estimate, and records
+without `deadlineDate` receive a `null` deadline. Older task records without
+`importance` receive `normal`, records without `parentTaskId` receive `null`,
+and records that omit `completedAt` deserialize with a `null` completion time
+and are not assigned to a historical Recap date. Stored records are validated
+when read.
 
 Browser data is local to the browser profile and application origin. It remains
 after refreshes and ordinary browser restarts, but private browsing, storage
@@ -259,8 +293,9 @@ Recurring events, event editing/deletion, time zones,
 all-day events, external calendar identifiers, advanced notification policy,
 quiet hours, default reminders, custom reminder offsets, day plans,
 recovery analytics, multi-level projects, partial-progress measurement,
-earliest-start constraints,
-preferred work periods, energy requirements, import/export, accounts, and cloud
+earliest-start constraints, recurring preferred work periods, soft scheduler
+ranking around a task's exact preferred time, energy requirements, import/export,
+accounts, and cloud
 synchronization are not part of this foundation.
 
 Cloud synchronization remains unapproved. A future design must explicitly

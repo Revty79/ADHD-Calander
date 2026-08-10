@@ -14,13 +14,18 @@ import { Screen } from "../../../src/components/Screen";
 import { formatReminderOffsets } from "../../../src/notifications/reminderRules";
 import { useTaskDetail } from "../../../src/features/tasks/hooks/useTaskDetail";
 import {
+  getTaskDeadlineLabel,
   getTaskImportanceLabel,
   getTaskPlanningLabel,
+  getTaskPreferredTimeLabel,
   getTaskStatusLabel,
   getTaskTimingNote
 } from "../../../src/features/tasks/taskPresentation";
 import { getTaskPlanningState, isTaskActive, Task } from "../../../src/types/task";
-import { formatLocalDateForDisplay } from "../../../src/utils/dates";
+import {
+  formatLocalDateForDisplay,
+  formatLocalTimeForDisplay
+} from "../../../src/utils/dates";
 
 export default function TaskDetailScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -129,15 +134,19 @@ export default function TaskDetailScreen() {
               : "No planned date"
           }
         />
-        <DetailRow label="Scheduled time" value={task.scheduledTime ?? "No time"} />
         <DetailRow
-          label="Deadline"
+          label="Preferred time"
+          value={getTaskPreferredTimeLabel(task) ?? "No preference"}
+        />
+        <DetailRow
+          label="Scheduled time"
           value={
-            task.deadlineDate
-              ? formatLocalDateForDisplay(task.deadlineDate)
-              : "No deadline"
+            task.scheduledTime
+              ? formatLocalTimeForDisplay(task.scheduledTime)
+              : "No scheduled time"
           }
         />
+        <DetailRow label="Deadline" value={getTaskDeadlineLabel(task)} />
         <DetailRow
           label="Estimated duration"
           value={

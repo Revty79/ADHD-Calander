@@ -8,7 +8,6 @@ import {
 import {
   maxRemindersPerItem,
   ReminderOffsetMinutes,
-  ReminderPermissionStatus,
   reminderSelectionOptions
 } from "../../../types/reminder";
 import {
@@ -24,6 +23,14 @@ import {
   getPlannedDateQuickChoices,
   TaskDateQuickChoice
 } from "../taskDateChoices";
+import {
+  buildTaskEditorInput,
+  getTaskPlanningTransition,
+  getTaskReminderDisabledMessage,
+  taskDurationOptions,
+  taskImportanceOptions,
+  taskPlanningOptions
+} from "../taskEditorModel";
 
 type FieldErrors = Partial<Record<TaskValidationError["field"], string>>;
 
@@ -33,18 +40,6 @@ type Props = {
   onSubmit(input: CreateTaskInput): Promise<void>;
   submitLabel: string;
 };
-
-const durationOptions = [null, 10, 15, 30, 45, 60, 90, 120] as const;
-const importanceOptions: { label: string; value: TaskImportance }[] = [
-  { label: "Low", value: "low" },
-  { label: "Normal", value: "normal" },
-  { label: "Important", value: "important" }
-];
-const planningOptions: { label: string; value: TaskPlanningState }[] = [
-  { label: "Flexible", value: "flexible" },
-  { label: "Planned", value: "planned" },
-  { label: "Scheduled", value: "scheduled" }
-];
 
 export function TaskEditorForm({
   initialDate = "",
@@ -65,10 +60,12 @@ export function TaskEditorForm({
     initialTask?.scheduledDate ?? initialDate
   );
   const [scheduledTime, setScheduledTime] = useState(initialTask?.scheduledTime ?? "");
+  const [preferredTime, setPreferredTime] = useState(initialTask?.preferredTime ?? "");
   const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState<number | null>(
     initialTask?.estimatedDurationMinutes ?? null
   );
   const [deadlineDate, setDeadlineDate] = useState(initialTask?.deadlineDate ?? "");
+  const [deadlineTime, setDeadlineTime] = useState(initialTask?.deadlineTime ?? "");
   const [reminderOffsets, setReminderOffsets] = useState<ReminderOffsetMinutes[]>(
     initialTask?.reminderOffsets ?? []
   );
@@ -80,16 +77,18 @@ export function TaskEditorForm({
   const [isSaving, setIsSaving] = useState(false);
 
   function choosePlanningState(nextState: TaskPlanningState) {
-    setPlanningState(nextState);
+    const transition = getTaskPlanningTransition(
+      nextState,
+      scheduledDate,
+      scheduledTime,
+      preferredTime,
+      getPlannedDateQuickChoices(referenceDate)[0]?.value ?? ""
+    );
 
-    if (nextState === "flexible") {
-      setScheduledDate("");
-      setScheduledTime("");
-    } else if (nextState === "planned") {
-      setScheduledTime("");
-    } else if (!scheduledDate) {
-      setScheduledDate(getPlannedDateQuickChoices(referenceDate)[0]?.value ?? "");
-    }
+    setPlanningState(transition.planningState);
+    setScheduledDate(transition.scheduledDate);
+    setScheduledTime(transition.scheduledTime);
+    setPreferredTime(transition.preferredTime);
   }
 
   async function saveTask(event: FormEvent<HTMLFormElement>) {
@@ -99,16 +98,21 @@ export function TaskEditorForm({
     setIsSaving(true);
 
     try {
-      await onSubmit({
-        title,
-        description,
-        importance,
-        scheduledDate: planningState === "flexible" ? null : scheduledDate,
-        scheduledTime: planningState === "scheduled" ? scheduledTime : null,
-        estimatedDurationMinutes,
-        deadlineDate,
-        reminderOffsets
-      });
+      await onSubmit(
+        buildTaskEditorInput({
+          title,
+          description,
+          importance,
+          planningState,
+          scheduledDate,
+          scheduledTime,
+          preferredTime,
+          estimatedDurationMinutes,
+          deadlineDate,
+          deadlineTime,
+          reminderOffsets
+        })
+      );
     } catch (error) {
       if (error instanceof TaskValidationError) {
         setFieldErrors({ [error.field]: error.message });
@@ -120,7 +124,7 @@ export function TaskEditorForm({
     }
   }
 
-  const reminderDisabledMessage = getReminderDisabledMessage(
+  const reminderDisabledMessage = getTaskReminderDisabledMessage(
     planningState,
     reminderSettings.status?.permissionStatus,
     reminderSettings.status?.settings.remindersEnabled
@@ -167,16 +171,16 @@ export function TaskEditorForm({
             legend="Importance"
             name="task-importance"
             onChange={setImportance}
-            options={importanceOptions}
+            options={taskImportanceOptions}
             value={importance}
           />
 
           <ChoiceFieldset<TaskPlanningState>
-            help="Flexible has no date. Planned has a date. Scheduled has a date and time."
+            help="Flexible has no date. Planned has a date and optional preferred time. Scheduled has a fixed date and start time."
             legend="Planning state"
             name="task-planning-state"
             onChange={choosePlanningState}
-            options={planningOptions}
+            options={taskPlanningOptions}
             value={planningState}
           />
 
@@ -227,11 +231,47 @@ export function TaskEditorForm({
             </div>
           ) : null}
 
+          {planningState === "planned" ? (
+            <div className="web-form-group">
+              <label htmlFor="task-preferred-time">
+                Preferred time <span>Optional</span>
+              </label>
+              <small id="task-preferred-time-help">
+                This is a preference, not a fixed calendar reservation.
+              </small>
+              <input
+                aria-describedby={
+                  fieldErrors.preferredTime
+                    ? "task-preferred-time-help task-preferred-time-error"
+                    : "task-preferred-time-help"
+                }
+                aria-invalid={fieldErrors.preferredTime ? true : undefined}
+                id="task-preferred-time"
+                onChange={(event) => setPreferredTime(event.currentTarget.value)}
+                type="time"
+                value={preferredTime}
+              />
+              {preferredTime ? (
+                <button
+                  className="web-text-button"
+                  onClick={() => setPreferredTime("")}
+                  type="button"
+                >
+                  Clear preferred time
+                </button>
+              ) : null}
+              <FieldError
+                id="task-preferred-time-error"
+                message={fieldErrors.preferredTime}
+              />
+            </div>
+          ) : null}
+
           <fieldset className="web-choice-fieldset">
             <legend>Estimated duration</legend>
             <small>Choose a practical estimate if it helps.</small>
             <div className="web-choice-options">
-              {durationOptions.map((duration) => (
+              {taskDurationOptions.map((duration) => (
                 <label key={duration ?? "none"}>
                   <input
                     checked={duration === estimatedDurationMinutes}
@@ -262,7 +302,14 @@ export function TaskEditorForm({
               }
               aria-invalid={fieldErrors.deadlineDate ? true : undefined}
               id="task-deadline"
-              onChange={(event) => setDeadlineDate(event.currentTarget.value)}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setDeadlineDate(value);
+
+                if (!value) {
+                  setDeadlineTime("");
+                }
+              }}
               ref={deadlineInput}
               type="date"
               value={deadlineDate}
@@ -270,7 +317,13 @@ export function TaskEditorForm({
             <DateQuickChoices
               choices={getDeadlineQuickChoices(referenceDate)}
               name="deadline"
-              onChange={(value) => setDeadlineDate(value ?? "")}
+              onChange={(value) => {
+                setDeadlineDate(value ?? "");
+
+                if (value === null) {
+                  setDeadlineTime("");
+                }
+              }}
               value={deadlineDate}
             />
             <button
@@ -286,8 +339,56 @@ export function TaskEditorForm({
             <small id="task-deadline-help">
               A deadline is the last day to finish, not when you plan to work.
             </small>
+            {deadlineDate ? (
+              <button
+                className="web-text-button"
+                onClick={() => {
+                  setDeadlineDate("");
+                  setDeadlineTime("");
+                }}
+                type="button"
+              >
+                Clear deadline
+              </button>
+            ) : null}
             <FieldError id="task-deadline-error" message={fieldErrors.deadlineDate} />
           </div>
+
+          {deadlineDate ? (
+            <div className="web-form-group">
+              <label htmlFor="task-deadline-time">
+                Deadline time <span>Optional</span>
+              </label>
+              <small id="task-deadline-time-help">
+                Without a time, the deadline is the end of the selected day.
+              </small>
+              <input
+                aria-describedby={
+                  fieldErrors.deadlineTime
+                    ? "task-deadline-time-help task-deadline-time-error"
+                    : "task-deadline-time-help"
+                }
+                aria-invalid={fieldErrors.deadlineTime ? true : undefined}
+                id="task-deadline-time"
+                onChange={(event) => setDeadlineTime(event.currentTarget.value)}
+                type="time"
+                value={deadlineTime}
+              />
+              {deadlineTime ? (
+                <button
+                  className="web-text-button"
+                  onClick={() => setDeadlineTime("")}
+                  type="button"
+                >
+                  Clear deadline time
+                </button>
+              ) : null}
+              <FieldError
+                id="task-deadline-time-error"
+                message={fieldErrors.deadlineTime}
+              />
+            </div>
+          ) : null}
 
           {planningState === "scheduled" &&
           reminderSettings.status?.permissionStatus === "unsupported" ? (
@@ -436,24 +537,4 @@ function FieldError({ id, message }: { id: string; message?: string | undefined 
       {message}
     </p>
   ) : null;
-}
-
-function getReminderDisabledMessage(
-  planningState: TaskPlanningState,
-  permissionStatus: ReminderPermissionStatus | undefined,
-  remindersEnabled: boolean | undefined
-): string | null {
-  if (planningState !== "scheduled") {
-    return "Reminders are available after adding a date and time.";
-  }
-
-  if (permissionStatus === "denied" || permissionStatus === "unsupported") {
-    return "Reminders are unavailable on this device or browser.";
-  }
-
-  if (remindersEnabled !== true) {
-    return "Turn on reminders in Settings to choose them here.";
-  }
-
-  return null;
 }

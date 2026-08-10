@@ -241,6 +241,28 @@ describe("RecoveryRepository", () => {
     assert.equal(restoredTask?.scheduledTime, "08:30");
   });
 
+  it("reopens a decision and restores a Planned task's preferred time", async () => {
+    const { taskStorage, taskRepository, recoveryRepository } = await createContext();
+    const task = await taskRepository.createTask({
+      title: "Return to the softer plan",
+      scheduledDate: sourceDate,
+      preferredTime: "08:30"
+    });
+    const session = await recoveryRepository.startSession(sourceDate);
+    const itemId = session.items[0]!.id;
+    await recoveryRepository.rescheduleTask(itemId, {
+      scheduledDate: "2026-08-10",
+      scheduledTime: "16:00"
+    });
+
+    await recoveryRepository.reopenItem(itemId);
+    const restoredTask = await taskStorage.getTaskById(task.id);
+
+    assert.equal(restoredTask?.scheduledDate, sourceDate);
+    assert.equal(restoredTask?.scheduledTime, null);
+    assert.equal(restoredTask?.preferredTime, "08:30");
+  });
+
   it("persists active progress and completed sessions across reinitialization", async () => {
     const { database, taskRepository, recoveryRepository } = await createContext();
     await createScheduledTask(taskRepository, "Persist this decision");

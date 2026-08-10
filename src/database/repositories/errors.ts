@@ -3,8 +3,10 @@ export type TaskValidationField =
   | "importance"
   | "scheduledDate"
   | "scheduledTime"
+  | "preferredTime"
   | "estimatedDurationMinutes"
   | "deadlineDate"
+  | "deadlineTime"
   | "reminderOffsets"
   | "breakdownTitles";
 
