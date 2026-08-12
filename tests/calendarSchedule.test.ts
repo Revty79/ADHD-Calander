@@ -5,7 +5,7 @@ import {
   buildCalendarSchedule,
   getEventDurationMinutes
 } from "../src/features/calendar/calendarSchedule";
-import { CalendarEvent } from "../src/types/calendarEvent";
+import { CalendarEventOccurrence } from "../src/types/calendarEvent";
 import { Task } from "../src/types/task";
 
 const timestamp = "2026-08-06T15:00:00.000Z";
@@ -63,7 +63,9 @@ describe("calendar schedule", () => {
   });
 });
 
-function createEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+function createEvent(
+  overrides: Partial<CalendarEventOccurrence> = {}
+): CalendarEventOccurrence {
   return {
     id: "event",
     title: "Fixed appointment",
@@ -73,8 +75,13 @@ function createEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     endTime: null,
     durationMinutes: null,
     notes: null,
+    color: "neutral",
     reminders: [],
     reminderOffsets: [],
+    recurrence: null,
+    seriesId: "event",
+    originalDate: "2026-08-06",
+    isRecurring: false,
     createdAt: timestamp,
     updatedAt: timestamp,
     ...overrides
@@ -87,6 +94,7 @@ function createTask(overrides: Partial<Task> = {}): Task {
     title: "Flexible work",
     description: null,
     importance: "normal",
+    color: "neutral",
     status: "not_started",
     parentTaskId: null,
     scheduledDate: "2026-08-06",

@@ -56,6 +56,11 @@ Each reminder has a deterministic, distinct identifier:
 - `adhd-calendar-task-{taskId}-absolute-{date}-{time}`
 - `adhd-calendar-event-{eventId}-absolute-{date}-{time}`
 
+Recurring relative event identifiers use the stable occurrence ID (`series ID
+
+- original local date`) in the event-ID position. A series-level explicit
+  reminder keeps the series ID and is deduplicated across derived occurrences.
+
 Before synchronizing one item, the service cancels every supported offset
 identity, the legacy single identity, and explicit identities from both the
 previous and updated record. It then schedules only valid future requests. This
@@ -97,10 +102,14 @@ is rebuilt against the confirmed local date/time.
 
 ## Event Synchronization
 
-Fixed-event creation persists and schedules zero to five reminders. General
-event editing is not implemented, so the app does not display a fake event
-reminder editor. Editing/removing events and their reminders remains part of a
-later Calendar functional-hardening phase.
+Fixed-event creation and editing persist and schedule zero to five reminders.
+Non-recurring events reconcile directly. Recurring events expand from today
+through 90 days ahead and calculate each relative reminder from that
+occurrence's local start. Modified exceptions use their overridden date, time,
+and reminder list; cancelled exceptions schedule nothing. Series edits cancel
+both prior and current horizon identifiers before rebuilding, and startup still
+cancels the complete app schedule before reconciliation. The finite horizon
+prevents an endless rule from producing endless OS requests.
 
 ## Recovery Integration
 
@@ -134,9 +143,7 @@ cancellation still require a physical-device preview-build test.
 
 - Quiet hours and default offsets
 - Arbitrary relative reminder offsets
-- Event reminder editing after creation
-- Recurring reminders, snooze, notification actions, badges, sounds, and
-  urgency tiers
+- Snooze, notification actions, badges, sounds, and urgency tiers
 - Location reminders and browser notifications
 - Exact-alarm policy work
 - Cloud push, accounts, analytics, and cross-device sync

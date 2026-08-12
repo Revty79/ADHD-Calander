@@ -79,6 +79,12 @@ must choose and confirm one before the existing task schedule changes.
 Calendar gives Add event and Add task comparable primary discoverability. A
 consistent Plans changed? action opens a confirmation step, then starts or
 resumes the one active Recovery session without automatic task changes.
+Tasks and fixed events share an optional calm color palette for visual scanning
+without replacing their text labels or semantics. Fixed events may repeat with
+daily, weekly, monthly, yearly, or custom local-date rules. A user can edit or
+remove one occurrence, this and future occurrences, or the whole series; the
+choice is requested only for recurring events. Occurrences and reminder intent
+survive restart without pre-generating duplicate event records.
 
 ## Explicit Non-MVP Features
 
@@ -110,3 +116,8 @@ Scheduling assistance passes when a flexible task with a duration can receive
 bounded, non-overlapping local-time suggestions around fixed events and timed
 tasks; accepting one preserves task identity and persistence, while declining
 leaves the task unchanged.
+
+Calendar recurrence passes when the same bounded Month, Week, or Day request
+produces the correct local occurrences on web and Android, occurrence edits do
+not rewrite the rest of the series, this-and-future changes preserve history,
+and Android reminder reconciliation schedules only a finite future horizon.

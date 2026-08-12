@@ -8,6 +8,7 @@ import { executionMultipleRemindersMigration } from "./007_execution_multiple_re
 import { plannedTimePreferencesCompatibilityMigration } from "./008_planned_time_preferences";
 import { taskPreferredDeadlineTimesMigration } from "./009_task_preferred_deadline_times";
 import { independentRemindersMigration } from "./010_independent_reminders";
+import { calendarColorsRecurrenceMigration } from "./011_calendar_colors_recurrence";
 import { Migration } from "./types";
 
 export const migrations: Migration[] = [
@@ -20,5 +21,6 @@ export const migrations: Migration[] = [
   executionMultipleRemindersMigration,
   plannedTimePreferencesCompatibilityMigration,
   taskPreferredDeadlineTimesMigration,
-  independentRemindersMigration
+  independentRemindersMigration,
+  calendarColorsRecurrenceMigration
 ];

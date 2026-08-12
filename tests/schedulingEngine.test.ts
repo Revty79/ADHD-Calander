@@ -487,6 +487,7 @@ function createTask(overrides: Partial<Task> = {}): Task {
     title: "Flexible work",
     description: null,
     importance: "normal",
+    color: "neutral",
     status: "not_started",
     parentTaskId: null,
     scheduledDate: null,
@@ -516,8 +517,10 @@ function createEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     endTime: null,
     durationMinutes: null,
     notes: null,
+    color: "neutral",
     reminders: [],
     reminderOffsets: [],
+    recurrence: null,
     createdAt: timestamp,
     updatedAt: timestamp,
     ...overrides

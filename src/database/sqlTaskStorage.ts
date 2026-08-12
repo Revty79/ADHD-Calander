@@ -5,6 +5,7 @@ import {
   TaskImportance,
   TaskStatus
 } from "../types/task";
+import { ItemColor } from "../types/itemColor";
 import {
   getRelativeReminderOffsets,
   parseStoredReminders
@@ -17,6 +18,7 @@ type TaskRow = {
   title: string;
   description: string | null;
   importance: TaskImportance;
+  color: ItemColor;
   status: TaskStatus;
   parentTaskId: string | null;
   scheduledDate: LocalDateString | null;
@@ -40,6 +42,7 @@ const taskSelect = `
     title,
     description,
     importance,
+    color,
     status,
     parent_task_id AS parentTaskId,
     scheduled_date AS scheduledDate,
@@ -69,6 +72,7 @@ export class SqlTaskStorage implements TaskStorage {
           title,
           description,
           importance,
+          color,
           status,
           parent_task_id,
           scheduled_date,
@@ -84,12 +88,13 @@ export class SqlTaskStorage implements TaskStorage {
           updated_at,
           completed_at,
           deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       `,
       task.id,
       task.title,
       task.description,
       task.importance,
+      task.color,
       task.status,
       task.parentTaskId,
       task.scheduledDate,
@@ -166,6 +171,7 @@ export class SqlTaskStorage implements TaskStorage {
           title = ?,
           description = ?,
           importance = ?,
+          color = ?,
           status = ?,
           parent_task_id = ?,
           scheduled_date = ?,
@@ -187,6 +193,7 @@ export class SqlTaskStorage implements TaskStorage {
       task.title,
       task.description,
       task.importance,
+      task.color,
       task.status,
       task.parentTaskId,
       task.scheduledDate,
@@ -241,6 +248,7 @@ function mapTaskRow(row: TaskRow): Task {
     title: row.title,
     description: row.description,
     importance: row.importance,
+    color: row.color,
     status: row.status,
     parentTaskId: row.parentTaskId,
     scheduledDate: row.scheduledDate,

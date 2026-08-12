@@ -31,7 +31,9 @@ import {
 } from "../../src/features/calendar/calendarSchedule";
 import { useCalendarSchedule } from "../../src/features/calendar/hooks/useCalendarSchedule";
 import { formatReminders } from "../../src/notifications/reminderRules";
-import { CalendarEvent } from "../../src/types/calendarEvent";
+import { CalendarEventOccurrence } from "../../src/types/calendarEvent";
+import { getItemColorOption } from "../../src/types/itemColor";
+import { formatRecurrence } from "../../src/features/calendar/recurrenceRules";
 import { LocalDateString } from "../../src/types/dateTime";
 import { Task } from "../../src/types/task";
 import {
@@ -287,6 +289,25 @@ function MonthView({
                 {gridDay.dayNumber}
               </Text>
               <View style={styles.monthIndicators}>
+                <View accessibilityLabel="Item colors" style={styles.colorDots}>
+                  {[
+                    ...schedule.fixedEvents,
+                    ...schedule.plannedTasks,
+                    ...schedule.flexibleTasks
+                  ]
+                    .slice(0, 5)
+                    .map((item) => (
+                      <View
+                        accessibilityElementsHidden
+                        importantForAccessibility="no-hide-descendants"
+                        key={item.id}
+                        style={[
+                          styles.colorDot,
+                          { backgroundColor: getItemColorOption(item.color).borderColor }
+                        ]}
+                      />
+                    ))}
+                </View>
                 {schedule.fixedEvents.length > 0 ? (
                   <Text numberOfLines={1} style={styles.fixedIndicator}>
                     Fixed {schedule.fixedEvents.length}
@@ -353,12 +374,35 @@ function WeekView({
             </View>
             <View style={styles.weekItems}>
               {day.fixedEvents.map((event) => (
-                <Text key={event.id} numberOfLines={2} style={styles.weekFixedItem}>
-                  {event.startTime} Fixed: {event.title}
-                </Text>
+                <View
+                  key={event.id}
+                  style={[
+                    styles.weekItemTint,
+                    {
+                      backgroundColor: getItemColorOption(event.color).backgroundColor,
+                      borderLeftColor: getItemColorOption(event.color).borderColor
+                    }
+                  ]}
+                >
+                  <Text numberOfLines={2} style={styles.weekFixedItem}>
+                    {event.startTime} Fixed: {event.title}
+                    {event.isRecurring ? " · Repeats" : ""}
+                  </Text>
+                </View>
               ))}
               {day.plannedTasks.map((task) => (
-                <Text key={task.id} numberOfLines={2} style={styles.weekTaskItem}>
+                <Text
+                  key={task.id}
+                  numberOfLines={2}
+                  style={[
+                    styles.weekTaskItem,
+                    {
+                      backgroundColor: getItemColorOption(task.color).backgroundColor,
+                      borderLeftColor: getItemColorOption(task.color).borderColor,
+                      borderLeftWidth: 3
+                    }
+                  ]}
+                >
                   {task.scheduledTime
                     ? `${formatLocalTimeForDisplay(task.scheduledTime)} Scheduled: `
                     : "Scheduled: "}
@@ -369,7 +413,18 @@ function WeekView({
                 </Text>
               ))}
               {day.flexibleTasks.map((task) => (
-                <Text key={task.id} numberOfLines={2} style={styles.weekTaskItem}>
+                <Text
+                  key={task.id}
+                  numberOfLines={2}
+                  style={[
+                    styles.weekTaskItem,
+                    {
+                      backgroundColor: getItemColorOption(task.color).backgroundColor,
+                      borderLeftColor: getItemColorOption(task.color).borderColor,
+                      borderLeftWidth: 3
+                    }
+                  ]}
+                >
                   Planned: {task.title}
                   {getTaskPreferredTimeLabel(task)
                     ? ` · ${getTaskPreferredTimeLabel(task)}`
@@ -477,11 +532,19 @@ function ScheduleSection({
   );
 }
 
-function EventCard({ event }: { event: CalendarEvent }) {
+function EventCard({ event }: { event: CalendarEventOccurrence }) {
+  const router = useRouter();
   const duration = formatDuration(getEventDurationMinutes(event));
+  const color = getItemColorOption(event.color);
 
   return (
-    <View style={[styles.scheduleCard, styles.fixedCard]}>
+    <View
+      style={[
+        styles.scheduleCard,
+        styles.fixedCard,
+        { backgroundColor: color.backgroundColor, borderLeftColor: color.borderColor }
+      ]}
+    >
       <Text style={styles.fixedLabel}>FIXED COMMITMENT</Text>
       <Text style={styles.scheduleCardTitle}>{event.title}</Text>
       <Text style={styles.scheduleMeta}>
@@ -494,7 +557,23 @@ function EventCard({ event }: { event: CalendarEvent }) {
           Reminders: {formatReminders(event.reminders)}
         </Text>
       ) : null}
+      {event.isRecurring ? (
+        <Text style={styles.scheduleMeta}>{formatRecurrence(event.recurrence)}</Text>
+      ) : null}
       {event.notes ? <Text style={styles.scheduleNotes}>{event.notes}</Text> : null}
+      <Pressable
+        accessibilityLabel={`Edit ${event.title}`}
+        accessibilityRole="button"
+        onPress={() =>
+          router.push({
+            pathname: "/events/[id]/edit",
+            params: { id: event.seriesId, originalDate: event.originalDate }
+          })
+        }
+        style={({ pressed }) => [styles.editEventButton, pressed && styles.pressed]}
+      >
+        <Text style={styles.editEventText}>Edit event</Text>
+      </Pressable>
     </View>
   );
 }
@@ -507,9 +586,16 @@ function TaskScheduleCard({
   variant: "scheduled" | "planned";
 }) {
   const duration = formatDuration(task.estimatedDurationMinutes);
+  const color = getItemColorOption(task.color);
 
   return (
-    <View style={[styles.scheduleCard, styles.taskCard]}>
+    <View
+      style={[
+        styles.scheduleCard,
+        styles.taskCard,
+        { backgroundColor: color.backgroundColor, borderLeftColor: color.borderColor }
+      ]}
+    >
       <Text style={styles.taskLabel}>
         {variant === "scheduled" ? "SCHEDULED TASK" : "PLANNED TASK"}
       </Text>
@@ -755,6 +841,16 @@ const styles = StyleSheet.create({
     gap: 3,
     marginTop: 6
   },
+  colorDots: {
+    flexDirection: "row",
+    gap: 3,
+    minHeight: 8
+  },
+  colorDot: {
+    borderRadius: 4,
+    height: 8,
+    width: 8
+  },
   fixedIndicator: {
     color: "#394941",
     fontSize: 10,
@@ -832,6 +928,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     paddingLeft: 6
+  },
+  weekItemTint: {
+    borderLeftWidth: 3,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 3
   },
   weekTaskItem: {
     borderLeftColor: "#789087",
@@ -937,6 +1039,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 3
+  },
+  editEventButton: {
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 3
+  },
+  editEventText: {
+    color: "#24565c",
+    fontSize: 13,
+    fontWeight: "800"
   },
   dayLink: {
     alignItems: "center",

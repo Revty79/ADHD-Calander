@@ -1,8 +1,10 @@
 import {
+  CalendarEventException,
   calendarEventKinds,
   CalendarEvent,
   CalendarEventKind
 } from "../types/calendarEvent";
+import { isItemColor, ItemColor } from "../types/itemColor";
 import {
   recoveryDecisionTypes,
   RecoveryDecisionType,
@@ -29,15 +31,17 @@ import {
   TaskStatus
 } from "../types/task";
 import { normalizeLocalDateInput, normalizeOptionalTime } from "../utils/dates";
-import { CalendarEventStorage } from "./calendarEventStorage";
+import { normalizeRecurrenceRule } from "../features/calendar/recurrenceRules";
+import { CalendarEventMutation, CalendarEventStorage } from "./calendarEventStorage";
 import { RecoveryDecisionMutation, RecoveryStorage } from "./recoveryStorage";
 import { SettingsStorage, StoredSetting } from "./settingsStorage";
 import { TaskStorage } from "./taskStorage";
 
 const WEB_DATABASE_NAME = "adhd-calendar-web";
-const WEB_DATABASE_VERSION = 10;
+const WEB_DATABASE_VERSION = 11;
 const TASK_STORE_NAME = "tasks";
 const EVENT_STORE_NAME = "calendarEvents";
+const EVENT_EXCEPTION_STORE_NAME = "calendarEventExceptions";
 const RECOVERY_SESSION_STORE_NAME = "recoverySessions";
 const RECOVERY_ITEM_STORE_NAME = "recoveryItems";
 const SETTINGS_STORE_NAME = "appSettings";
@@ -55,6 +59,7 @@ type StoredTask = {
   title: string;
   description: string | null;
   importance?: TaskImportance;
+  color?: ItemColor;
   status: TaskStatus;
   parentTaskId?: string | null;
   scheduledDate: string | null;
@@ -82,12 +87,16 @@ type StoredCalendarEvent = {
   endTime: string | null;
   durationMinutes: number | null;
   notes: string | null;
+  color?: ItemColor;
   reminders?: CalendarEvent["reminders"];
   reminderOffsets?: CalendarEvent["reminderOffsets"];
   reminderOffsetMinutes?: number | null;
+  recurrence?: CalendarEvent["recurrence"];
   createdAt: string;
   updatedAt: string;
 };
+
+type StoredCalendarEventException = CalendarEventException;
 
 type StoredRecoverySession = {
   id: string;
@@ -221,6 +230,7 @@ export function deserializeTaskFromWeb(value: unknown): Task {
 
   const status = value.status;
   const importance = value.importance ?? "normal";
+  const color = value.color ?? "neutral";
   const parentTaskId = value.parentTaskId ?? null;
   const scheduledDate = value.scheduledDate;
   const scheduledTime = value.scheduledTime;
@@ -250,6 +260,7 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     !isNullableString(value.description) ||
     typeof importance !== "string" ||
     !isTaskImportance(importance) ||
+    !isItemColor(color) ||
     typeof status !== "string" ||
     !isTaskStatus(status) ||
     !isNullableString(parentTaskId) ||
@@ -288,6 +299,7 @@ export function deserializeTaskFromWeb(value: unknown): Task {
     title: value.title,
     description: value.description,
     importance,
+    color,
     status,
     parentTaskId,
     scheduledDate,
@@ -324,6 +336,7 @@ export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
   const startTime = value.startTime;
   const endTime = value.endTime;
   const durationMinutes = value.durationMinutes;
+  const color = value.color ?? "neutral";
   const legacyReminderOffset = value.reminderOffsetMinutes ?? null;
   const reminderOffsets =
     value.reminderOffsets ??
@@ -349,6 +362,7 @@ export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
     normalizeOptionalTime(startTime) !== startTime ||
     !isValidStoredTime(endTime) ||
     !isValidStoredDuration(durationMinutes) ||
+    !isItemColor(color) ||
     !isReminderOffsetList(reminderOffsets) ||
     !isNullableString(value.notes) ||
     typeof value.createdAt !== "string" ||
@@ -372,8 +386,82 @@ export function deserializeCalendarEventFromWeb(value: unknown): CalendarEvent {
     endTime,
     durationMinutes,
     notes: value.notes,
+    color,
     reminders,
     reminderOffsets: getRelativeReminderOffsets(reminders),
+    recurrence: normalizeRecurrenceRule(value.recurrence ?? null, date),
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt
+  };
+}
+
+export function serializeCalendarEventExceptionForWeb(
+  exception: CalendarEventException
+): StoredCalendarEventException {
+  const overrides = { ...exception.overrides };
+
+  if (exception.overrides.reminders) {
+    overrides.reminders = exception.overrides.reminders.map((reminder) => ({
+      ...reminder
+    }));
+  }
+
+  return {
+    ...exception,
+    overrides
+  };
+}
+
+export function deserializeCalendarEventExceptionFromWeb(
+  value: unknown
+): CalendarEventException {
+  if (!isRecord(value) || !isRecord(value.overrides)) {
+    throw new WebStorageDataError("Stored event exception data has an invalid shape.");
+  }
+
+  const originalDate =
+    typeof value.originalDate === "string"
+      ? normalizeLocalDateInput(value.originalDate)
+      : null;
+  const overrides = { ...value.overrides } as CalendarEventException["overrides"];
+
+  if (overrides.reminders !== undefined) {
+    try {
+      overrides.reminders = normalizeStoredReminders(overrides.reminders, []);
+    } catch (error) {
+      throw new WebStorageDataError(
+        error instanceof Error ? error.message : "Stored exception reminders are invalid."
+      );
+    }
+  }
+
+  if (
+    typeof value.id !== "string" ||
+    typeof value.seriesId !== "string" ||
+    !originalDate ||
+    (value.status !== "modified" && value.status !== "cancelled") ||
+    typeof value.createdAt !== "string" ||
+    typeof value.updatedAt !== "string" ||
+    (overrides.title !== undefined && typeof overrides.title !== "string") ||
+    (overrides.date !== undefined &&
+      normalizeLocalDateInput(overrides.date) !== overrides.date) ||
+    (overrides.startTime !== undefined &&
+      normalizeOptionalTime(overrides.startTime) !== overrides.startTime) ||
+    (overrides.endTime !== undefined && !isValidStoredTime(overrides.endTime)) ||
+    (overrides.durationMinutes !== undefined &&
+      !isValidStoredDuration(overrides.durationMinutes)) ||
+    (overrides.notes !== undefined && !isNullableString(overrides.notes)) ||
+    (overrides.color !== undefined && !isItemColor(overrides.color))
+  ) {
+    throw new WebStorageDataError("Stored event exception data has an invalid shape.");
+  }
+
+  return {
+    id: value.id,
+    seriesId: value.seriesId,
+    originalDate,
+    status: value.status,
+    overrides,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt
   };
@@ -671,6 +759,16 @@ class IndexedDbCalendarEventStorage implements CalendarEventStorage {
     }
   }
 
+  async getEventById(id: string): Promise<CalendarEvent | null> {
+    const transaction = this.database.transaction(EVENT_STORE_NAME, "readonly");
+    const completion = transactionComplete(transaction);
+    const record = await requestResult(transaction.objectStore(EVENT_STORE_NAME).get(id));
+
+    await completion;
+
+    return record === undefined ? null : deserializeCalendarEventFromWeb(record);
+  }
+
   async getEventsForDate(date: string): Promise<CalendarEvent[]> {
     const transaction = this.database.transaction(EVENT_STORE_NAME, "readonly");
     const completion = transactionComplete(transaction);
@@ -705,6 +803,18 @@ class IndexedDbCalendarEventStorage implements CalendarEventStorage {
     return records.map(deserializeCalendarEventFromWeb);
   }
 
+  async getEventSeriesForRange(
+    startDate: string,
+    endDate: string
+  ): Promise<CalendarEvent[]> {
+    const events = await this.getAllEvents();
+
+    return events.filter(
+      (event) =>
+        event.recurrence !== null || (event.date >= startDate && event.date <= endDate)
+    );
+  }
+
   async getAllEvents(): Promise<CalendarEvent[]> {
     const transaction = this.database.transaction(EVENT_STORE_NAME, "readonly");
     const completion = transactionComplete(transaction);
@@ -715,6 +825,77 @@ class IndexedDbCalendarEventStorage implements CalendarEventStorage {
     await completion;
 
     return records.map(deserializeCalendarEventFromWeb);
+  }
+
+  async getExceptionsForSeries(seriesIds: string[]): Promise<CalendarEventException[]> {
+    if (seriesIds.length === 0) {
+      return [];
+    }
+
+    const transaction = this.database.transaction(EVENT_EXCEPTION_STORE_NAME, "readonly");
+    const completion = transactionComplete(transaction);
+    const index = transaction.objectStore(EVENT_EXCEPTION_STORE_NAME).index("seriesId");
+    const records: unknown[] = [];
+
+    for (const seriesId of seriesIds) {
+      records.push(...(await requestResult(index.getAll(seriesId))));
+    }
+
+    await completion;
+
+    return records.map(deserializeCalendarEventExceptionFromWeb);
+  }
+
+  async applyEventMutation(mutation: CalendarEventMutation): Promise<void> {
+    const transaction = this.database.transaction(
+      [EVENT_STORE_NAME, EVENT_EXCEPTION_STORE_NAME],
+      "readwrite"
+    );
+    const completion = transactionComplete(transaction);
+    const eventStore = transaction.objectStore(EVENT_STORE_NAME);
+    const exceptionStore = transaction.objectStore(EVENT_EXCEPTION_STORE_NAME);
+
+    try {
+      for (const event of mutation.insertEvents ?? []) {
+        await requestResult(eventStore.add(serializeCalendarEventForWeb(event)));
+      }
+
+      for (const event of mutation.updateEvents ?? []) {
+        if ((await requestResult(eventStore.get(event.id))) === undefined) {
+          throw new Error(`Calendar event ${event.id} could not be updated.`);
+        }
+
+        await requestResult(eventStore.put(serializeCalendarEventForWeb(event)));
+      }
+
+      for (const exception of mutation.upsertExceptions ?? []) {
+        await requestResult(
+          exceptionStore.put(serializeCalendarEventExceptionForWeb(exception))
+        );
+      }
+
+      for (const exceptionId of mutation.deleteExceptionIds ?? []) {
+        await requestResult(exceptionStore.delete(exceptionId));
+      }
+
+      for (const eventId of mutation.deleteEventIds ?? []) {
+        const exceptionKeys = await requestResult(
+          exceptionStore.index("seriesId").getAllKeys(eventId)
+        );
+
+        for (const exceptionKey of exceptionKeys) {
+          await requestResult(exceptionStore.delete(exceptionKey));
+        }
+
+        await requestResult(eventStore.delete(eventId));
+      }
+    } catch (error) {
+      abortTransaction(transaction);
+      await ignoreTransactionResult(completion);
+      throw error;
+    }
+
+    await completion;
   }
 }
 
@@ -981,6 +1162,14 @@ function openDatabase(
         eventStore.createIndex("updatedAt", "updatedAt", { unique: false });
       } else {
         eventStore = request.transaction!.objectStore(EVENT_STORE_NAME);
+      }
+
+      if (!database.objectStoreNames.contains(EVENT_EXCEPTION_STORE_NAME)) {
+        const exceptionStore = database.createObjectStore(EVENT_EXCEPTION_STORE_NAME, {
+          keyPath: "id"
+        });
+        exceptionStore.createIndex("seriesId", "seriesId", { unique: false });
+        exceptionStore.createIndex("originalDate", "originalDate", { unique: false });
       }
 
       if (!database.objectStoreNames.contains(RECOVERY_SESSION_STORE_NAME)) {

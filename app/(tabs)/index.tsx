@@ -7,7 +7,9 @@ import { Screen } from "../../src/components/Screen";
 import { TaskList } from "../../src/features/tasks/components/TaskList";
 import { useTodayPlan } from "../../src/features/today/hooks/useTodayPlan";
 import { formatReminders } from "../../src/notifications/reminderRules";
-import { CalendarEvent } from "../../src/types/calendarEvent";
+import { CalendarEventOccurrence } from "../../src/types/calendarEvent";
+import { getItemColorOption } from "../../src/types/itemColor";
+import { formatRecurrence } from "../../src/features/calendar/recurrenceRules";
 import { isTaskActive, isTaskCompleted } from "../../src/types/task";
 import { formatLocalDateForDisplay, getLocalDateString } from "../../src/utils/dates";
 
@@ -129,7 +131,7 @@ export default function TodayScreen() {
   );
 }
 
-function FixedEventList({ events }: { events: CalendarEvent[] }) {
+function FixedEventList({ events }: { events: CalendarEventOccurrence[] }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Fixed appointments</Text>
@@ -140,7 +142,16 @@ function FixedEventList({ events }: { events: CalendarEvent[] }) {
       ) : (
         <View style={styles.eventList}>
           {events.map((event) => (
-            <View key={event.id} style={styles.eventCard}>
+            <View
+              key={event.id}
+              style={[
+                styles.eventCard,
+                {
+                  backgroundColor: getItemColorOption(event.color).backgroundColor,
+                  borderLeftColor: getItemColorOption(event.color).borderColor
+                }
+              ]}
+            >
               <Text style={styles.eventTime}>
                 {event.startTime}
                 {event.endTime ? `–${event.endTime}` : ""}
@@ -148,11 +159,25 @@ function FixedEventList({ events }: { events: CalendarEvent[] }) {
               <View style={styles.eventCopy}>
                 <Text style={styles.eventTitle}>{event.title}</Text>
                 <Text style={styles.fixedLabel}>Fixed</Text>
+                {event.isRecurring ? (
+                  <Text style={styles.fixedLabel}>
+                    {formatRecurrence(event.recurrence)}
+                  </Text>
+                ) : null}
                 {event.reminders.length > 0 ? (
                   <Text style={styles.fixedLabel}>
                     Reminders: {formatReminders(event.reminders)}
                   </Text>
                 ) : null}
+                <Link
+                  href={{
+                    pathname: "/events/[id]/edit",
+                    params: { id: event.seriesId, originalDate: event.originalDate }
+                  }}
+                  style={styles.eventEditLink}
+                >
+                  Edit event
+                </Link>
               </View>
             </View>
           ))}
@@ -303,6 +328,12 @@ const styles = StyleSheet.create({
     color: "#68645e",
     fontSize: 12,
     textTransform: "uppercase"
+  },
+  eventEditLink: {
+    color: "#24565c",
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 4
   },
   pressed: {
     opacity: 0.75

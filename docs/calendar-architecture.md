@@ -10,7 +10,9 @@ for one flexible task, but never decides or moves work on its own.
 ## Domain Separation
 
 `CalendarEvent` represents a fixed commitment. Its current `kind` is always
-`fixed`. `Task` represents work and can be:
+`fixed`. A non-recurring event is one stored row. A recurring event is one
+stored series row plus sparse occurrence exceptions; visible occurrences are
+derived only for the requested local-date range. `Task` represents work and can be:
 
 - Unscheduled: no date or time.
 - Flexible on a date: a date without a start time.
@@ -43,7 +45,9 @@ calendar” facts and never as completed or attended accomplishments.
 
 Current day and selected day each have non-color visual treatment. Event and
 task cards use both text labels and different borders, so their meaning does not
-depend on color alone.
+depend on color alone. Tasks and events may independently use the shared calm
+Neutral, Blue, Green, Amber, Lavender, or Rose tint. Month shows color markers
+alongside factual counts, while Week and Day tint the labeled item cards.
 
 ## Workload Facts
 
@@ -63,9 +67,11 @@ task, event, and recovery storage adapters. Web composition opens one IndexedDB
 database and creates equivalent adapters. Recovery task mutations and recovery
 decision writes share a storage transaction.
 
-The calendar hook loads events for the visible local-date range and filters
-scheduled tasks into that range. Unscheduled tasks remain available in Tasks
-but do not appear on a calendar date.
+The calendar hook loads candidate event series for the visible local-date range,
+loads sparse exceptions for those series, and expands only that bounded range.
+It then filters scheduled tasks into the same range. Infinite recurrence rules
+are never expanded without a caller-provided end date. Unscheduled tasks remain
+available in Tasks but do not appear on a calendar date.
 
 ## Local Dates
 
@@ -98,11 +104,37 @@ requests. A master setting controls Android delivery without erasing intent.
 Completed, removed, or past-trigger items keep saved choices while delivery is
 inactive; an untimed task can still deliver future explicit reminders.
 
+Recurring relative event reminders are derived from each occurrence's local
+date and start time. Android reconciles recurring occurrences from today through
+a 90-day horizon, using occurrence identity in each relative notification ID.
+Exception date, time, and reminder overrides replace the generated occurrence
+values. Startup reconciliation cancels all pending app reminders before
+rebuilding the horizon, while targeted edits cancel both previous and current
+occurrence identifiers. Infinite series are never scheduled all at once.
+
 Web keeps the same persisted domain shape and reminder editor behavior while
 truthfully reporting that browser notification delivery is unsupported. Task
 editing updates the existing record through `TaskRepository`. Native event
-creation uses date/time pickers; web uses browser date/time controls. General
-event editing, including later reminder changes, remains deferred.
+editing uses date/time pickers; web uses browser date/time controls. Both call
+the same validation, recurrence, exception, and repository logic.
+
+## Recurrence And Exceptions
+
+Rules support daily, weekly, monthly, and yearly frequencies with a positive
+interval. Weekly rules store one or more weekdays. Monthly rules store either
+the anchor calendar date or an ordinal weekday from first through fourth or
+last. End conditions are never, an inclusive local date, or a count of actual
+occurrences. A same-date monthly rule skips months that do not contain that
+date. A February 29 yearly rule occurs only in leap years; it is not shifted to
+February 28 or March 1.
+
+Occurrence identity is `series ID + original local occurrence date`. A modified
+exception stores only fields that differ from the series; a cancelled exception
+skips that occurrence. Moving one occurrence preserves its original identity.
+"This and future" truncates the old rule before the selected original date and
+creates a new series, preserving historical occurrences. "All events" updates
+the series row. The same explicit scopes apply to deletion, and non-recurring
+events never show a series-scope question.
 
 ## Scheduling Assistance Integration
 
@@ -122,10 +154,9 @@ behavior does not invent duration or label a day overloaded.
 - Automatic scheduling, optimization, and rescheduling
 - Automatic Recovery Mode scheduling
 - Weekly availability and inferred capacity or overload labels
-- Recurring or all-day events
-- Event editing/deletion
+- All-day events
 - Drag-and-drop
-- Arbitrary relative reminder offsets, quiet hours, and event reminder editing
+- Arbitrary relative reminder offsets and quiet hours
 - Time-zone-aware travel behavior
 - External calendar sync
 - Accounts, cloud sync, analytics, and AI

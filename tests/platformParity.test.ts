@@ -84,6 +84,7 @@ describe("Web and Android parity contracts", () => {
         title: "Prepare notes",
         description: "Bring the checklist",
         importance: "important",
+        color: "neutral",
         planningState: "flexible",
         scheduledDate: "2026-08-10",
         scheduledTime: "09:30",
@@ -100,6 +101,7 @@ describe("Web and Android parity contracts", () => {
         title: "Prepare notes",
         description: "Bring the checklist",
         importance: "important",
+        color: "neutral",
         scheduledDate: null,
         scheduledTime: null,
         preferredTime: null,
@@ -286,6 +288,7 @@ async function runPlanningWorkflow(harness: PlatformHarness) {
     title: "  Schedule focused work  ",
     description: "  Keep the same task identity  ",
     importance: "important",
+    color: "blue",
     estimatedDurationMinutes: 45,
     deadlineDate: nextLocalDate,
     deadlineTime: "17:00",
@@ -342,22 +345,35 @@ async function runPlanningWorkflow(harness: PlatformHarness) {
   await harness.taskRepository.removeTask(removableTask.id);
   await harness.taskRepository.restoreTask(removableTask.id);
 
-  await harness.calendarEventRepository.createEvent({
+  const recurringEvent = await harness.calendarEventRepository.createEvent({
     title: "Fixed appointment",
     date: localDate,
     startTime: "10:30",
     durationMinutes: 60,
     notes: "Stay fixed",
+    color: "rose",
+    recurrence: {
+      frequency: "daily",
+      interval: 1,
+      end: { kind: "after_count", count: 2 }
+    },
     reminders: [
       { kind: "relative", offsetMinutes: 60 },
       { kind: "absolute", date: localDate, time: "08:45" }
     ]
   });
+  await harness.calendarEventRepository.updateEvent(
+    recurringEvent.id,
+    recurringEvent.date,
+    "all",
+    { ...recurringEvent, color: "lavender" }
+  );
   await harness.calendarEventRepository.createEvent({
     title: "Same-time fixed appointment",
     date: localDate,
     startTime: "10:30",
-    durationMinutes: 30
+    durationMinutes: 30,
+    color: "amber"
   });
   await harness.settingsRepository.setPlanningPreference("planningDayStart", "07:00");
   await harness.settingsRepository.setPlanningPreference("planningDayEnd", "18:00");

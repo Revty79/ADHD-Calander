@@ -2,6 +2,7 @@ import { Link } from "expo-router";
 
 import { formatReminders } from "../../../notifications/reminderRules";
 import { isTaskActive, Task } from "../../../types/task";
+import { getItemColorOption } from "../../../types/itemColor";
 import {
   formatLocalDateForDisplay,
   formatLocalTimeForDisplay
@@ -52,7 +53,15 @@ export function TaskList({
       ) : (
         <ul className="web-task-list">
           {tasks.map((task) => (
-            <li className="web-task-card" key={task.id}>
+            <li
+              className="web-task-card"
+              key={task.id}
+              style={{
+                backgroundColor: getItemColorOption(task.color).backgroundColor,
+                borderLeftColor: getItemColorOption(task.color).borderColor,
+                borderLeftWidth: 5
+              }}
+            >
               <div className="web-task-copy">
                 <h3>
                   <Link

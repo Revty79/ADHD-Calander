@@ -85,7 +85,12 @@ describe("calendar event repository", () => {
     );
 
     assert.deepEqual(await restoredRepository.getEventsForDate("2026-08-06"), [
-      createdEvent
+      {
+        ...createdEvent,
+        seriesId: createdEvent.id,
+        originalDate: createdEvent.date,
+        isRecurring: false
+      }
     ]);
   });
 

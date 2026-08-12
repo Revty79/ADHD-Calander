@@ -1,4 +1,4 @@
-import { CalendarEvent } from "../types/calendarEvent";
+import { CalendarEvent, CalendarEventOccurrence } from "../types/calendarEvent";
 import {
   Reminder,
   ReminderNotificationRequest,
@@ -63,7 +63,7 @@ export function buildTaskReminderRequests(task: Task): ReminderNotificationReque
 }
 
 export function buildEventReminderRequests(
-  event: CalendarEvent
+  event: CalendarEvent | CalendarEventOccurrence
 ): ReminderNotificationRequest[] {
   return event.reminders.flatMap((reminder) => {
     const triggerDate = getReminderDate(reminder, event.date, event.startTime);
@@ -71,7 +71,12 @@ export function buildEventReminderRequests(
     return triggerDate
       ? [
           {
-            identifier: getEventReminderIdentifier(event.id, reminder),
+            identifier: getEventReminderIdentifier(
+              reminder.kind === "absolute" && "seriesId" in event
+                ? event.seriesId
+                : event.id,
+              reminder
+            ),
             title: event.title,
             body:
               reminder.kind === "relative" && reminder.offsetMinutes === 0

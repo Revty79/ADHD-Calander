@@ -1,4 +1,5 @@
 import { LocalDateString, LocalTimeString } from "./dateTime";
+import { ItemColor } from "./itemColor";
 import { Reminder, ReminderInput, ReminderOffsetMinutes } from "./reminder";
 
 export const implementedTaskStatuses = [
@@ -36,6 +37,7 @@ export type Task = {
   title: string;
   description: string | null;
   importance: TaskImportance;
+  color: ItemColor;
   status: TaskStatus;
   parentTaskId: string | null;
   scheduledDate: LocalDateString | null;
@@ -57,6 +59,7 @@ export type CreateTaskInput = {
   title: string;
   description?: string | null;
   importance?: TaskImportance;
+  color?: ItemColor;
   scheduledDate?: string | null;
   scheduledTime?: string | null;
   preferredTime?: string | null;

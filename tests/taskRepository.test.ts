@@ -79,7 +79,8 @@ describe("task database", () => {
       { version: 7, name: "execution_multiple_reminders" },
       { version: 8, name: "planned_time_preferences" },
       { version: 9, name: "task_preferred_deadline_times" },
-      { version: 10, name: "independent_reminders" }
+      { version: 10, name: "independent_reminders" },
+      { version: 11, name: "calendar_colors_recurrence" }
     ]);
 
     const taskColumns = await database.getAllAsync<{ name: string }>(
@@ -89,6 +90,7 @@ describe("task database", () => {
     assert.ok(taskColumns.some((column) => column.name === "parent_task_id"));
     assert.ok(taskColumns.some((column) => column.name === "started_at"));
     assert.ok(taskColumns.some((column) => column.name === "reminder_offsets"));
+    assert.ok(taskColumns.some((column) => column.name === "color"));
     assert.ok(taskColumns.some((column) => column.name === "planned_time_preference"));
     assert.ok(taskColumns.some((column) => column.name === "preferred_time"));
     assert.ok(taskColumns.some((column) => column.name === "deadline_time"));
@@ -131,6 +133,7 @@ describe("task database", () => {
       title: "Existing completed task",
       description: "Keep native history",
       importance: "important",
+      color: "neutral",
       status: "completed",
       parentTaskId: null,
       scheduledDate: "2026-08-08",
@@ -159,8 +162,10 @@ describe("task database", () => {
       endTime: null,
       durationMinutes: 30,
       notes: "Keep native event",
+      color: "neutral",
       reminders: [{ kind: "relative", offsetMinutes: 30 }],
       reminderOffsets: [30],
+      recurrence: null,
       createdAt: "2026-08-07T14:00:00.000Z",
       updatedAt: "2026-08-07T14:00:00.000Z"
     };

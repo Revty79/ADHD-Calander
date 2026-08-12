@@ -4,7 +4,7 @@ import {
   useCalendarEventRepository,
   useTaskRepository
 } from "../../../database/DatabaseProvider";
-import { CalendarEvent } from "../../../types/calendarEvent";
+import { CalendarEventOccurrence } from "../../../types/calendarEvent";
 import { LocalDateString } from "../../../types/dateTime";
 import { Task } from "../../../types/task";
 
@@ -12,7 +12,7 @@ export function useTodayPlan(date: LocalDateString) {
   const taskRepository = useTaskRepository();
   const calendarEventRepository = useCalendarEventRepository();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [fixedEvents, setFixedEvents] = useState<CalendarEvent[]>([]);
+  const [fixedEvents, setFixedEvents] = useState<CalendarEventOccurrence[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 

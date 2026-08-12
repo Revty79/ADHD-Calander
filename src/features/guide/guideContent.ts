@@ -47,7 +47,17 @@ export const guideSections: GuideSection[] = [
   {
     title: "Calendar events",
     summary:
-      "Events are fixed commitments. They stay separate from tasks and are never moved automatically. Event creation supports a date, start time, optional end or duration, and reminders."
+      "Events are fixed commitments. They stay separate from tasks and are never moved automatically. Add a color for scanning, or use Repeat for daily, weekly, monthly, yearly, and custom series."
+  },
+  {
+    title: "Task and event colors",
+    summary:
+      "Color is an optional visual aid shared by tasks and events. Labels such as Fixed, Flexible, Planned, and Scheduled still explain what each item means."
+  },
+  {
+    title: "Editing a recurring event",
+    summary:
+      "This event changes one occurrence. This and future events preserves the past and begins a new series. All events changes the whole series. The same choices protect recurring deletion."
   },
   {
     title: "Calendar",

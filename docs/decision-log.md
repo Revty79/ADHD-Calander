@@ -2,6 +2,33 @@
 
 ## 2026-08-10
 
+### Calendar Color And Recurrence Storage Advances To Version 11
+
+Decision: Store one row per normal event or recurring series, keep recurrence
+rules as validated JSON, and store sparse modified/cancelled exceptions by
+series ID plus original local date. Derive occurrences only for bounded caller
+ranges. Add one shared six-color key to tasks and events. SQLite migration 11 is
+additive; IndexedDB advances to 11 and adds only the exception store. Missing
+color and recurrence fields read as `neutral` and non-recurring.
+
+Reason: Pre-generating event copies would create unbounded storage and fragile
+edit semantics. Stable original-date identity supports one-occurrence edits,
+while splitting a series for this-and-future preserves factual history. Shared
+types and expansion prevent web/native drift. February 29 yearly events occur
+only in leap years, and same-date monthly rules skip months without that date,
+so local calendar intent is never silently shifted.
+
+### Recurring Android Reminders Use A 90-Day Horizon
+
+Decision: Reconcile relative reminders for recurring event occurrences from
+today through 90 days ahead. Notification IDs include series occurrence
+identity and reminder identity. Startup rebuilds all pending app reminders;
+targeted series edits cancel both previous and current horizon IDs.
+
+Reason: This keeps multiple occurrence reminders correct without scheduling an
+infinite series, and gives edits, moved exceptions, skipped occurrences, and
+series splits deterministic cleanup behavior.
+
 ### Explicit Reminders Are Independent From Planning State
 
 Decision: Replace offset-only domain intent with a shared reminder union. A
@@ -519,7 +546,6 @@ of scope for the first build and require product-owner approval.
   before cloud synchronization is considered?
 - Should week view start on Sunday, Monday, or follow a configurable locale
   preference? The foundation currently starts on Sunday.
-- When should event editing and reversible removal be introduced?
 - What retention or backup guidance should the web UI provide before the
   prototype is used for important long-term planning data?
 - What user action and data shape should represent partial progress without

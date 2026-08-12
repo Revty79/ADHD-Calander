@@ -17,7 +17,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/taskRepository.test.ts tests/calendarEventRepository.test.ts tests/calendarSchedule.test.ts tests/recoveryRepository.test.ts tests/dailyRecapRepository.test.ts tests/indexedDbTaskStorage.test.ts tests/settingsReminders.test.ts tests/schedulingEngine.test.ts tests/platformParity.test.ts",
+    "test": "tsx --test tests/taskRepository.test.ts tests/calendarEventRepository.test.ts tests/calendarRecurrence.test.ts tests/calendarSchedule.test.ts tests/recoveryRepository.test.ts tests/dailyRecapRepository.test.ts tests/indexedDbTaskStorage.test.ts tests/settingsReminders.test.ts tests/schedulingEngine.test.ts tests/platformParity.test.ts",
     "validate": "npm run format:check && npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {

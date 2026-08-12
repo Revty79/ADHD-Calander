@@ -1,8 +1,10 @@
 import { FormEvent, useRef, useState } from "react";
 
 import { TaskValidationError } from "../../../database/repositories/errors";
+import { ItemColorPicker } from "../../../components/ItemColorPicker";
 import { ReminderEditor } from "../../reminders/components/ReminderEditor";
 import { Reminder } from "../../../types/reminder";
+import { ItemColor } from "../../../types/itemColor";
 import {
   CreateTaskInput,
   getTaskPlanningState,
@@ -43,6 +45,7 @@ export function TaskEditorForm({
   const [importance, setImportance] = useState<TaskImportance>(
     initialTask?.importance ?? "normal"
   );
+  const [color, setColor] = useState<ItemColor>(initialTask?.color ?? "neutral");
   const [planningState, setPlanningState] = useState<TaskPlanningState>(
     initialTask ? getTaskPlanningState(initialTask) : initialDate ? "planned" : "flexible"
   );
@@ -91,6 +94,7 @@ export function TaskEditorForm({
           title,
           description,
           importance,
+          color,
           planningState,
           scheduledDate,
           scheduledTime,
@@ -156,6 +160,8 @@ export function TaskEditorForm({
             options={taskImportanceOptions}
             value={importance}
           />
+
+          <ItemColorPicker onChange={setColor} value={color} />
 
           <ChoiceFieldset<TaskPlanningState>
             help="Flexible has no date. Planned has a date and optional preferred time. Scheduled has a fixed date and start time."

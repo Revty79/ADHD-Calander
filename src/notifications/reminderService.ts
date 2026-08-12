@@ -1,10 +1,16 @@
 import { CalendarEventStorage } from "../database/calendarEventStorage";
 import { SettingsRepository } from "../database/repositories/settingsRepository";
 import { TaskStorage } from "../database/taskStorage";
-import { CalendarEvent } from "../types/calendarEvent";
+import { CalendarEvent, CalendarEventException } from "../types/calendarEvent";
 import { ReminderNotificationRequest, ReminderPermissionStatus } from "../types/reminder";
 import { AppSettings } from "../types/settings";
 import { Task } from "../types/task";
+import {
+  addLocalDays,
+  expandCalendarEventForRange,
+  materializeCalendarEventOccurrence
+} from "../features/calendar/recurrence";
+import { getLocalDateString } from "../utils/dates";
 import { NotificationAdapter } from "./notificationAdapter";
 import {
   buildEventReminderRequests,
@@ -15,6 +21,8 @@ import {
 import { ReminderSynchronizer } from "./reminderSynchronizer";
 
 type Clock = () => Date;
+
+export const recurringReminderHorizonDays = 90;
 
 export type ReminderServiceStatus = {
   settings: AppSettings;
@@ -90,6 +98,9 @@ export class ReminderService implements ReminderSynchronizer {
         this.taskStorage.getAllTasks(),
         this.calendarEventStorage.getAllEvents()
       ]);
+      const exceptions = await this.calendarEventStorage.getExceptionsForSeries(
+        events.filter((event) => event.recurrence !== null).map((event) => event.id)
+      );
 
       for (const task of tasks) {
         for (const request of buildTaskReminderRequests(task)) {
@@ -97,10 +108,16 @@ export class ReminderService implements ReminderSynchronizer {
         }
       }
 
-      for (const event of events) {
-        for (const request of buildEventReminderRequests(event)) {
-          await this.scheduleIfFuture(request);
-        }
+      for (const request of uniqueRequests(
+        events.flatMap((event) =>
+          buildSeriesReminderRequests(
+            event,
+            exceptions.filter((exception) => exception.seriesId === event.id),
+            this.clock()
+          )
+        )
+      )) {
+        await this.scheduleIfFuture(request);
       }
     } catch (error) {
       console.error("Reminder reconciliation failed", error);
@@ -118,15 +135,28 @@ export class ReminderService implements ReminderSynchronizer {
   }
 
   async syncEventReminder(
-    event: CalendarEvent,
-    previousEvent?: CalendarEvent
+    event: CalendarEvent | null,
+    previousEvent?: CalendarEvent,
+    exceptions: CalendarEventException[] = [],
+    previousExceptions: CalendarEventException[] = []
   ): Promise<void> {
+    const currentRequests = event
+      ? buildSeriesReminderRequests(event, exceptions, this.clock())
+      : [];
+    const previousRequests = previousEvent
+      ? buildSeriesReminderRequests(previousEvent, previousExceptions, this.clock())
+      : [];
+
     await this.safelySynchronize(
       uniqueIdentifiers([
-        ...getAllEventReminderIdentifiers(event.id, event.reminders),
-        ...getAllEventReminderIdentifiers(event.id, previousEvent?.reminders ?? [])
+        ...(event ? getAllEventReminderIdentifiers(event.id, event.reminders) : []),
+        ...(previousEvent
+          ? getAllEventReminderIdentifiers(previousEvent.id, previousEvent.reminders)
+          : []),
+        ...currentRequests.map((request) => request.identifier),
+        ...previousRequests.map((request) => request.identifier)
       ]),
-      buildEventReminderRequests(event)
+      uniqueRequests(currentRequests)
     );
   }
 
@@ -166,6 +196,37 @@ export class ReminderService implements ReminderSynchronizer {
 
     await this.notificationAdapter.scheduleReminder(request);
   }
+}
+
+function buildSeriesReminderRequests(
+  event: CalendarEvent,
+  exceptions: CalendarEventException[],
+  clock: Date
+): ReminderNotificationRequest[] {
+  if (!event.recurrence) {
+    return buildEventReminderRequests(
+      materializeCalendarEventOccurrence(event, event.date, null)!
+    );
+  }
+
+  const startDate = getLocalDateString(clock);
+  const endDate = addLocalDays(startDate, recurringReminderHorizonDays);
+
+  return expandCalendarEventForRange(event, exceptions, startDate, endDate).flatMap(
+    buildEventReminderRequests
+  );
+}
+
+function uniqueRequests(
+  requests: ReminderNotificationRequest[]
+): ReminderNotificationRequest[] {
+  const byIdentifier = new Map<string, ReminderNotificationRequest>();
+
+  for (const request of requests) {
+    byIdentifier.set(request.identifier, request);
+  }
+
+  return [...byIdentifier.values()];
 }
 
 function uniqueIdentifiers(identifiers: string[]): string[] {

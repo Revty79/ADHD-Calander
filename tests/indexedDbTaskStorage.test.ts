@@ -74,7 +74,7 @@ describe("IndexedDB task storage", () => {
     const repository = await createRepository(databaseName, indexedDB);
 
     assert.deepEqual(await repository.getAllTasks(), []);
-    assert.equal((await readIndexedDbSnapshot(indexedDB, databaseName)).version, 10);
+    assert.equal((await readIndexedDbSnapshot(indexedDB, databaseName)).version, 11);
   });
 
   it("creates and reads a task after storage reinitialization", async () => {
@@ -251,6 +251,7 @@ describe("IndexedDB task storage", () => {
       title: "Review notes",
       description: null,
       importance: "normal",
+      color: "neutral",
       status: "not_started",
       parentTaskId: null,
       scheduledDate: "2026-08-06",
@@ -369,6 +370,7 @@ describe("IndexedDB task storage", () => {
       title: "Existing completed task",
       description: "Preserve this history",
       importance: "important",
+      color: "neutral",
       status: "completed",
       parentTaskId: null,
       scheduledDate: "2026-08-08",
@@ -397,8 +399,10 @@ describe("IndexedDB task storage", () => {
       endTime: null,
       durationMinutes: 30,
       notes: "Keep this event",
+      color: "neutral",
       reminders: [{ kind: "relative", offsetMinutes: 30 }],
       reminderOffsets: [30],
+      recurrence: null,
       createdAt: "2026-08-07T14:00:00.000Z",
       updatedAt: "2026-08-07T14:00:00.000Z"
     };
@@ -506,7 +510,7 @@ describe("IndexedDB task storage", () => {
     const { version: afterVersion, ...afterRecords } = afterOpen;
 
     assert.equal(beforeVersion, 8);
-    assert.equal(afterVersion, 10);
+    assert.equal(afterVersion, 11);
     assert.deepEqual(afterRecords, beforeRecords);
   });
 
@@ -518,6 +522,7 @@ describe("IndexedDB task storage", () => {
       title: "Existing version nine task",
       description: "Keep every field",
       importance: "important",
+      color: "neutral",
       status: "started",
       parentTaskId: null,
       scheduledDate: "2026-08-09",
@@ -561,8 +566,72 @@ describe("IndexedDB task storage", () => {
     const { version: afterVersion, ...afterRecords } = afterOpen;
 
     assert.equal(beforeVersion, 9);
-    assert.equal(afterVersion, 10);
+    assert.equal(afterVersion, 11);
     assert.deepEqual(afterRecords, beforeRecords);
+  });
+
+  it("upgrades a version ten database with neutral colors and non-recurring events", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "version-ten-calendar-color-recurrence-upgrade";
+    await createPreviousVersionDatabase(indexedDB, databaseName, 10, {
+      tasks: [
+        {
+          id: "version-ten-task",
+          title: "Existing task",
+          description: null,
+          importance: "normal",
+          status: "not_started",
+          parentTaskId: null,
+          scheduledDate: null,
+          scheduledTime: null,
+          preferredTime: null,
+          estimatedDurationMinutes: null,
+          deadlineDate: null,
+          deadlineTime: null,
+          reminders: [],
+          reminderOffsets: [],
+          startedAt: null,
+          createdAt: "2026-08-09T14:00:00.000Z",
+          updatedAt: "2026-08-09T14:00:00.000Z",
+          completedAt: null,
+          deletedAt: null
+        }
+      ],
+      calendarEvents: [
+        {
+          id: "version-ten-event",
+          title: "Existing event",
+          kind: "fixed",
+          date: "2026-08-10",
+          startTime: "09:00",
+          endTime: null,
+          durationMinutes: 30,
+          notes: null,
+          reminders: [],
+          reminderOffsets: [],
+          createdAt: "2026-08-09T14:00:00.000Z",
+          updatedAt: "2026-08-09T14:00:00.000Z"
+        }
+      ],
+      recoverySessions: [],
+      recoveryItems: [],
+      appSettings: []
+    });
+
+    const storages = await openIndexedDbStorages({
+      databaseName,
+      indexedDB,
+      keyRange: IDBKeyRange
+    });
+    const task = await storages.taskStorage.getTaskById("version-ten-task");
+    const event = (await storages.calendarEventStorage.getAllEvents())[0];
+
+    assert.equal((await readIndexedDbSnapshot(indexedDB, databaseName)).version, 11);
+    assert.equal(task?.title, "Existing task");
+    assert.equal(task?.color, "neutral");
+    assert.equal(event?.title, "Existing event");
+    assert.equal(event?.color, "neutral");
+    assert.equal(event?.recurrence, null);
   });
 
   it("persists edits, breakdown relationships, removal, and restoration", async () => {
@@ -658,8 +727,10 @@ describe("IndexedDB calendar event storage", () => {
       endTime: null,
       durationMinutes: 30,
       notes: null,
+      color: "neutral",
       reminders: [],
       reminderOffsets: [],
+      recurrence: null,
       createdAt: "2026-08-06T15:00:00.000Z",
       updatedAt: "2026-08-06T15:00:00.000Z"
     };
@@ -1052,7 +1123,7 @@ type IndexedDbSnapshot = {
 function createPreviousVersionDatabase(
   indexedDB: IDBFactory,
   databaseName: string,
-  version: 8 | 9,
+  version: 8 | 9 | 10,
   records: Omit<IndexedDbSnapshot, "version">
 ): Promise<void> {
   return new Promise((resolve, reject) => {

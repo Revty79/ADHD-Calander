@@ -501,6 +501,7 @@ describe("settings and reminder foundation", () => {
       title: "Keep local time",
       description: null,
       importance: "normal",
+      color: "neutral",
       status: "not_started",
       parentTaskId: null,
       scheduledDate: null,

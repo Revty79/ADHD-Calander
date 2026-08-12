@@ -4,6 +4,8 @@ export type CalendarEventValidationField =
   | "startTime"
   | "endTime"
   | "durationMinutes"
+  | "color"
+  | "recurrence"
   | "reminders"
   | "reminderOffsets";
 
@@ -24,5 +26,12 @@ export class CalendarEventPersistenceError extends Error {
     super(message);
     this.name = "CalendarEventPersistenceError";
     this.cause = cause;
+  }
+}
+
+export class CalendarEventNotFoundError extends Error {
+  constructor(message = "Calendar event was not found.") {
+    super(message);
+    this.name = "CalendarEventNotFoundError";
   }
 }

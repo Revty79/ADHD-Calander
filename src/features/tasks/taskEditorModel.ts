@@ -1,5 +1,6 @@
 import { Reminder, ReminderPermissionStatus } from "../../types/reminder";
 import { CreateTaskInput, TaskImportance, TaskPlanningState } from "../../types/task";
+import { ItemColor } from "../../types/itemColor";
 import { TaskValidationError } from "../../database/repositories/errors";
 import { getReminderDeliveryMessage } from "../reminders/reminderEditorModel";
 
@@ -21,6 +22,7 @@ export type TaskEditorDraft = {
   title: string;
   description: string;
   importance: TaskImportance;
+  color?: ItemColor;
   planningState: TaskPlanningState;
   scheduledDate: string;
   scheduledTime: string;
@@ -50,6 +52,7 @@ export function buildTaskEditorInput(draft: TaskEditorDraft): CreateTaskInput {
     title: draft.title,
     description: draft.description,
     importance: draft.importance,
+    color: draft.color ?? "neutral",
     scheduledDate: draft.planningState === "flexible" ? null : draft.scheduledDate,
     scheduledTime: draft.planningState === "scheduled" ? draft.scheduledTime : null,
     preferredTime: draft.planningState === "planned" ? draft.preferredTime : null,

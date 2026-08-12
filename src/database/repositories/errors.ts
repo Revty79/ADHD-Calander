@@ -1,6 +1,7 @@
 export type TaskValidationField =
   | "title"
   | "importance"
+  | "color"
   | "scheduledDate"
   | "scheduledTime"
   | "preferredTime"

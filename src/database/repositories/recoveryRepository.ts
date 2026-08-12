@@ -462,6 +462,7 @@ function createUnscheduledTask(
     title,
     description: null,
     importance: "normal",
+    color: "neutral",
     status: "not_started",
     parentTaskId,
     scheduledDate: null,

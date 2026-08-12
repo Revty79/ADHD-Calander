@@ -57,6 +57,7 @@ Android and future iOS builds use Expo SQLite with versioned SQL migrations.
 | `title`                      | text    | Required trimmed title.                                                                                                   |
 | `description`                | text    | Optional trimmed description.                                                                                             |
 | `importance`                 | text    | `low`, `normal`, or `important`; legacy rows default to `normal`.                                                         |
+| `color`                      | text    | Shared visual-aid key; version 11 defaults existing rows to `neutral`.                                                    |
 | `status`                     | text    | Implemented values are `not_started`, `started`, `completed`, `delegated`, `removed`, and `broken_down`.                  |
 | `parent_task_id`             | text    | Optional self-reference for a smaller task created by breakdown.                                                          |
 | `scheduled_date`             | text    | Optional local `YYYY-MM-DD` date.                                                                                         |
@@ -99,25 +100,44 @@ need to rewrite rows only to recognize planned states: `partially_completed`,
 
 ### `calendar_events`
 
-| Column                    | Type    | Notes                                                             |
-| ------------------------- | ------- | ----------------------------------------------------------------- |
-| `id`                      | text    | Unique event ID.                                                  |
-| `title`                   | text    | Required trimmed title.                                           |
-| `kind`                    | text    | Currently constrained to `fixed`.                                 |
-| `date`                    | text    | Required local `YYYY-MM-DD` date.                                 |
-| `start_time`              | text    | Required local `HH:MM` start.                                     |
-| `end_time`                | text    | Optional local end time, not earlier than start.                  |
-| `duration_minutes`        | integer | Optional positive duration used instead of `end_time`.            |
-| `notes`                   | text    | Optional trimmed notes.                                           |
-| `reminder_offset_minutes` | integer | Legacy single-reminder column retained for upgrade compatibility. |
-| `reminder_offsets`        | text    | Legacy-compatible JSON projection of relative reminder offsets.   |
-| `reminders`               | text    | Nullable authoritative JSON array of up to five reminders.        |
-| `created_at`              | text    | ISO timestamp.                                                    |
-| `updated_at`              | text    | ISO timestamp.                                                    |
+| Column                    | Type    | Notes                                                                  |
+| ------------------------- | ------- | ---------------------------------------------------------------------- |
+| `id`                      | text    | Unique event ID.                                                       |
+| `title`                   | text    | Required trimmed title.                                                |
+| `kind`                    | text    | Currently constrained to `fixed`.                                      |
+| `date`                    | text    | Required local `YYYY-MM-DD` date.                                      |
+| `start_time`              | text    | Required local `HH:MM` start.                                          |
+| `end_time`                | text    | Optional local end time, not earlier than start.                       |
+| `duration_minutes`        | integer | Optional positive duration used instead of `end_time`.                 |
+| `notes`                   | text    | Optional trimmed notes.                                                |
+| `color`                   | text    | Shared visual-aid key; version 11 defaults existing rows to `neutral`. |
+| `reminder_offset_minutes` | integer | Legacy single-reminder column retained for upgrade compatibility.      |
+| `reminder_offsets`        | text    | Legacy-compatible JSON projection of relative reminder offsets.        |
+| `reminders`               | text    | Nullable authoritative JSON array of up to five reminders.             |
+| `recurrence_rule`         | text    | Nullable JSON recurrence rule. `NULL` means a normal event.            |
+| `created_at`              | text    | ISO timestamp.                                                         |
+| `updated_at`              | text    | ISO timestamp.                                                         |
 
 An event may have an end time or a duration, but not both. Both may be omitted
 when the duration is unknown. Calendar workload summaries count only known
 minutes and never infer availability or overload.
+
+### `calendar_event_exceptions`
+
+| Column          | Type | Notes                                                                             |
+| --------------- | ---- | --------------------------------------------------------------------------------- |
+| `id`            | text | Stable `series ID + original local date` identity.                                |
+| `series_id`     | text | Parent `calendar_events.id`, deleted with the series.                             |
+| `original_date` | text | Local date generated by the parent rule before any move.                          |
+| `status`        | text | `modified` or `cancelled`.                                                        |
+| `overrides`     | text | Sparse JSON overrides for title, date/time, duration, notes, color, or reminders. |
+| `created_at`    | text | ISO timestamp.                                                                    |
+| `updated_at`    | text | ISO timestamp.                                                                    |
+
+One exception is allowed per series and original date. Occurrences are derived
+for a bounded range and are not pre-generated as event rows. A modified
+occurrence keeps the original recurrence identity even when its visible date is
+moved.
 
 ### `recovery_sessions`
 
@@ -261,13 +281,24 @@ No migration is required. Recap derives its view from the existing nullable
 `tasks.completed_at`, calendar-event, and Recovery session/item records. It
 does not persist duplicate daily summary rows.
 
+### Calendar Color And Recurrence Migration
+
+SQLite migration 11 adds `tasks.color`, `calendar_events.color`, nullable
+`calendar_events.recurrence_rule`, and `calendar_event_exceptions`. Existing
+tasks and events receive `neutral`; existing events remain non-recurring. The
+migration is additive and does not rewrite or delete Tasks, Events, Recovery,
+Recap source records, Settings, reminders, completion history, or scheduling
+data. Migrations 8, 9, and 10 remain unchanged and forward-only.
+
 ## Web Persistence
 
-The web build uses IndexedDB database version 10. It has:
+The web build uses IndexedDB database version 11. It has:
 
 - `tasks`, keyed by task ID with `scheduledDate`, `updatedAt`, and `parentTaskId`
   indexes.
 - `calendarEvents`, keyed by event ID with `date` and `updatedAt` indexes.
+- `calendarEventExceptions`, keyed by exception ID with `seriesId` and
+  `originalDate` indexes.
 - `recoverySessions`, keyed by session ID with `status` and `completedAt` indexes.
 - `recoveryItems`, keyed by item ID with `sessionId` and `status` indexes.
 - `appSettings`, keyed by setting key.
@@ -291,7 +322,10 @@ next ordinary domain write. Version 10 advances storage without rewriting
 records. Missing `reminders` and `originalReminders` fields fall back to the
 version 7 relative-offset arrays; ordinary writes add the authoritative shared
 reminder shape. Existing version 8 and 9 databases therefore open forward and
-retain all records. Older task records without
+retain all records. Version 11 adds the exception store without rewriting
+existing records. Readers default missing task/event colors to `neutral` and a
+missing event recurrence to `null`, so version 10 databases retain every record
+while opening forward. Older task records without
 `estimatedDurationMinutes` deserialize with a `null` estimate, and records
 without `deadlineDate` receive a `null` deadline. Older task records without
 `importance` receive `normal`, records without `parentTaskId` receive `null`,
@@ -306,8 +340,7 @@ native data are intentionally separate.
 
 ## Deferred Data Work
 
-Recurring events, event editing/deletion, time zones,
-all-day events, external calendar identifiers, advanced notification policy,
+Time zones, all-day events, external calendar identifiers, advanced notification policy,
 quiet hours, default reminders, arbitrary relative reminder offsets, day plans,
 recovery analytics, multi-level projects, partial-progress measurement,
 earliest-start constraints, recurring preferred work periods, soft scheduler

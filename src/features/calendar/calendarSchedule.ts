@@ -1,10 +1,10 @@
-import { CalendarEvent } from "../../types/calendarEvent";
+import { CalendarEventOccurrence } from "../../types/calendarEvent";
 import { LocalDateString, LocalTimeString } from "../../types/dateTime";
 import { isTaskResolved, Task } from "../../types/task";
 
 export type CalendarDaySchedule = {
   date: LocalDateString;
-  fixedEvents: CalendarEvent[];
+  fixedEvents: CalendarEventOccurrence[];
   plannedTasks: Task[];
   flexibleTasks: Task[];
   completedTaskCount: number;
@@ -14,7 +14,7 @@ export type CalendarDaySchedule = {
 export function buildCalendarSchedule(
   startDate: LocalDateString,
   endDate: LocalDateString,
-  events: CalendarEvent[],
+  events: CalendarEventOccurrence[],
   tasks: Task[]
 ): Map<LocalDateString, CalendarDaySchedule> {
   const schedule = new Map<LocalDateString, CalendarDaySchedule>();
@@ -74,7 +74,9 @@ export function createEmptyDay(date: LocalDateString): CalendarDaySchedule {
   };
 }
 
-export function getEventDurationMinutes(event: CalendarEvent): number {
+export function getEventDurationMinutes(
+  event: Pick<CalendarEventOccurrence, "durationMinutes" | "endTime" | "startTime">
+): number {
   if (event.durationMinutes !== null) {
     return event.durationMinutes;
   }

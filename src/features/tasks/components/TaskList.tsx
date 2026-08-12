@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { formatReminders } from "../../../notifications/reminderRules";
 import { isTaskActive, Task } from "../../../types/task";
+import { getItemColorOption } from "../../../types/itemColor";
 import {
   formatLocalDateForDisplay,
   formatLocalTimeForDisplay
@@ -49,7 +50,16 @@ export function TaskList({
       ) : (
         <View style={styles.list}>
           {tasks.map((task) => (
-            <View key={task.id} style={styles.taskCard}>
+            <View
+              key={task.id}
+              style={[
+                styles.taskCard,
+                {
+                  backgroundColor: getItemColorOption(task.color).backgroundColor,
+                  borderLeftColor: getItemColorOption(task.color).borderColor
+                }
+              ]}
+            >
               <View style={styles.taskContent}>
                 <Link
                   accessibilityLabel={`Open ${task.title}`}
@@ -195,6 +205,7 @@ const styles = StyleSheet.create({
   emptyState: {
     backgroundColor: "#ffffff",
     borderColor: "#ded9cf",
+    borderLeftWidth: 5,
     borderRadius: 8,
     borderWidth: 1,
     padding: 16

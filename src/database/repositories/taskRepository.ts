@@ -8,6 +8,7 @@ import {
   TaskImportance,
   UpdateTaskInput
 } from "../../types/task";
+import { isItemColor } from "../../types/itemColor";
 import {
   getReminderDate,
   getReminderTriggerDate
@@ -40,6 +41,7 @@ type NormalizedTaskInput = Pick<
   | "title"
   | "description"
   | "importance"
+  | "color"
   | "scheduledDate"
   | "scheduledTime"
   | "preferredTime"
@@ -69,6 +71,7 @@ export class TaskRepository {
       title: normalizedInput.title,
       description: normalizedInput.description,
       importance: normalizedInput.importance,
+      color: normalizedInput.color,
       status: "not_started",
       parentTaskId: null,
       scheduledDate: normalizedInput.scheduledDate,
@@ -272,6 +275,7 @@ export class TaskRepository {
         title,
         description: null,
         importance: "normal",
+        color: parentTask.color,
         status: "not_started",
         parentTaskId: parentTask.id,
         scheduledDate: null,
@@ -556,6 +560,12 @@ function normalizeTaskInput(
     throw new TaskValidationError("Choose an available importance.", "importance");
   }
 
+  const color = input.color ?? "neutral";
+
+  if (!isItemColor(color)) {
+    throw new TaskValidationError("Choose an available color.", "color");
+  }
+
   const rawScheduledDate = input.scheduledDate?.trim() ?? "";
   const scheduledDate = rawScheduledDate
     ? normalizeLocalDateInput(rawScheduledDate)
@@ -694,6 +704,7 @@ function normalizeTaskInput(
     title,
     description,
     importance,
+    color,
     scheduledDate,
     scheduledTime,
     preferredTime,

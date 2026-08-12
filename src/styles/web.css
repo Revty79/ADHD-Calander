@@ -979,6 +979,78 @@ summary:focus-visible {
   font-weight: 800;
 }
 
+.web-choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.web-choice-grid label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 9px 13px;
+  color: #4a4742;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid #aaa39a;
+  border-radius: 8px;
+}
+
+.web-choice-grid input {
+  margin-right: 7px;
+}
+
+.web-choice-grid label:has(input:checked) {
+  color: #244b4f;
+  background: #edf4f2;
+  border-color: #2f5d62;
+  box-shadow: inset 0 0 0 1px #2f5d62;
+}
+
+.web-recurrence-advanced {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  background: #f1f0eb;
+  border: 1px solid #d5d0c7;
+  border-radius: 10px;
+}
+
+.web-recurrence-advanced h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.web-inline-field {
+  display: grid;
+  gap: 7px;
+  color: #34312d;
+  font-weight: 800;
+}
+
+.web-scope-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.web-scope-grid button {
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+  min-height: 68px;
+  text-align: left;
+}
+
+.web-scope-grid span {
+  color: #68645e;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
 .web-choice-fieldset > small,
 .web-form-group > small {
   color: #706b64;

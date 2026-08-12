@@ -6,6 +6,8 @@ import { useTodayPlan } from "../../src/features/today/hooks/useTodayPlan";
 import { formatReminders } from "../../src/notifications/reminderRules";
 import { isTaskActive, isTaskCompleted } from "../../src/types/task";
 import { formatLocalDateForDisplay, getLocalDateString } from "../../src/utils/dates";
+import { getItemColorOption } from "../../src/types/itemColor";
+import { formatRecurrence } from "../../src/features/calendar/recurrenceRules";
 
 export default function WebTodayScreen() {
   const today = useMemo(() => getLocalDateString(), []);
@@ -91,7 +93,13 @@ export default function WebTodayScreen() {
               ) : (
                 <ul className="web-fixed-event-list">
                   {fixedEvents.map((event) => (
-                    <li key={event.id}>
+                    <li
+                      key={event.id}
+                      style={{
+                        backgroundColor: getItemColorOption(event.color).backgroundColor,
+                        borderLeftColor: getItemColorOption(event.color).borderColor
+                      }}
+                    >
                       <time dateTime={event.startTime}>
                         {event.startTime}
                         {event.endTime ? `–${event.endTime}` : ""}
@@ -99,9 +107,23 @@ export default function WebTodayScreen() {
                       <div>
                         <strong>{event.title}</strong>
                         <span>Fixed</span>
+                        {event.isRecurring ? (
+                          <span>{formatRecurrence(event.recurrence)}</span>
+                        ) : null}
                         {event.reminders.length > 0 ? (
                           <span>Reminders: {formatReminders(event.reminders)}</span>
                         ) : null}
+                        <Link
+                          href={{
+                            pathname: "/events/[id]/edit",
+                            params: {
+                              id: event.seriesId,
+                              originalDate: event.originalDate
+                            }
+                          }}
+                        >
+                          Edit event
+                        </Link>
                       </div>
                     </li>
                   ))}
